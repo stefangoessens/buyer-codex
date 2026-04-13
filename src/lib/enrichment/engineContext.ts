@@ -6,9 +6,11 @@ import type {
 import type {
   ListingAgentProfile,
   NeighborhoodContext,
+  PropertyMarketContext,
   PortalEstimate,
   RecentComparableSale,
 } from "./types";
+import { pickResolvedMarketContext } from "./marketContext";
 
 export interface EngineContextPropertyInput {
   propertyId: string;
@@ -27,6 +29,8 @@ export interface EngineContextPropertyInput {
   waterfrontType?: string;
   pool?: boolean;
   hoaFee?: number;
+  buildingName?: string;
+  neighborhood?: string;
   subdivision?: string;
   schoolDistrict?: string;
   garageSpaces?: number;
@@ -61,10 +65,13 @@ export function pickNeighborhoodContext(
 export function buildPricingInputFromEnrichment(args: {
   property: EngineContextPropertyInput;
   estimates: PortalEstimate[];
-  contexts: NeighborhoodContext[];
+  marketContext?: PropertyMarketContext | null;
+  contexts?: NeighborhoodContext[];
   recentSales?: RecentComparableSale[];
 }): PricingInput {
-  const neighborhood = pickNeighborhoodContext(args.contexts, 90);
+  const neighborhood =
+    pickResolvedMarketContext(args.marketContext, 90)?.selectedContext ??
+    pickNeighborhoodContext(args.contexts ?? [], 90);
   const latestEstimates = latestPortalEstimates(args.estimates);
 
   return {
@@ -90,15 +97,19 @@ export function buildPricingInputFromEnrichment(args: {
 
 export function buildLeverageInputFromEnrichment(args: {
   property: EngineContextPropertyInput;
-  contexts: NeighborhoodContext[];
+  marketContext?: PropertyMarketContext | null;
+  contexts?: NeighborhoodContext[];
   listingAgent: ListingAgentProfile | null;
   recentSales?: RecentComparableSale[];
 }): LeverageInput {
-  const neighborhood = pickNeighborhoodContext(args.contexts, 30)
-    ?? pickNeighborhoodContext(args.contexts, 90);
-  const neighborhoodMedianSaleToListRatio = computeMedianSaleToListRatio(
-    args.recentSales ?? [],
-  );
+  const neighborhood =
+    pickResolvedMarketContext(args.marketContext, 30)?.selectedContext ??
+    pickResolvedMarketContext(args.marketContext, 90)?.selectedContext ??
+    pickNeighborhoodContext(args.contexts ?? [], 30) ??
+    pickNeighborhoodContext(args.contexts ?? [], 90);
+  const neighborhoodMedianSaleToListRatio =
+    neighborhood?.medianSaleToListRatio ??
+    computeMedianSaleToListRatio(args.recentSales ?? []);
 
   return {
     propertyId: args.property.propertyId,
@@ -112,6 +123,8 @@ export function buildLeverageInputFromEnrichment(args: {
     neighborhoodInventoryCount: neighborhood?.inventoryCount,
     neighborhoodMarketTrajectory: neighborhood?.trajectory,
     neighborhoodMedianSaleToListRatio,
+    neighborhoodMedianPriceCutFrequency: neighborhood?.priceReductionFrequency,
+    neighborhoodMedianReductionPct: neighborhood?.medianReductionPct,
     sqft: args.property.sqftLiving ?? 0,
     wasRelisted: args.property.wasRelisted,
     wasWithdrawn: args.property.wasWithdrawn,

@@ -2525,14 +2525,24 @@ export default defineSchema({
   neighborhoodMarketContext: defineTable({
     geoKey: v.string(),
     geoKind: v.union(
-      v.literal("zip"),
+      v.literal("building"),
       v.literal("subdivision"),
+      v.literal("neighborhood"),
+      v.literal("school_zone"),
+      v.literal("zip"),
+      v.literal("broader_area"),
       v.literal("city"),
     ),
     windowDays: v.number(),
+    avgPricePerSqft: v.optional(v.number()),
     medianDom: v.optional(v.number()),
     medianPricePerSqft: v.optional(v.number()),
     medianListPrice: v.optional(v.number()),
+    avgSaleToListRatio: v.optional(v.number()),
+    medianSaleToListRatio: v.optional(v.number()),
+    priceReductionFrequency: v.optional(v.number()),
+    avgReductionPct: v.optional(v.number()),
+    medianReductionPct: v.optional(v.number()),
     inventoryCount: v.optional(v.number()),
     pendingCount: v.optional(v.number()),
     salesVelocity: v.optional(v.number()),
@@ -2543,9 +2553,19 @@ export default defineSchema({
       source: v.string(),
       fetchedAt: v.string(),
     }),
+    sampleSize: v.object({
+      total: v.number(),
+      sold: v.number(),
+      active: v.number(),
+      pending: v.number(),
+      pricePerSqft: v.number(),
+      dom: v.number(),
+      saleToList: v.number(),
+      reduction: v.number(),
+    }),
     lastRefreshedAt: v.string(),
   })
-    .index("by_geoKey_and_windowDays", ["geoKey", "windowDays"])
+    .index("by_geoKind_and_geoKey_and_windowDays", ["geoKind", "geoKey", "windowDays"])
     .index("by_lastRefreshedAt", ["lastRefreshedAt"]),
 
   // Per-portal property estimates captured as distinct values. The
@@ -2607,6 +2627,9 @@ export default defineSchema({
       ),
     ),
     dom: v.optional(v.number()),
+    reductionCount: v.optional(v.number()),
+    totalReductionAmount: v.optional(v.number()),
+    totalReductionPct: v.optional(v.number()),
     provenance: v.object({
       source: v.string(),
       fetchedAt: v.string(),

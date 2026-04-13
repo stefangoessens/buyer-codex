@@ -274,7 +274,15 @@ function requireGeoKind(
   key: string,
 ): GeoKind {
   const value = ctx[key];
-  if (value === "zip" || value === "subdivision" || value === "city") {
+  if (
+    value === "building" ||
+    value === "subdivision" ||
+    value === "neighborhood" ||
+    value === "school_zone" ||
+    value === "zip" ||
+    value === "broader_area" ||
+    value === "city"
+  ) {
     return value;
   }
   throw parseError(job, `Missing context.${key} (expected GeoKind)`);

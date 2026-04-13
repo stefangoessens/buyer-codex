@@ -25,7 +25,10 @@ export interface EnrichmentPropertyInput {
   listingAgentName?: string;
   listingBrokerage?: string;
   listingAgentPhone?: string;
+  buildingName?: string;
   subdivision?: string;
+  neighborhood?: string;
+  schoolDistrict?: string;
 }
 
 export interface CrossPortalIdInput {
@@ -169,10 +172,17 @@ export function buildNeighborhoodRequests(
 ): NeighborhoodMarketRequest[] {
   const requests: NeighborhoodMarketRequest[] = [];
   const seen = new Set<string>();
-  const candidates: Array<{ geoKey?: string; geoKind: NeighborhoodMarketRequest["geoKind"] }> = [
-    { geoKey: property.address.zip, geoKind: "zip" },
+  const broaderArea = property.address.city?.trim() || undefined;
+  const candidates: Array<{
+    geoKey?: string;
+    geoKind: NeighborhoodMarketRequest["geoKind"];
+  }> = [
+    { geoKey: property.buildingName, geoKind: "building" },
     { geoKey: property.subdivision, geoKind: "subdivision" },
-    { geoKey: property.address.city, geoKind: "city" },
+    { geoKey: property.neighborhood, geoKind: "neighborhood" },
+    { geoKey: property.schoolDistrict, geoKind: "school_zone" },
+    { geoKey: property.address.zip, geoKind: "zip" },
+    { geoKey: broaderArea, geoKind: "broader_area" },
   ];
 
   for (const candidate of candidates) {

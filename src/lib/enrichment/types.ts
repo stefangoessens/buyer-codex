@@ -184,24 +184,50 @@ export interface AgentObservation {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Neighborhood market context
+// Market context
 // ───────────────────────────────────────────────────────────────────────────
 
-export type GeoKind = "zip" | "subdivision" | "city";
+export type GeoKind =
+  | "building"
+  | "subdivision"
+  | "neighborhood"
+  | "school_zone"
+  | "zip"
+  | "broader_area"
+  // Legacy alias for older rows that used `city` as the broad fallback.
+  | "city";
 
 export type MarketTrajectory = "rising" | "flat" | "falling";
+
+export interface NeighborhoodContextSampleSize {
+  total: number;
+  sold: number;
+  active: number;
+  pending: number;
+  pricePerSqft: number;
+  dom: number;
+  saleToList: number;
+  reduction: number;
+}
 
 export interface NeighborhoodContext {
   geoKey: string;
   geoKind: GeoKind;
   windowDays: number;
+  avgPricePerSqft?: number;
   medianDom?: number;
   medianPricePerSqft?: number;
   medianListPrice?: number;
+  avgSaleToListRatio?: number;
+  medianSaleToListRatio?: number;
+  priceReductionFrequency?: number;
+  avgReductionPct?: number;
+  medianReductionPct?: number;
   inventoryCount?: number;
   pendingCount?: number;
   salesVelocity?: number;
   trajectory?: MarketTrajectory;
+  sampleSize: NeighborhoodContextSampleSize;
   provenance: FieldProvenance;
   lastRefreshedAt: string;
 }
@@ -213,7 +239,49 @@ export interface NeighborhoodSale {
   listPrice?: number;
   sqft?: number;
   dom?: number;
+  reductionCount?: number;
+  totalReductionAmount?: number;
+  totalReductionPct?: number;
+  priceReductions?: Array<{ amount: number; date: string }>;
   status: "sold" | "pending" | "active";
+}
+
+export interface MarketContextSubject {
+  propertyId: string;
+  buildingName?: string;
+  subdivision?: string;
+  neighborhood?: string;
+  schoolDistrict?: string;
+  zip?: string;
+  broaderArea?: string;
+}
+
+export type MarketContextDowngradeReasonCode =
+  | "missing_geo_key"
+  | "missing_baseline"
+  | "insufficient_sold_sample";
+
+export interface MarketContextDowngradeReason {
+  code: MarketContextDowngradeReasonCode;
+  geoKind: GeoKind;
+  geoKey?: string;
+  message: string;
+}
+
+export interface ResolvedMarketContext {
+  windowDays: number;
+  selectedContext: NeighborhoodContext | null;
+  selectedGeoKind?: GeoKind;
+  selectedGeoKey?: string;
+  downgradeReasons: MarketContextDowngradeReason[];
+  confidence: number;
+}
+
+export interface PropertyMarketContext {
+  propertyId: string;
+  baselines: NeighborhoodContext[];
+  windows: ResolvedMarketContext[];
+  generatedAt: string;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -274,6 +342,9 @@ export interface RecentComparableSale {
   garageSpaces?: number;
   condition?: "renovated" | "original" | "unknown";
   dom?: number;
+  reductionCount?: number;
+  totalReductionAmount?: number;
+  totalReductionPct?: number;
   provenance: FieldProvenance;
   capturedAt: string;
 }

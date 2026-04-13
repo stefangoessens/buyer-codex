@@ -61,6 +61,7 @@ describe("detectPriceReductions", () => {
         { amount: 10000, date: "2026-01-01" },
         { amount: 5000, date: "2026-02-01" },
       ],
+      1 / 3,
       0.98,
     );
 
@@ -118,6 +119,8 @@ describe("analyzeLeverage", () => {
       neighborhoodInventoryCount: 12,
       neighborhoodMarketTrajectory: "falling",
       neighborhoodMedianSaleToListRatio: 0.98,
+      neighborhoodMedianPriceCutFrequency: 1 / 3,
+      neighborhoodMedianReductionPct: 2,
       priceReductions: [{ amount: 20000, date: "2026-02-01" }],
       wasRelisted: true,
       wasPendingFellThrough: true,
@@ -188,6 +191,8 @@ describe("analyzeLeverage", () => {
       neighborhoodInventoryCount: 8,
       neighborhoodMarketTrajectory: "rising",
       neighborhoodMedianSaleToListRatio: 0.985,
+      neighborhoodMedianPriceCutFrequency: 0.15,
+      neighborhoodMedianReductionPct: 1.2,
       listingAgentAvgDom: 18,
       listingAgentAvgSaleToList: 0.995,
       listingAgentPriceCutFrequency: 0.1,

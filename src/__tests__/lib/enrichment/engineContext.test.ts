@@ -5,6 +5,7 @@ import {
   buildPricingInputFromEnrichment,
   pickNeighborhoodContext,
 } from "@/lib/enrichment/engineContext";
+import { buildPropertyMarketContext } from "@/lib/enrichment/marketContext";
 
 const property = {
   propertyId: "p1",
@@ -35,6 +36,18 @@ const contexts = [
     pendingCount: 5,
     salesVelocity: 0.23,
     trajectory: "rising" as const,
+    priceReductionFrequency: 0.4,
+    medianReductionPct: 2.5,
+    sampleSize: {
+      total: 18,
+      sold: 7,
+      active: 12,
+      pending: 5,
+      pricePerSqft: 7,
+      dom: 7,
+      saleToList: 6,
+      reduction: 10,
+    },
     provenance: { source: "market://30", fetchedAt: "2026-04-12T12:00:00Z" },
     lastRefreshedAt: "2026-04-12T12:00:00Z",
   },
@@ -49,10 +62,32 @@ const contexts = [
     pendingCount: 6,
     salesVelocity: 0.17,
     trajectory: "flat" as const,
+    priceReductionFrequency: 0.28,
+    medianReductionPct: 1.8,
+    sampleSize: {
+      total: 24,
+      sold: 9,
+      active: 18,
+      pending: 6,
+      pricePerSqft: 9,
+      dom: 9,
+      saleToList: 8,
+      reduction: 16,
+    },
     provenance: { source: "market://90", fetchedAt: "2026-04-12T12:00:00Z" },
     lastRefreshedAt: "2026-04-12T12:00:00Z",
   },
 ];
+
+const marketContext = buildPropertyMarketContext({
+  baselines: contexts,
+  subject: {
+    propertyId: "p1",
+    zip: "33301",
+    broaderArea: "Fort Lauderdale",
+  },
+  generatedAt: "2026-04-12T12:00:00Z",
+});
 
 const estimates = [
   {
@@ -129,6 +164,7 @@ describe("enrichment/engineContext", () => {
     const input = buildPricingInputFromEnrichment({
       property,
       estimates,
+      marketContext,
       contexts,
       recentSales,
     });
@@ -143,6 +179,7 @@ describe("enrichment/engineContext", () => {
   it("builds leverage input from 30-day market context + listing-agent stats", () => {
     const input = buildLeverageInputFromEnrichment({
       property,
+      marketContext,
       contexts,
       listingAgent: {
         canonicalAgentId: "jane-smith::compass",
@@ -163,6 +200,8 @@ describe("enrichment/engineContext", () => {
     expect(input.neighborhoodInventoryCount).toBe(12);
     expect(input.neighborhoodMarketTrajectory).toBe("rising");
     expect(input.neighborhoodMedianSaleToListRatio).toBeCloseTo(0.9862, 4);
+    expect(input.neighborhoodMedianPriceCutFrequency).toBeCloseTo(0.4, 2);
+    expect(input.neighborhoodMedianReductionPct).toBeCloseTo(2.5, 2);
     expect(input.listingAgentAvgDom).toBe(46);
     expect(input.listingAgentAvgSaleToList).toBeCloseTo(0.972, 3);
     expect(input.listingAgentPriceCutFrequency).toBeCloseTo(0.35, 2);
