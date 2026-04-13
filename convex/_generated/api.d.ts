@@ -56,6 +56,7 @@ import type * as offerCockpit from "../offerCockpit.js";
 import type * as offerEligibility from "../offerEligibility.js";
 import type * as promptRegistry from "../promptRegistry.js";
 import type * as properties from "../properties.js";
+import type * as propertyDossiers from "../propertyDossiers.js";
 import type * as propertyMerge from "../propertyMerge.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as reconciliation from "../reconciliation.js";
@@ -123,6 +124,7 @@ declare const fullApi: ApiFromModules<{
   offerEligibility: typeof offerEligibility;
   promptRegistry: typeof promptRegistry;
   properties: typeof properties;
+  propertyDossiers: typeof propertyDossiers;
   propertyMerge: typeof propertyMerge;
   rateLimits: typeof rateLimits;
   reconciliation: typeof reconciliation;
