@@ -2,9 +2,9 @@
 
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Card, CardContent } from "@/components/ui/card";
+import { KPICard } from "@/components/product/KPICard";
+import { LoadingState } from "@/components/product/LoadingState";
 import { resolveBuyerDashboardState } from "@/lib/dashboard/deal-index-state";
-import { cn } from "@/lib/utils";
 import { DealRoomGrid } from "./DealRoomGrid";
 import { EmptyDashboardState } from "./EmptyDashboardState";
 import { OnboardingResumeCard } from "./OnboardingResumeCard";
@@ -35,31 +35,25 @@ export function BuyerDashboard({ now }: BuyerDashboardProps) {
       <PasteLinkCTA />
       <OnboardingResumeCard />
 
-      {state.kind !== "loading" && (
+      {state.kind === "loading" ? (
+        <LoadingState variant="metrics" count={1} />
+      ) : (
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {state.summaryBadges.map((badge) => (
-            <Card
+            <KPICard
               key={badge.kind}
-              className={cn(
-                "border-neutral-200 bg-white",
-                badge.tone === "primary" && "border-primary-200 bg-primary-50/40",
-                badge.tone === "warning" && "border-warning-200 bg-warning-50/60",
-              )}
-            >
-              <CardContent className="px-4 py-3">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
-                  {badge.label}
-                </p>
-                <p
-                  className={cn(
-                    "mt-1 text-lg font-semibold text-neutral-900",
-                    badge.isEmpty && "text-neutral-500",
-                  )}
-                >
-                  {badge.value}
-                </p>
-              </CardContent>
-            </Card>
+              label={badge.label}
+              value={badge.value}
+              density="compact"
+              tone={
+                badge.tone === "primary"
+                  ? "primary"
+                  : badge.tone === "warning"
+                    ? "warning"
+                    : "default"
+              }
+              description={badge.isEmpty ? "Waiting for your first signal." : undefined}
+            />
           ))}
         </section>
       )}
@@ -76,11 +70,7 @@ export function BuyerDashboard({ now }: BuyerDashboardProps) {
         </div>
 
         {state.kind === "loading" ? (
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-neutral-500">
-              Loading your searches…
-            </CardContent>
-          </Card>
+          <LoadingState variant="panel" />
         ) : state.kind === "empty" ? (
           <EmptyDashboardState />
         ) : (

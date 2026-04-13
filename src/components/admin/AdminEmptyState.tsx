@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { SurfaceState } from "@/components/product/SurfaceState";
 
 interface AdminEmptyStateProps {
   title: string;
@@ -17,8 +18,12 @@ export function AdminEmptyState({
   action,
 }: AdminEmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white px-8 py-12 text-center">
-      <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+    <SurfaceState
+      title={title}
+      description={description}
+      action={action}
+      className="bg-white"
+      icon={
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
@@ -34,12 +39,7 @@ export function AdminEmptyState({
           <path d="M3 10h18" />
           <path d="M9 14h6" />
         </svg>
-      </div>
-      <div className="text-base font-medium text-neutral-900">{title}</div>
-      {description ? (
-        <p className="mt-1 max-w-sm text-sm text-neutral-500">{description}</p>
-      ) : null}
-      {action ? <div className="mt-4">{action}</div> : null}
-    </div>
+      }
+    />
   );
 }
