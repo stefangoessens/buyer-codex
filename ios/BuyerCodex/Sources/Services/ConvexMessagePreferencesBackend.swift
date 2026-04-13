@@ -11,16 +11,16 @@ import Foundation
 final class ConvexMessagePreferencesBackend: MessagePreferencesBackend, @unchecked Sendable {
 
     private let baseURL: URL
-    private let tokenProvider: @Sendable () async -> String?
+    private let authSession: AuthSessionContext
     private let session: URLSession
 
     init(
         baseURL: URL = URL(string: "https://api.buyerv2.com")!,
-        tokenProvider: @escaping @Sendable () async -> String? = { nil },
+        authSession: AuthSessionContext = .unavailable,
         session: URLSession = .shared
     ) {
         self.baseURL = baseURL
-        self.tokenProvider = tokenProvider
+        self.authSession = authSession
         self.session = session
     }
 
@@ -65,27 +65,24 @@ final class ConvexMessagePreferencesBackend: MessagePreferencesBackend, @uncheck
     // MARK: - Private
 
     private func post<T: Encodable>(path: String, body: T) async throws -> Data {
-        guard let token = await tokenProvider(), !token.isEmpty else {
-            throw MessagePreferencesError.notAuthenticated
+        do {
+            return try await authorizedPOST(
+                baseURL: baseURL,
+                path: path,
+                body: body,
+                authSession: authSession,
+                session: session
+            )
+        } catch let error as AuthenticatedRequestError {
+            switch error {
+            case .notAuthenticated:
+                throw MessagePreferencesError.notAuthenticated
+            case .invalidResponse:
+                throw MessagePreferencesError.invalidResponse
+            case .httpError(let statusCode):
+                throw MessagePreferencesError.httpError(statusCode: statusCode)
+            }
         }
-
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(body)
-
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw MessagePreferencesError.invalidResponse
-        }
-        if http.statusCode == 401 || http.statusCode == 403 {
-            throw MessagePreferencesError.notAuthenticated
-        }
-        guard (200...299).contains(http.statusCode) else {
-            throw MessagePreferencesError.httpError(statusCode: http.statusCode)
-        }
-        return data
     }
 }
 

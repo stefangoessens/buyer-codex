@@ -1,7 +1,13 @@
 import Foundation
 import Security
 
-actor KeychainStore {
+protocol AuthTokenStore: Actor {
+    func save(key: String, data: Data) throws
+    func load(key: String) throws -> Data?
+    func delete(key: String) throws
+}
+
+actor KeychainStore: AuthTokenStore {
 
     private let service = "com.buyerv2.auth"
 

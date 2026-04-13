@@ -10,15 +10,36 @@ struct ContentView: View {
 
     let user: AuthUser
 
-    @State private var dealService = DealService()
-    @State private var tasksService = DealTasksService()
-    @State private var timelineService = DealTimelineService()
-    @State private var cacheCoordinator = DealCacheCoordinator()
-    @State private var preferencesService = MessagePreferencesService(
-        backend: ConvexMessagePreferencesBackend(
-            tokenProvider: { await AuthService.loadAccessToken() }
+    @State private var dealService: DealService
+    @State private var tasksService: DealTasksService
+    @State private var timelineService: DealTimelineService
+    @State private var cacheCoordinator: DealCacheCoordinator
+    @State private var preferencesService: MessagePreferencesService
+
+    init(user: AuthUser, authSession: AuthSessionContext) {
+        self.user = user
+        _dealService = State(
+            initialValue: DealService(
+                provider: ConvexDealProvider(authSession: authSession)
+            )
         )
-    )
+        _tasksService = State(
+            initialValue: DealTasksService(
+                backend: ConvexDealTasksBackend(authSession: authSession)
+            )
+        )
+        _timelineService = State(
+            initialValue: DealTimelineService(
+                backend: ConvexDealTimelineBackend(authSession: authSession)
+            )
+        )
+        _cacheCoordinator = State(initialValue: DealCacheCoordinator())
+        _preferencesService = State(
+            initialValue: MessagePreferencesService(
+                backend: ConvexMessagePreferencesBackend(authSession: authSession)
+            )
+        )
+    }
 
     var body: some View {
         DealTrackerShell(user: user)

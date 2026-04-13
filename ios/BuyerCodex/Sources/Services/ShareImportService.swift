@@ -155,47 +155,46 @@ enum ShareImportError: Error {
 
 final class ConvexShareImportBackend: ShareImportBackend, Sendable {
     private let baseURL: URL
-    private let tokenProvider: AccessTokenProvider
+    private let authSession: AuthSessionContext
+    private let session: URLSession
 
     init(
         baseURL: URL = URL(string: "https://api.buyerv2.com")!,
-        tokenProvider: @escaping AccessTokenProvider = { nil }
+        authSession: AuthSessionContext = .unavailable,
+        session: URLSession = .shared
     ) {
         self.baseURL = baseURL
-        self.tokenProvider = tokenProvider
+        self.authSession = authSession
+        self.session = session
     }
 
     func submitImport(
         url: String,
         portal: ShareImportPortal
     ) async throws -> ShareImportBackendResponse {
-        guard let accessToken = await tokenProvider() else {
-            throw ShareImportError.notAuthenticated
-        }
-
-        let endpoint = baseURL.appendingPathComponent("/share-import")
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-
         let body: [String: String] = [
             "url": url,
             "portal": portal.rawValue,
         ]
-        request.httpBody = try JSONEncoder().encode(body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw ShareImportError.invalidResponse
-        }
-        guard (200...299).contains(http.statusCode) else {
-            if http.statusCode == 401 {
+        do {
+            let data = try await authorizedPOST(
+                baseURL: baseURL,
+                path: "/share-import",
+                body: body,
+                authSession: authSession,
+                session: session
+            )
+            return try JSONDecoder().decode(ShareImportBackendResponse.self, from: data)
+        } catch let error as AuthenticatedRequestError {
+            switch error {
+            case .notAuthenticated:
                 throw ShareImportError.notAuthenticated
+            case .invalidResponse:
+                throw ShareImportError.invalidResponse
+            case .httpError(let statusCode):
+                throw ShareImportError.httpError(statusCode: statusCode)
             }
-            throw ShareImportError.httpError(statusCode: http.statusCode)
         }
-        return try JSONDecoder().decode(ShareImportBackendResponse.self, from: data)
     }
 }
 
@@ -223,15 +222,15 @@ final class ShareImportService {
     private(set) var state: ShareImportState = .idle
 
     private let backend: ShareImportBackend
-    private let authState: () -> AuthState
+    private let authSession: AuthSessionContext
     private var pendingUrl: String?
 
     init(
         backend: ShareImportBackend,
-        authState: @escaping () -> AuthState
+        authSession: AuthSessionContext
     ) {
         self.backend = backend
-        self.authState = authState
+        self.authSession = authSession
     }
 
     /// Entry point for an incoming share URL.
@@ -265,7 +264,7 @@ final class ShareImportService {
     // MARK: - Private
 
     private func attemptImport(url: String, portal: ShareImportPortal) async {
-        switch authState() {
+        switch await authSession.authState() {
         case .signedOut, .restoring:
             pendingUrl = url
             state = .signInRequired(pendingUrl: url)
@@ -290,7 +289,7 @@ final class ShareImportService {
             let outcome = try decodeOutcome(from: response)
             pendingUrl = nil
             state = .imported(outcome)
-        } catch let ShareImportError.notAuthenticated {
+        } catch ShareImportError.notAuthenticated {
             // Backend rejected our token — treat as session expired
             pendingUrl = url
             state = .sessionExpired(pendingUrl: url)

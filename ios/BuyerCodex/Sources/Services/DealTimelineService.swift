@@ -27,19 +27,28 @@ protocol DealTimelineBackend: Sendable {
 
 final class ConvexDealTimelineBackend: DealTimelineBackend, Sendable {
     private let baseURL: URL
+    private let authSession: AuthSessionContext
+    private let session: URLSession
 
-    init(baseURL: URL = URL(string: "https://api.buyerv2.com")!) {
+    init(
+        baseURL: URL = URL(string: "https://api.buyerv2.com")!,
+        authSession: AuthSessionContext = .unavailable,
+        session: URLSession = .shared
+    ) {
         self.baseURL = baseURL
+        self.authSession = authSession
+        self.session = session
     }
 
     func fetchEvents(dealRoomId: String) async throws -> [MilestoneEvent] {
-        let url = baseURL.appendingPathComponent("/timeline/list")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = ["dealRoomId": dealRoomId]
-        request.httpBody = try JSONEncoder().encode(body)
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let data = try await authorizedPOST(
+            baseURL: baseURL,
+            path: "/timeline/list",
+            body: body,
+            authSession: authSession,
+            session: session
+        )
         return try JSONDecoder().decode([MilestoneEvent].self, from: data)
     }
 }

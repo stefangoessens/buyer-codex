@@ -115,20 +115,32 @@ final class AuthService {
     }
 
     private let provider: AuthProvider
-    private let keychain = KeychainStore()
+    private let tokenStore: any AuthTokenStore
 
     private static let accessTokenKey = "authToken"
     private static let refreshTokenKey = "refreshToken"
 
-    init(provider: AuthProvider = ConvexAuthProvider()) {
+    init(
+        provider: AuthProvider = ConvexAuthProvider(),
+        tokenStore: any AuthTokenStore = KeychainStore()
+    ) {
         self.provider = provider
+        self.tokenStore = tokenStore
     }
 
     // MARK: - Public
 
+    var sessionContext: AuthSessionContext {
+        AuthSessionContext(
+            accessToken: { await self.currentAccessToken() },
+            authState: { await self.currentAuthState() },
+            handleExpiredSession: { await self.markSessionExpired() }
+        )
+    }
+
     func initialize() async {
         do {
-            guard let tokenData = try await keychain.load(key: Self.accessTokenKey),
+            guard let tokenData = try await tokenStore.load(key: Self.accessTokenKey),
                   let token = String(data: tokenData, encoding: .utf8)
             else {
                 state = .signedOut
@@ -154,37 +166,24 @@ final class AuthService {
     }
 
     func signOut() async {
-        try? await keychain.delete(key: Self.accessTokenKey)
-        try? await keychain.delete(key: Self.refreshTokenKey)
+        try? await tokenStore.delete(key: Self.accessTokenKey)
+        try? await tokenStore.delete(key: Self.refreshTokenKey)
         state = .signedOut
     }
 
     func handleTokenExpired() {
-        state = .expired
-    }
-
-    /// Async snapshot of the current access token from the keychain.
-    ///
-    /// Intended for authenticated backend adapters (like
-    /// `ConvexMessagePreferencesBackend`) that need a bearer token per
-    /// request without holding a reference to the live `AuthService`.
-    /// Deliberately uses a transient `KeychainStore` so callers can
-    /// read tokens from a non-MainActor context; the keychain itself
-    /// is the source of truth, not any in-memory cache.
-    static func loadAccessToken() async -> String? {
-        let keychain = KeychainStore()
-        guard let data = try? await keychain.load(key: Self.accessTokenKey),
-              let token = String(data: data, encoding: .utf8),
-              !token.isEmpty
-        else {
-            return nil
+        switch state {
+        case .signedIn, .restoring:
+            state = .expired
+        case .signedOut, .expired, .authUnavailable:
+            break
         }
-        return token
     }
 
     func restoreSession() async {
+        state = .restoring
         do {
-            guard let refreshData = try await keychain.load(key: Self.refreshTokenKey),
+            guard let refreshData = try await tokenStore.load(key: Self.refreshTokenKey),
                   let refreshToken = String(data: refreshData, encoding: .utf8)
             else {
                 throw AuthError.noRefreshToken
@@ -200,14 +199,32 @@ final class AuthService {
 
     // MARK: - Private
 
+    private func currentAccessToken() async -> String? {
+        guard let data = try? await tokenStore.load(key: Self.accessTokenKey),
+              let token = String(data: data, encoding: .utf8),
+              !token.isEmpty
+        else {
+            return nil
+        }
+        return token
+    }
+
+    private func currentAuthState() -> AuthState {
+        state
+    }
+
+    private func markSessionExpired() {
+        handleTokenExpired()
+    }
+
     private func storeTokens(_ tokens: AuthTokens) async throws {
         guard let accessData = tokens.accessToken.data(using: .utf8),
               let refreshData = tokens.refreshToken.data(using: .utf8)
         else {
             throw KeychainStore.KeychainError.encodingFailed
         }
-        try await keychain.save(key: Self.accessTokenKey, data: accessData)
-        try await keychain.save(key: Self.refreshTokenKey, data: refreshData)
+        try await tokenStore.save(key: Self.accessTokenKey, data: accessData)
+        try await tokenStore.save(key: Self.refreshTokenKey, data: refreshData)
     }
 
     private func isUnauthorized(_ error: Error) -> Bool {

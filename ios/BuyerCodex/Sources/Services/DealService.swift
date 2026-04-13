@@ -21,34 +21,29 @@ protocol DealProvider: Sendable {
 final class ConvexDealProvider: DealProvider, Sendable {
 
     private let baseURL: URL
+    private let authSession: AuthSessionContext
+    private let session: URLSession
 
-    init(baseURL: URL = URL(string: "https://api.buyerv2.com")!) {
+    init(
+        baseURL: URL = URL(string: "https://api.buyerv2.com")!,
+        authSession: AuthSessionContext = .unavailable,
+        session: URLSession = .shared
+    ) {
         self.baseURL = baseURL
+        self.authSession = authSession
+        self.session = session
     }
 
     func fetchDeals(for userId: String) async throws -> [DealSummary] {
-        let url = baseURL.appendingPathComponent("/deals/list")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
         let body: [String: String] = ["userId": userId]
-        request.httpBody = try JSONEncoder().encode(body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try validateHTTPResponse(response)
+        let data = try await authorizedPOST(
+            baseURL: baseURL,
+            path: "/deals/list",
+            body: body,
+            authSession: authSession,
+            session: session
+        )
         return try JSONDecoder().decode([DealSummary].self, from: data)
-    }
-
-    // MARK: - Private
-
-    private func validateHTTPResponse(_ response: URLResponse) throws {
-        guard let http = response as? HTTPURLResponse else {
-            throw DealServiceError.invalidResponse
-        }
-        guard (200...299).contains(http.statusCode) else {
-            throw DealServiceError.httpError(statusCode: http.statusCode)
-        }
     }
 }
 
