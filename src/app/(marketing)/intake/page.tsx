@@ -1,5 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import {
+  LINK_PASTED_SOURCES,
+  type LinkPastedSource,
+} from "@buyer-codex/shared/launch-events";
 import { BuyerOnboardingFlow } from "@/components/onboarding/BuyerOnboardingFlow";
 import {
   getExtensionIntakeViewModel,
@@ -12,10 +16,13 @@ import { metadataForStaticPage } from "@/lib/seo/pageDefinitions";
 
 export const metadata: Metadata = metadataForStaticPage("intake");
 
+const LINK_PASTED_SOURCE_SET = new Set<LinkPastedSource>(LINK_PASTED_SOURCES);
+
 interface IntakePageProps {
   searchParams: Promise<{
     url?: string;
     source?: string;
+    submittedAt?: string;
     result?: string;
     auth?: string;
     platform?: string;
@@ -34,8 +41,23 @@ function isExtensionAuthState(
   return value === "signed_in" || value === "signed_out";
 }
 
+function isLinkPastedSource(
+  value: string | undefined,
+): value is LinkPastedSource {
+  return value ? LINK_PASTED_SOURCE_SET.has(value as LinkPastedSource) : false;
+}
+
 export default async function IntakePage({ searchParams }: IntakePageProps) {
-  const { url, source, result, auth, platform, listingId, sourceListingId } =
+  const {
+    url,
+    source,
+    submittedAt,
+    result,
+    auth,
+    platform,
+    listingId,
+    sourceListingId,
+  } =
     await searchParams;
 
   if (!url) {
@@ -57,6 +79,11 @@ export default async function IntakePage({ searchParams }: IntakePageProps) {
   }
 
   const parsed = parseListingUrl(url);
+  const intakeSource = isLinkPastedSource(source) ? source : null;
+  const submittedAtMs =
+    typeof submittedAt === "string" && /^\d+$/.test(submittedAt)
+      ? Number(submittedAt)
+      : null;
 
   if (!parsed.success) {
     return (
@@ -109,6 +136,8 @@ export default async function IntakePage({ searchParams }: IntakePageProps) {
         portalLabel={portalLabel}
         summaryTitle={extensionViewModel?.title}
         summaryBody={extensionViewModel?.body}
+        intakeSource={intakeSource}
+        submittedAtMs={submittedAtMs}
         initialSourcePlatform={parsed.data.platform}
       />
     </main>

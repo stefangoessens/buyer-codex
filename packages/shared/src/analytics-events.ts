@@ -267,7 +267,7 @@ export interface AnalyticsEventContractRelease {
   changes: readonly string[];
 }
 
-export const CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION = "1.0.0" as const;
+export const CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION = "1.1.0" as const;
 export const CURRENT_ANALYTICS_EVENT_CONTRACT_DATE = "2026-04-13" as const;
 
 export const ANALYTICS_EVENT_CONTRACT_CHANGELOG = [
@@ -281,11 +281,48 @@ export const ANALYTICS_EVENT_CONTRACT_CHANGELOG = [
       "Added dashboard event coverage and promoted non-funnel analytics definitions into @buyer-codex/shared.",
       "Documented per-event source, when-fired rules, semantics, and PII posture in a serializable contract.",
       "Preserved typed event-call enforcement for web code while making the full catalog consumable by backend and iOS tooling.",
+      "Added the KIN-942 public paste-link funnel event taxonomy and stage metadata for homepage-to-agreement tracking.",
     ],
   },
 ] as const satisfies readonly AnalyticsEventContractRelease[];
 
 const launchEventMetadata = {
+  paste_submitted: {
+    category: "funnel",
+    source: "web.marketing.paste_link_cta",
+    whenFired:
+      "Buyer submits a supported listing URL from the homepage or another paste-link CTA.",
+    semantics:
+      "Represents the top-of-funnel paste action after the shared parser confirms the URL is a supported portal link.",
+    piiSafe: true,
+  },
+  parse_succeeded: {
+    category: "funnel",
+    source: "web.marketing.shared_parser",
+    whenFired:
+      "The shared listing parser successfully classifies and normalizes a submitted URL.",
+    semantics:
+      "Represents a typed parser success before the intake teaser and registration gate render.",
+    piiSafe: true,
+  },
+  teaser_rendered: {
+    category: "funnel",
+    source: "web.marketing.intake_teaser",
+    whenFired:
+      "The anonymous teaser / onboarding gate first renders after intake navigation completes.",
+    semantics:
+      "Represents the first buyer-visible listing context after a successful paste-link submission.",
+    piiSafe: true,
+  },
+  registration_prompted: {
+    category: "funnel",
+    source: "web.auth.registration_gate",
+    whenFired:
+      "The teaser surface prompts the buyer to create or resume an account.",
+    semantics:
+      "Represents the transition from anonymous teaser to the registration decision point.",
+    piiSafe: true,
+  },
   link_pasted: {
     category: "funnel",
     source: "web.marketing.intake",
@@ -318,6 +355,33 @@ const launchEventMetadata = {
     whenFired: "Buyer account creation succeeds and the app receives a user id.",
     semantics:
       "Represents a completed acquisition conversion from anonymous visitor to registered buyer.",
+    piiSafe: true,
+  },
+  deal_room_unlocked: {
+    category: "funnel",
+    source: "web.deal_room.first_view",
+    whenFired:
+      "The buyer lands on the first unlocked deal-room view after completing onboarding.",
+    semantics:
+      "Represents the first buyer-visible deal-room step in the paste-link conversion funnel.",
+    piiSafe: true,
+  },
+  agreement_prompted: {
+    category: "funnel",
+    source: "web.offer.eligibility_gate",
+    whenFired:
+      "The offer-entry gate prompts the buyer to review or sign their representation agreement.",
+    semantics:
+      "Represents the agreement-entry boundary in the paste-link conversion funnel.",
+    piiSafe: true,
+  },
+  agreement_signed: {
+    category: "funnel",
+    source: "backend.agreements",
+    whenFired:
+      "The agreement lifecycle reaches signed state for the buyer's deal room.",
+    semantics:
+      "Represents the agreement completion step that unlocks the next conversion workflow.",
     piiSafe: true,
   },
   deal_room_entered: {
@@ -428,10 +492,17 @@ export const ANALYTICS_EVENT_CONTRACT = {
   version: CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION,
   lastUpdated: CURRENT_ANALYTICS_EVENT_CONTRACT_DATE,
   events: {
+    paste_submitted: defineLaunchAnalyticsEvent("paste_submitted"),
+    parse_succeeded: defineLaunchAnalyticsEvent("parse_succeeded"),
+    teaser_rendered: defineLaunchAnalyticsEvent("teaser_rendered"),
+    registration_prompted: defineLaunchAnalyticsEvent("registration_prompted"),
     link_pasted: defineLaunchAnalyticsEvent("link_pasted"),
     teaser_viewed: defineLaunchAnalyticsEvent("teaser_viewed"),
     registration_started: defineLaunchAnalyticsEvent("registration_started"),
     registration_completed: defineLaunchAnalyticsEvent("registration_completed"),
+    deal_room_unlocked: defineLaunchAnalyticsEvent("deal_room_unlocked"),
+    agreement_prompted: defineLaunchAnalyticsEvent("agreement_prompted"),
+    agreement_signed: defineLaunchAnalyticsEvent("agreement_signed"),
     extension_intake_succeeded: {
       name: "extension_intake_succeeded",
       category: "funnel",

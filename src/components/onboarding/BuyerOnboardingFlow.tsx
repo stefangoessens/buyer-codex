@@ -1,5 +1,6 @@
 "use client";
 
+import type { LinkPastedSource } from "@buyer-codex/shared/launch-events";
 import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { useRouter } from "next/navigation";
@@ -10,6 +11,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { env, isConfigured } from "@/lib/env";
 import { buildListingIntakeHref } from "@/lib/intake/pasteLink";
+import {
+  trackRegistrationCompleted,
+  trackRegistrationPrompted,
+  trackTeaserRendered,
+} from "@/lib/intake/pasteLinkFunnel";
 import type { SourcePlatform } from "@/lib/intake/types";
 import { linkFirstPropertyReference } from "@/lib/onboarding/api";
 import {
@@ -22,12 +28,15 @@ import {
   type BuyerOnboardingValidationError,
 } from "@/lib/onboarding/state";
 import { useStoredBuyerOnboardingDraft } from "@/lib/onboarding/storage";
+import { identifyUser } from "@/lib/posthog";
 
 interface BuyerOnboardingFlowProps {
   listingUrl: string;
   portalLabel: string;
   summaryTitle?: string;
   summaryBody?: string;
+  intakeSource?: LinkPastedSource | null;
+  submittedAtMs?: number | null;
   initialSourcePlatform?: SourcePlatform | null;
 }
 
@@ -104,11 +113,144 @@ function EnsureCurrentBuyerEffect({
   return null;
 }
 
+function RegistrationCompletionEffect({
+  source,
+}: {
+  source: string;
+}) {
+  const { user, isLoaded } = useUser();
+  const trackedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+    if (trackedFor.current === user.id) return;
+
+    trackedFor.current = user.id;
+    identifyUser(user.id);
+    trackRegistrationCompleted({
+      userId: user.id,
+      source,
+    });
+  }, [isLoaded, source, user]);
+
+  return null;
+}
+
 export function BuyerOnboardingFlow({
+  ...props
+}: BuyerOnboardingFlowProps) {
+  const isClerkConfigured =
+    env.NEXT_PUBLIC_AUTH_PROVIDER === "clerk" && isConfigured.auth();
+
+  return isClerkConfigured ? (
+    <BuyerOnboardingFlowWithAuth {...props} />
+  ) : (
+    <BuyerOnboardingFlowAuthDisabled {...props} />
+  );
+}
+
+function BuyerOnboardingFlowAuthDisabled({
   listingUrl,
   portalLabel,
   summaryTitle,
   summaryBody,
+  intakeSource = null,
+  submittedAtMs = null,
+  initialSourcePlatform = null,
+}: BuyerOnboardingFlowProps) {
+  const teaserTracked = useRef(false);
+  const registrationPromptTracked = useRef(false);
+  const registrationSource = intakeSource ?? "hero";
+  const teaserSource = `${registrationSource}:intake_teaser`;
+
+  useEffect(() => {
+    if (teaserTracked.current) return;
+
+    teaserTracked.current = true;
+    trackTeaserRendered({
+      source: teaserSource,
+      platform: initialSourcePlatform ?? undefined,
+      latencyMs:
+        typeof submittedAtMs === "number"
+          ? Math.max(Date.now() - submittedAtMs, 0)
+          : undefined,
+    });
+  }, [initialSourcePlatform, submittedAtMs, teaserSource]);
+
+  useEffect(() => {
+    if (registrationPromptTracked.current) return;
+
+    registrationPromptTracked.current = true;
+    trackRegistrationPrompted(teaserSource);
+  }, [teaserSource]);
+
+  return (
+    <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-16">
+      <section className="space-y-3">
+        <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">
+          {portalLabel} intake
+        </p>
+        <h1 className="text-3xl font-semibold text-neutral-900">
+          {summaryTitle ??
+            `Create your buyer account to unlock this ${portalLabel} deal room.`}
+        </h1>
+        <p className="max-w-2xl text-sm leading-6 text-neutral-600">
+          {summaryBody ??
+            `We captured the listing link. Register once, tell us your buyer basics, and we’ll open the first deal room with this property already attached.`}
+        </p>
+        <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-600">
+          <span className="font-medium text-neutral-900">Listing:</span>{" "}
+          <span className="break-all">{listingUrl}</span>
+        </div>
+      </section>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        {STEP_LABELS.map((step, index) => (
+          <div
+            key={step.key}
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              step.key === "account"
+                ? "border-primary-300 bg-primary-50"
+                : "border-neutral-200 bg-white"
+            }`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              Step {index + 1}
+            </p>
+            <p className="mt-1 font-medium text-neutral-900">{step.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <Card className="border-neutral-200 bg-white shadow-sm">
+        <CardContent className="space-y-4 p-6">
+          <div>
+            <h2 className="text-xl font-semibold text-neutral-900">
+              Step 1: Create your account
+            </h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              Auth is disabled in this environment, so the live registration step
+              cannot complete here.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800">
+            Auth is not configured in this environment, so the registration step
+            cannot complete.
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function BuyerOnboardingFlowWithAuth({
+  listingUrl,
+  portalLabel,
+  summaryTitle,
+  summaryBody,
+  intakeSource = null,
+  submittedAtMs = null,
   initialSourcePlatform = null,
 }: BuyerOnboardingFlowProps) {
   const router = useRouter();
@@ -122,6 +264,8 @@ export function BuyerOnboardingFlow({
 
   const captureRequestedFor = useRef<string | null>(null);
   const prefilledFromProfile = useRef(false);
+  const teaserTracked = useRef(false);
+  const registrationPromptTracked = useRef(false);
 
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
@@ -130,6 +274,7 @@ export function BuyerOnboardingFlow({
   >([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const isClerkConfigured = true;
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -137,16 +282,18 @@ export function BuyerOnboardingFlow({
     setDraft((current) => {
       if (current?.listingUrl === listingUrl) {
         return mergeBuyerOnboardingDraft(current, {
+          intakeSource: current.intakeSource ?? intakeSource,
           sourcePlatform: current.sourcePlatform ?? initialSourcePlatform,
         });
       }
 
       return createBuyerOnboardingDraft({
         listingUrl,
+        intakeSource,
         sourcePlatform: initialSourcePlatform,
       });
     });
-  }, [initialSourcePlatform, isHydrated, listingUrl, setDraft]);
+  }, [initialSourcePlatform, intakeSource, isHydrated, listingUrl, setDraft]);
 
   useEffect(() => {
     if (!draft || draft.listingUrl !== listingUrl) return;
@@ -221,11 +368,41 @@ export function BuyerOnboardingFlow({
       ? draft
       : createBuyerOnboardingDraft({
           listingUrl,
+          intakeSource,
           sourcePlatform: initialSourcePlatform,
         });
 
-  const isClerkConfigured =
-    env.NEXT_PUBLIC_AUTH_PROVIDER === "clerk" && isConfigured.auth();
+  const registrationSource = activeDraft.intakeSource ?? intakeSource ?? "hero";
+  const teaserSource = `${registrationSource}:intake_teaser`;
+
+  useEffect(() => {
+    if (teaserTracked.current) return;
+
+    teaserTracked.current = true;
+    trackTeaserRendered({
+      source: teaserSource,
+      platform: activeDraft.sourcePlatform ?? initialSourcePlatform ?? undefined,
+      sourceListingId: activeDraft.sourceListingId ?? undefined,
+      latencyMs:
+        typeof submittedAtMs === "number"
+          ? Math.max(Date.now() - submittedAtMs, 0)
+          : undefined,
+    });
+  }, [
+    activeDraft.sourceListingId,
+    activeDraft.sourcePlatform,
+    initialSourcePlatform,
+    submittedAtMs,
+    teaserSource,
+  ]);
+
+  useEffect(() => {
+    if (registrationPromptTracked.current) return;
+    if (!isClerkConfigured || isAuthLoading || isAuthenticated) return;
+
+    registrationPromptTracked.current = true;
+    trackRegistrationPrompted(teaserSource);
+  }, [isAuthenticated, isAuthLoading, isClerkConfigured, teaserSource]);
 
   const handleDraftChange = (
     updater: (current: BuyerOnboardingDraft) => BuyerOnboardingDraft,
@@ -272,7 +449,7 @@ export function BuyerOnboardingFlow({
 
       if (result.status === "deal_room_ready") {
         clearDraft();
-        router.push("/dashboard");
+        router.push(`/dealroom/${result.dealRoomId}`);
         return;
       }
 
@@ -315,11 +492,12 @@ export function BuyerOnboardingFlow({
           {portalLabel} intake
         </p>
         <h1 className="text-3xl font-semibold text-neutral-900">
-          {summaryTitle ?? `Create your buyer account to keep this ${portalLabel} listing moving.`}
+          {summaryTitle ??
+            `Create your buyer account to unlock this ${portalLabel} deal room.`}
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-neutral-600">
           {summaryBody ??
-            `We captured the listing link. Register once, tell us your buyer basics, and we’ll carry that first property into your buyer dashboard.`}
+            `We captured the listing link. Register once, tell us your buyer basics, and we’ll open the first deal room with this property already attached.`}
         </p>
         <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-600">
           <span className="font-medium text-neutral-900">Listing:</span>{" "}
@@ -375,6 +553,10 @@ export function BuyerOnboardingFlow({
             />
           )}
 
+          {isClerkConfigured && isAuthenticated && (
+            <RegistrationCompletionEffect source={teaserSource} />
+          )}
+
           {!isClerkConfigured ? (
             <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800">
               Auth is not configured in this environment, so the registration step
@@ -427,7 +609,7 @@ export function BuyerOnboardingFlow({
                   Step 2: Fill in your buyer basics
                 </h2>
                 <p className="mt-1 text-sm text-neutral-500">
-                  We&apos;ll use this to prefill your first dashboard and keep the
+                  We&apos;ll use this to prefill your first deal room and keep the
                   right property context tied to your account.
                 </p>
               </div>
@@ -556,7 +738,7 @@ export function BuyerOnboardingFlow({
                   disabled={isSaving || !activeDraft.sourceListingId}
                   className="inline-flex h-11 items-center justify-center rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:bg-primary-200"
                 >
-                  {isSaving ? "Finishing setup…" : "Continue to dashboard"}
+                  {isSaving ? "Unlocking deal room…" : "Continue to deal room"}
                 </button>
               </div>
             </div>

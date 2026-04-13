@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { PasteLinkInput } from "@/components/marketing/PasteLinkInput";
 import { PasteLinkCtaCard } from "@/components/product/PasteLinkCtaCard";
-import { buildListingIntakeHref } from "@/lib/intake/pasteLink";
 
 /**
  * Authenticated-dashboard version of the homepage hero paste-link CTA.
@@ -18,9 +17,9 @@ export function PasteLinkCTA() {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
-  const handleSubmit = (url: string) => {
+  const handleSubmit = (submission: { href: string }) => {
     startTransition(() => {
-      router.push(buildListingIntakeHref(url));
+      router.push(submission.href);
     });
   };
 

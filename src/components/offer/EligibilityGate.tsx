@@ -1,18 +1,49 @@
+"use client";
+
 // Gate that blocks offer cockpit access when the buyer is not eligible and surfaces the resolution step.
+import { useEffect, useRef } from "react";
 import type { OfferEligibilitySnapshot } from "@/lib/dealroom/offer-cockpit-types";
 import { Button } from "@/components/ui/button";
+import { trackAgreementPrompted } from "@/lib/intake/pasteLinkFunnel";
 
 interface EligibilityGateProps {
   eligibility: OfferEligibilitySnapshot;
   children: React.ReactNode;
+  dealRoomId?: string;
   agreementHref?: string;
 }
 
 export function EligibilityGate({
   eligibility,
   children,
+  dealRoomId,
   agreementHref,
 }: EligibilityGateProps) {
+  const promptTracked = useRef(false);
+
+  useEffect(() => {
+    const requiredAction = eligibility.requiredAction?.toLowerCase() ?? "";
+    const mentionsAgreement = requiredAction.includes("agreement");
+    if (!dealRoomId || !mentionsAgreement || eligibility.isEligible) {
+      return;
+    }
+
+    if (promptTracked.current) {
+      return;
+    }
+
+    promptTracked.current = true;
+    trackAgreementPrompted({
+      dealRoomId,
+      source: "offer_cockpit_gate",
+      requiredAction: eligibility.requiredAction ?? undefined,
+    });
+  }, [
+    dealRoomId,
+    eligibility.isEligible,
+    eligibility.requiredAction,
+  ]);
+
   if (eligibility.isEligible) {
     return <>{children}</>;
   }

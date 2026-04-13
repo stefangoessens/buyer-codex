@@ -1,3 +1,4 @@
+import type { LinkPastedSource } from "@buyer-codex/shared/launch-events";
 import type { BuyerFinancingType, BuyerMoveTimeline } from "@/lib/buyerProfile";
 import type { SourcePlatform } from "@/lib/intake/types";
 
@@ -26,6 +27,7 @@ export interface BuyerOnboardingDraft {
   version: typeof BUYER_ONBOARDING_DRAFT_VERSION;
   stage: BuyerOnboardingStage;
   listingUrl: string;
+  intakeSource: LinkPastedSource | null;
   sourceListingId: string | null;
   sourcePlatform: SourcePlatform | null;
   authStatus: "anonymous" | "authenticated";
@@ -61,6 +63,7 @@ export interface BuyerOnboardingBasicsPayload {
 
 export function createBuyerOnboardingDraft(params: {
   listingUrl: string;
+  intakeSource?: LinkPastedSource | null;
   sourceListingId?: string | null;
   sourcePlatform?: SourcePlatform | null;
 }): BuyerOnboardingDraft {
@@ -69,6 +72,7 @@ export function createBuyerOnboardingDraft(params: {
     version: BUYER_ONBOARDING_DRAFT_VERSION,
     stage: "account",
     listingUrl: params.listingUrl,
+    intakeSource: params.intakeSource ?? null,
     sourceListingId: params.sourceListingId ?? null,
     sourcePlatform: params.sourcePlatform ?? null,
     authStatus: "anonymous",
@@ -189,6 +193,7 @@ export function reviveBuyerOnboardingDraft(
     return {
       ...createBuyerOnboardingDraft({
         listingUrl: parsed.listingUrl,
+        intakeSource: parsed.intakeSource ?? null,
         sourceListingId: parsed.sourceListingId ?? null,
         sourcePlatform: parsed.sourcePlatform ?? null,
       }),
@@ -204,6 +209,7 @@ export function reviveBuyerOnboardingDraft(
         moveTimeline: parsed.buyerBasics?.moveTimeline ?? "",
         preferredAreas: parsed.buyerBasics?.preferredAreas ?? [],
       },
+      intakeSource: parsed.intakeSource ?? null,
       sourceListingId: parsed.sourceListingId ?? null,
       sourcePlatform: parsed.sourcePlatform ?? null,
       authStatus: parsed.authStatus ?? "anonymous",

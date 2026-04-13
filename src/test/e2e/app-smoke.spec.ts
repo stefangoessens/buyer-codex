@@ -11,6 +11,37 @@ test.describe("App smoke", () => {
     ).toBeVisible();
   });
 
+  test("homepage hero accepts a supported listing URL and routes into intake", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    await page
+      .getByPlaceholder("Paste a Zillow, Redfin, or Realtor.com link...")
+      .first()
+      .fill("https://www.zillow.com/homedetails/123456_zpid/");
+    await page.getByRole("button", { name: "Get free analysis" }).first().click();
+
+    await expect(page).toHaveURL(/\/intake\?url=.*source=hero.*submittedAt=/);
+    await expect(page.getByText("Listing:")).toBeVisible();
+  });
+
+  test("homepage hero shows a typed parser error for unsupported domains", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    await page
+      .getByPlaceholder("Paste a Zillow, Redfin, or Realtor.com link...")
+      .first()
+      .fill("https://example.com/listing/123");
+    await page.getByRole("button", { name: "Get free analysis" }).first().click();
+
+    await expect(
+      page.getByText("Paste a Zillow, Redfin, or Realtor.com listing link."),
+    ).toBeVisible();
+  });
+
   test("intake landing route renders its fallback state", async ({ page }) => {
     await page.goto("/intake");
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { ClerkProvider, useAuth } from "@clerk/nextjs";
-import { ConvexProvider } from "convex/react";
+import { ConvexProviderWithAuth } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { type ReactNode } from "react";
 import { convex } from "@/lib/convex";
@@ -20,6 +20,14 @@ function ConvexClerkProvider({ children }: { children: ReactNode }) {
   );
 }
 
+function useAnonymousConvexAuth() {
+  return {
+    isLoading: false,
+    isAuthenticated: false,
+    fetchAccessToken: async () => null,
+  };
+}
+
 function AuthProviders({ children }: { children: ReactNode }) {
   const authProvider = env.NEXT_PUBLIC_AUTH_PROVIDER;
   const isClerkConfigured =
@@ -30,7 +38,11 @@ function AuthProviders({ children }: { children: ReactNode }) {
       return <>{children}</>;
     }
 
-    return <ConvexProvider client={convex}>{children}</ConvexProvider>;
+    return (
+      <ConvexProviderWithAuth client={convex} useAuth={useAnonymousConvexAuth}>
+        {children}
+      </ConvexProviderWithAuth>
+    );
   }
 
   return (

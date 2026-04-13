@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -17,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { PropertyCaseOverviewSurface } from "@/lib/dealroom/property-case-overview";
+import { trackDealRoomUnlocked } from "@/lib/intake/pasteLinkFunnel";
 import { cn } from "@/lib/utils";
 
 interface PropertyCaseOverviewProps {
@@ -26,9 +28,21 @@ interface PropertyCaseOverviewProps {
 export function PropertyCaseOverview({
   dealRoomId,
 }: PropertyCaseOverviewProps) {
+  const trackedDealRoomId = useRef<string | null>(null);
   const overview = useQuery(api.dealRoomCaseOverview.getOverview, {
     dealRoomId,
   }) as PropertyCaseOverviewSurface | null | undefined;
+
+  useEffect(() => {
+    if (!overview) return;
+    if (trackedDealRoomId.current === overview.dealRoomId) return;
+
+    trackedDealRoomId.current = overview.dealRoomId;
+    trackDealRoomUnlocked({
+      dealRoomId: overview.dealRoomId,
+      propertyId: overview.propertyId,
+    });
+  }, [overview]);
 
   if (overview === undefined) {
     return <LoadingState variant="panel" />;

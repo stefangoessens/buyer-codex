@@ -1,17 +1,21 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PasteLinkInput } from "@/components/marketing/PasteLinkInput";
 import { ManualAddressInput } from "@/components/marketing/ManualAddressInput";
 import { PasteLinkCtaCard } from "@/components/product/PasteLinkCtaCard";
 import { SegmentedTabs } from "@/components/product/SegmentedTabs";
 
 export function HeroInput() {
+  const router = useRouter();
   const [mode, setMode] = useState<"link" | "address">("link");
   const [submitted, setSubmitted] = useState(false);
-  const handleSubmit = useCallback((_url: string) => {
+
+  const handleSubmit = useCallback((submission: { href: string }) => {
     setSubmitted(true);
-  }, []);
+    router.push(submission.href);
+  }, [router]);
 
   return (
     <PasteLinkCtaCard

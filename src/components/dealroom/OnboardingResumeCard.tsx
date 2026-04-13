@@ -37,9 +37,12 @@ export function OnboardingResumeCard() {
       return;
     }
 
-    if (activeDraft.property.status === "deal_room_ready") {
+    if (
+      activeDraft.property.status === "deal_room_ready" &&
+      activeDraft.property.dealRoomId
+    ) {
       clearDraft();
-      router.refresh();
+      router.push(`/dealroom/${activeDraft.property.dealRoomId}`);
     }
   }, [activeDraft, clearDraft, router]);
 
@@ -60,7 +63,7 @@ export function OnboardingResumeCard() {
         .then((result) => {
           if (result.status === "deal_room_ready") {
             clearDraft();
-            router.refresh();
+            router.push(`/dealroom/${result.dealRoomId}`);
             return;
           }
 
@@ -116,7 +119,9 @@ export function OnboardingResumeCard() {
     return null;
   }
 
-  const intakeHref = buildListingIntakeHref(activeDraft.listingUrl);
+  const intakeHref = buildListingIntakeHref(activeDraft.listingUrl, {
+    source: activeDraft.intakeSource ?? undefined,
+  });
   const currentStatus =
     sourceListingStatus?.status ??
     (activeDraft.property.status === "captured"
