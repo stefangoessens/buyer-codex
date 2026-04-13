@@ -1,5 +1,6 @@
 import type { PricingInput, PricingOutput, PricePoint } from "./types";
-import type { GatewayRequest } from "../types";
+import { gateway, type GatewayDependencies } from "../gateway";
+import type { GatewayRequest, GatewayUsage } from "../types";
 
 /**
  * Compute consensus estimate from available portal estimates.
@@ -173,4 +174,51 @@ export function parsePricingResponse(
   } catch {
     return null;
   }
+}
+
+export async function executePricingAnalysis(args: {
+  input: PricingInput;
+  promptTemplate: string;
+  systemPrompt?: string;
+  dealRoomId?: string;
+  gatewayDependencies?: Partial<GatewayDependencies>;
+}): Promise<{ output: PricingOutput; usage: GatewayUsage }> {
+  const {
+    input,
+    promptTemplate,
+    systemPrompt,
+    dealRoomId,
+    gatewayDependencies,
+  } = args;
+
+  const request = buildPricingRequest(input, promptTemplate, systemPrompt);
+  const response = await gateway(
+    {
+      ...request,
+      dealRoomId,
+    },
+    gatewayDependencies,
+  );
+
+  if (!response.success) {
+    throw new Error(`Pricing analysis failed: ${response.error.message}`);
+  }
+
+  const { consensus, spread, sources } = computeConsensus(input);
+  const parsed = parsePricingResponse(
+    response.data.content,
+    input,
+    consensus,
+    spread,
+    sources,
+  );
+
+  if (!parsed) {
+    throw new Error("Pricing analysis returned an invalid response payload");
+  }
+
+  return {
+    output: parsed,
+    usage: response.data.usage,
+  };
 }

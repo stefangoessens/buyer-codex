@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { DEFAULT_CONFIG, ENGINE_CONFIGS } from "@/lib/ai/gateway";
+import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_CONFIG, ENGINE_CONFIGS, gateway } from "@/lib/ai/gateway";
+import {
+  observeGatewayResult,
+  summarizeGatewayObservationsByDealRoom,
+  summarizeGatewayObservationsByEngine,
+} from "@/lib/ai/observability";
 import { MODEL_COSTS } from "@/lib/ai/types";
 
 describe("Gateway config", () => {
@@ -27,5 +32,184 @@ describe("MODEL_COSTS", () => {
     expect(claude.input).toBeGreaterThan(0);
     expect(claude.output).toBeGreaterThan(0);
     expect(claude.output).toBeGreaterThan(claude.input);
+  });
+});
+
+describe("gateway failover", () => {
+  const request = {
+    engineType: "pricing",
+    dealRoomId: "deal_123",
+    messages: [{ role: "user" as const, content: "hello" }],
+    maxTokens: 128,
+    temperature: 0,
+  };
+
+  it("returns the primary response when Anthropic succeeds", async () => {
+    const anthropic = vi.fn().mockResolvedValue({
+      content: "{\"fairValue\": 480000}",
+      usage: {
+        inputTokens: 100,
+        outputTokens: 50,
+        model: "claude-sonnet-4-20250514",
+        provider: "anthropic" as const,
+        latencyMs: 120,
+        estimatedCost: 0.0045,
+        fallbackUsed: false,
+      },
+    });
+    const openai = vi.fn();
+
+    const result = await gateway(request, { anthropic, openai });
+
+    expect(result.success).toBe(true);
+    expect(anthropic).toHaveBeenCalledTimes(1);
+    expect(openai).not.toHaveBeenCalled();
+    if (result.success) {
+      expect(result.data.usage.provider).toBe("anthropic");
+      expect(result.data.usage.fallbackUsed).toBe(false);
+    }
+  });
+
+  it("fails over to OpenAI on retryable transport errors", async () => {
+    const anthropic = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("429 rate limit"))
+      .mockRejectedValueOnce(new Error("429 rate limit"));
+    const openai = vi.fn().mockResolvedValue({
+      content: "{\"fairValue\": 481000}",
+      usage: {
+        inputTokens: 110,
+        outputTokens: 55,
+        model: "gpt-4o",
+        provider: "openai" as const,
+        latencyMs: 180,
+        estimatedCost: 0.0032,
+        fallbackUsed: false,
+      },
+    });
+
+    const result = await gateway(request, { anthropic, openai });
+
+    expect(result.success).toBe(true);
+    expect(anthropic).toHaveBeenCalledTimes(2);
+    expect(openai).toHaveBeenCalledTimes(1);
+    if (result.success) {
+      expect(result.data.usage.provider).toBe("openai");
+      expect(result.data.usage.fallbackUsed).toBe(true);
+    }
+  });
+
+  it("returns a combined failure when both providers fail", async () => {
+    const anthropic = vi.fn().mockRejectedValue(new Error("503 upstream"));
+    const openai = vi.fn().mockRejectedValue(new Error("timeout"));
+
+    const result = await gateway(request, { anthropic, openai });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("all_providers_failed");
+      expect(result.error.message).toContain("Primary (anthropic)");
+      expect(result.error.message).toContain("Fallback (openai)");
+    }
+  });
+});
+
+describe("gateway observability", () => {
+  it("aggregates cost, latency, and fallback by engine and deal room", () => {
+    const observations = [
+      observeGatewayResult(
+        {
+          engineType: "pricing",
+          dealRoomId: "deal_a",
+          messages: [],
+        },
+        {
+          success: true,
+          data: {
+            content: "{}",
+            usage: {
+              inputTokens: 100,
+              outputTokens: 25,
+              model: "claude-sonnet-4-20250514",
+              provider: "anthropic",
+              latencyMs: 150,
+              estimatedCost: 0.004,
+              fallbackUsed: false,
+            },
+          },
+        },
+      ),
+      observeGatewayResult(
+        {
+          engineType: "pricing",
+          dealRoomId: "deal_a",
+          messages: [],
+        },
+        {
+          success: true,
+          data: {
+            content: "{}",
+            usage: {
+              inputTokens: 120,
+              outputTokens: 30,
+              model: "gpt-4o",
+              provider: "openai",
+              latencyMs: 200,
+              estimatedCost: 0.005,
+              fallbackUsed: true,
+            },
+          },
+        },
+      ),
+      observeGatewayResult(
+        {
+          engineType: "copilot",
+          dealRoomId: "deal_b",
+          messages: [],
+        },
+        {
+          success: false,
+          error: {
+            code: "provider_error",
+            message: "boom",
+            provider: "anthropic",
+          },
+        },
+      ),
+    ];
+
+    expect(summarizeGatewayObservationsByEngine(observations)).toEqual([
+      expect.objectContaining({
+        key: "copilot",
+        requestCount: 1,
+        successCount: 0,
+        errorCount: 1,
+        totalEstimatedCost: 0,
+      }),
+      expect.objectContaining({
+        key: "pricing",
+        requestCount: 2,
+        successCount: 2,
+        fallbackCount: 1,
+        totalEstimatedCost: 0.009000000000000001,
+        totalInputTokens: 220,
+        totalOutputTokens: 55,
+      }),
+    ]);
+
+    expect(summarizeGatewayObservationsByDealRoom(observations)).toEqual([
+      expect.objectContaining({
+        key: "deal_a",
+        requestCount: 2,
+        successCount: 2,
+        fallbackCount: 1,
+      }),
+      expect.objectContaining({
+        key: "deal_b",
+        requestCount: 1,
+        successCount: 0,
+        errorCount: 1,
+      }),
+    ]);
   });
 });
