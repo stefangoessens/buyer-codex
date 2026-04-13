@@ -154,6 +154,139 @@ describe("track() — deal_room category", () => {
       ).not.toThrow();
     }
   });
+
+  it("accepts advisory memo and recommendation events with typed context", () => {
+    expect(() =>
+      track("advisory_memo_viewed", {
+        dealRoomId: "dr_1",
+        propertyId: "prop_1",
+        actorRole: "buyer",
+        surface: "deal_room_overview",
+        variant: "buyer_safe",
+        viewState: "ready",
+        claimCount: 3,
+        sourceCount: 3,
+        missingSignalCount: 1,
+        coverageAvailableCount: 3,
+        coveragePendingCount: 1,
+        coverageUncertainCount: 0,
+        coverageMissingCount: 0,
+        hasRecommendation: true,
+        overallConfidence: 0.82,
+        recommendationConfidence: 0.78,
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      track("advisory_recommendation_viewed", {
+        dealRoomId: "dr_1",
+        propertyId: "prop_1",
+        actorRole: "buyer",
+        surface: "deal_room_overview",
+        variant: "buyer_safe",
+        viewState: "ready",
+        claimCount: 3,
+        sourceCount: 3,
+        missingSignalCount: 1,
+        coverageAvailableCount: 3,
+        coveragePendingCount: 1,
+        coverageUncertainCount: 0,
+        coverageMissingCount: 0,
+        openingPrice: 615000,
+        recommendationConfidence: 0.78,
+        riskLevel: "medium",
+        suggestedContingencyCount: 2,
+        rationaleCount: 2,
+        overallConfidence: 0.82,
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts advisory interaction events for trust, sharing, and feedback", () => {
+    expect(() =>
+      track("advisory_confidence_details_expanded", {
+        dealRoomId: "dr_1",
+        propertyId: "prop_1",
+        actorRole: "buyer",
+        surface: "deal_room_overview",
+        variant: "buyer_safe",
+        viewState: "partial",
+        claimCount: 3,
+        sourceCount: 3,
+        missingSignalCount: 1,
+        coverageAvailableCount: 3,
+        coveragePendingCount: 1,
+        coverageUncertainCount: 0,
+        coverageMissingCount: 0,
+        overallConfidence: 0.82,
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      track("advisory_source_trace_opened", {
+        dealRoomId: "dr_1",
+        propertyId: "prop_1",
+        actorRole: "buyer",
+        surface: "deal_room_overview",
+        variant: "buyer_safe",
+        viewState: "partial",
+        claimCount: 3,
+        sourceCount: 3,
+        missingSignalCount: 1,
+        coverageAvailableCount: 3,
+        coveragePendingCount: 1,
+        coverageUncertainCount: 0,
+        coverageMissingCount: 0,
+        citationId: "engineOut_pricing_1",
+        engineType: "pricing",
+        linkedClaimCount: 1,
+        sourceStatus: "available",
+        trigger: "claim_link",
+        claimTopic: "pricing",
+        overallConfidence: 0.82,
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      track("advisory_buyer_safe_summary_copied", {
+        dealRoomId: "dr_1",
+        propertyId: "prop_1",
+        actorRole: "buyer",
+        surface: "deal_room_overview",
+        variant: "buyer_safe",
+        viewState: "partial",
+        claimCount: 3,
+        sourceCount: 3,
+        missingSignalCount: 1,
+        coverageAvailableCount: 3,
+        coveragePendingCount: 1,
+        coverageUncertainCount: 0,
+        coverageMissingCount: 0,
+        summaryLength: 420,
+        includesRecommendation: true,
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      track("advisory_recommendation_feedback_recorded", {
+        dealRoomId: "dr_1",
+        propertyId: "prop_1",
+        actorRole: "buyer",
+        surface: "deal_room_overview",
+        variant: "buyer_safe",
+        viewState: "partial",
+        claimCount: 3,
+        sourceCount: 3,
+        missingSignalCount: 1,
+        coverageAvailableCount: 3,
+        coveragePendingCount: 1,
+        coverageUncertainCount: 0,
+        coverageMissingCount: 0,
+        decision: "accepted",
+        recommendationConfidence: 0.78,
+      }),
+    ).not.toThrow();
+  });
 });
 
 describe("track() — documents category", () => {
@@ -420,6 +553,27 @@ describe("track() — PII stripping for piiSafe: false events", () => {
       }),
     ).not.toThrow();
   });
+
+  it("advisory broker override remains piiSafe because free-form detail is not exported", () => {
+    expect(EVENT_METADATA.advisory_broker_override_submitted.piiSafe).toBe(true);
+    expect(() =>
+      track("advisory_broker_override_submitted", {
+        outputId: "engineOut_offer_1",
+        propertyId: "prop_1",
+        dealRoomId: "dr_1",
+        actorRole: "broker",
+        surface: "deal_room_overview",
+        engineType: "offer",
+        priorReviewState: "pending",
+        reasonCategory: "unsupported_evidence",
+        hasReasonDetail: true,
+        outputConfidence: 0.44,
+        linkedClaimCount: 1,
+        reviewLatencyMs: 120000,
+        generatedAt: "2026-04-13T19:00:00.000Z",
+      }),
+    ).not.toThrow();
+  });
 });
 
 describe("track() — posthog guard", () => {
@@ -530,7 +684,9 @@ describe("listEventsByCategory()", () => {
     expect(events).toContain("deal_room_entered");
     expect(events).toContain("pricing_panel_viewed");
     expect(events).toContain("ai_analysis_viewed");
-    expect(events.length).toBeGreaterThanOrEqual(7);
+    expect(events).toContain("advisory_memo_viewed");
+    expect(events).toContain("advisory_broker_override_submitted");
+    expect(events.length).toBeGreaterThanOrEqual(16);
   });
 
   it("returns all dashboard events", () => {

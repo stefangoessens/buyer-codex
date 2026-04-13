@@ -129,6 +129,7 @@ export const previewBuyerDashboardState: BuyerDashboardState = {
 
 export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
   variant: "buyer_safe",
+  viewerRole: "buyer",
   dealRoomId: "preview-miami-beach",
   propertyId: "preview-property-1",
   propertyAddress: "123 Gulf Stream Ave, Miami Beach, FL 33139",
@@ -147,6 +148,12 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
   overallConfidence: 0.78,
   overallConfidenceLabel: "78% confidence",
   overallConfidenceTone: "strong",
+  coverageStats: {
+    availableCount: 3,
+    pendingCount: 1,
+    uncertainCount: 0,
+    missingCount: 0,
+  },
   coverageSummary:
     "Pricing, comps, and leverage are approved for the buyer-safe case. Offer strategy stays visible with one pending citation refresh.",
   headerDescription:
@@ -246,8 +253,10 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
     {
       citationId: "pricing-2026-04-13-01",
       anchorId: "source-pricing-2026-04-13-01",
+      engineType: "pricing",
       engineLabel: "Pricing engine",
       status: "available",
+      reviewState: "approved",
       confidenceLabel: "82% confidence",
       generatedAtLabel: "Apr 13",
       claimCount: 1,
@@ -255,8 +264,10 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
     {
       citationId: "dom-2026-04-13-01",
       anchorId: "source-dom-2026-04-13-01",
+      engineType: "comps",
       engineLabel: "Comparable sales engine",
       status: "available",
+      reviewState: "approved",
       confidenceLabel: "74% confidence",
       generatedAtLabel: "Apr 13",
       claimCount: 1,
@@ -264,8 +275,10 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
     {
       citationId: "leverage-2026-04-13-01",
       anchorId: "source-leverage-2026-04-13-01",
+      engineType: "leverage",
       engineLabel: "Leverage engine",
       status: "available",
+      reviewState: "approved",
       confidenceLabel: "69% confidence",
       generatedAtLabel: "Apr 13",
       claimCount: 1,
@@ -273,8 +286,10 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
     {
       citationId: "offer-2026-04-13-01",
       anchorId: "source-offer-2026-04-13-01",
+      engineType: "offer",
       engineLabel: "Offer strategy engine",
       status: "pending",
+      reviewState: "pending",
       confidenceLabel: "Refresh running",
       generatedAtLabel: null,
       claimCount: 0,
