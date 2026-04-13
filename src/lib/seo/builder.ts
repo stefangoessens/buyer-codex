@@ -8,7 +8,7 @@ import type {
 } from "./types";
 
 /**
- * SEO metadata builder for buyer-v2 public surfaces (KIN-815).
+ * SEO metadata builder for buyer-codex public surfaces (KIN-815).
  *
  * Every public route composes its Next.js `Metadata` object via
  * `buildMetadata(input)`. The builder owns:
@@ -28,7 +28,7 @@ import type {
 // MARK: - Site constants
 
 const DEFAULT_SITE_URL = "https://buyerv2.com";
-const DEFAULT_SITE_NAME = "buyer-v2";
+const DEFAULT_SITE_NAME = "buyer-codex";
 const DEFAULT_SOCIAL_IMAGE_PATH = "/og-default.png";
 
 /**

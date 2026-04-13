@@ -232,7 +232,7 @@ describe("buildIcsForMilestone", () => {
     expect(ics).toContain("END:VCALENDAR");
     expect(ics).toContain("BEGIN:VEVENT");
     expect(ics).toContain("SUMMARY:Closing day");
-    expect(ics).toContain("UID:dr1-1@buyer-v2");
+    expect(ics).toContain("UID:dr1-1@buyer-codex");
     expect(ics).toContain("DTSTART;VALUE=DATE:20260425");
   });
 

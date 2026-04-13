@@ -17,7 +17,7 @@ const trustStats = [
 const features = [
   {
     imageSrc: "/images/marketing/features/feature-1.png",
-    imageAlt: "Listing link intake on buyer-v2",
+    imageAlt: "Listing link intake on buyer-codex",
     title: "Paste any listing link",
     description:
       "Drop a Zillow, Redfin, or Realtor.com URL. We instantly analyze the property.",
@@ -53,7 +53,7 @@ const testimonials = [
   },
   {
     quote:
-      "The AI analysis caught overpricing my agent missed. buyer-v2 gave us the confidence to negotiate hard and win.",
+      "The AI analysis caught overpricing my agent missed. buyer-codex gave us the confidence to negotiate hard and win.",
     author: "James Chen",
     role: "Homebuyer, Miami",
   },
@@ -95,7 +95,7 @@ export function HomePageClient() {
       <section className="w-full bg-white py-16 lg:py-24">
         <div className="mx-auto max-w-[1248px] px-6">
           <h2 className="text-center text-3xl font-bold tracking-tight text-neutral-800">
-            How buyer-v2 works for you
+            How buyer-codex works for you
           </h2>
           <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-3">
             {features.map((feature) => (

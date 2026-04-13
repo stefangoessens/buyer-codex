@@ -1,6 +1,6 @@
-# buyer-v2 Design System
+# buyer-codex Design System
 
-Canonical design language for the buyer-v2 platform. Every UI surface — marketing site, deal room, dashboards, broker console, iOS app — derives from this document.
+Canonical design language for the buyer-codex platform. Every UI surface — marketing site, deal room, dashboards, broker console, iOS app — derives from this document.
 
 ---
 
@@ -238,7 +238,7 @@ Base unit: **4px**. All spacing values are multiples of 4.
 
 ## 9. Surface Mapping
 
-How design patterns map to buyer-v2 surfaces:
+How design patterns map to buyer-codex surfaces:
 
 | Surface | Primary Reference | Layout Pattern | Key Components |
 |---|---|---|---|
@@ -255,7 +255,7 @@ How design patterns map to buyer-v2 surfaces:
 
 ## 10. Component Patterns
 
-Key reusable components derived from the reference sites. Each component lists its source inspiration, visual characteristics, and buyer-v2 adaptation.
+Key reusable components derived from the reference sites. Each component lists its source inspiration, visual characteristics, and buyer-codex adaptation.
 
 ### PasteLinkInput
 - **Source**: Hosman hero search bar, adapted for URL paste
@@ -343,9 +343,9 @@ Key reusable components derived from the reference sites. Each component lists i
 | Rejected | Rationale |
 |---|---|
 | HR/payroll content patterns | Different domain (real estate) |
-| Enterprise pricing tier layout | buyer-v2 has a single commission model, not SaaS tiers |
-| Complex multi-tab settings UI | Over-engineered for buyer-v2's simpler config needs |
-| Illustration-heavy onboarding | buyer-v2 onboarding is URL-paste-first, not tour-based |
+| Enterprise pricing tier layout | buyer-codex has a single commission model, not SaaS tiers |
+| Complex multi-tab settings UI | Over-engineered for buyer-codex's simpler config needs |
+| Illustration-heavy onboarding | buyer-codex onboarding is URL-paste-first, not tour-based |
 
 ### Hosman
 
@@ -361,8 +361,8 @@ Key reusable components derived from the reference sites. Each component lists i
 
 | Rejected | Rationale |
 |---|---|
-| French real estate content patterns | buyer-v2 is Florida-specific |
-| Agent matching directory | buyer-v2 has its own broker assignment model |
+| French real estate content patterns | buyer-codex is Florida-specific |
+| Agent matching directory | buyer-codex has its own broker assignment model |
 | City-specific landing page templates | Not needed at launch (FL-first) |
 | Hosman's specific color scheme | Replaced by PayFit-derived brand palette |
 
@@ -377,10 +377,10 @@ Key reusable components derived from the reference sites. Each component lists i
 
 | Rejected | Rationale |
 |---|---|
-| Agent directory listing layout | buyer-v2 doesn't have a public agent directory |
+| Agent directory listing layout | buyer-codex doesn't have a public agent directory |
 | Swiss market navigation patterns | Different market |
 | Multi-language selector UI | English-only at launch |
-| Review/rating collection UI | buyer-v2 doesn't collect public reviews |
+| Review/rating collection UI | buyer-codex doesn't collect public reviews |
 
 ---
 
@@ -388,7 +388,7 @@ Key reusable components derived from the reference sites. Each component lists i
 
 ### What This Document Covers
 
-This design system covers every visual and structural decision needed to build buyer-v2's UI surfaces:
+This design system covers every visual and structural decision needed to build buyer-codex's UI surfaces:
 
 - **Color**: Full brand palette with primary, accent, secondary, neutrals, semantic, and surface colors — sufficient for all UI states.
 - **Typography**: Font family, scale (12-72px), weights, line heights, and letter spacing — covers everything from badge captions to hero display text.

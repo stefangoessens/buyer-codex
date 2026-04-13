@@ -16,7 +16,7 @@ export interface DataClassification {
 }
 
 /**
- * Canonical data classification catalog for buyer-v2.
+ * Canonical data classification catalog for buyer-codex.
  * Every data type in the system must be classified here.
  */
 export const DATA_CATALOG: Record<string, DataClassification> = {

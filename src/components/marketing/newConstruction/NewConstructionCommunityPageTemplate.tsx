@@ -45,7 +45,7 @@ export function NewConstructionCommunityPageTemplate({
               href="/"
               className="inline-flex items-center text-xs font-semibold uppercase tracking-wide text-primary-200 hover:text-white"
             >
-              ← Back to buyer-v2
+              ← Back to buyer-codex
             </Link>
           )}
           <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-primary-200">

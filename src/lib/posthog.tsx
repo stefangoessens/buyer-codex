@@ -11,7 +11,7 @@ import { resolveObservabilityContext } from "@/lib/observability";
 let initialized = false;
 
 const context = resolveObservabilityContext({
-  defaultService: "buyer-v2-web",
+  defaultService: "buyer-codex-web",
 });
 
 export function initPostHog() {

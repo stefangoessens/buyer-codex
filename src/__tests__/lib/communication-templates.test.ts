@@ -4,7 +4,7 @@ import {
   compareCommunicationTemplateVersions,
   isValidCommunicationTemplateVersion,
   type CommunicationTemplateRecord,
-} from "@buyer-v2/shared";
+} from "@buyer-codex/shared";
 
 const sampleTemplate = {
   key: "tour_confirmation",

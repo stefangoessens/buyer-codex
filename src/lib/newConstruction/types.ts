@@ -36,7 +36,7 @@ export interface BuilderConfig {
   tagline: string;
   /** Meta description (50–300 chars). */
   summary: string;
-  /** SEO-optimized page title (< 70 chars). DO NOT append " | buyer-v2". */
+  /** SEO-optimized page title (< 70 chars). DO NOT append " | buyer-codex". */
   pageTitle: string;
   heroHeadline: string;
   heroSubheadline: string;
@@ -116,7 +116,7 @@ export interface UrgencyBlock {
 }
 
 /**
- * Savings projection block — breaks down the estimated buyer-v2
+ * Savings projection block — breaks down the estimated buyer-codex
  * rebate + builder incentives into a 2-column layout.
  */
 export interface SavingsProjectionBlock {

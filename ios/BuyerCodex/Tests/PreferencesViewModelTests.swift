@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import BuyerV2
+@testable import BuyerCodex
 
 @Suite("PreferencesViewModel display mapping")
 struct PreferencesViewModelDisplayTests {

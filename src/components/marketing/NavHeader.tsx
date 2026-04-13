@@ -6,7 +6,7 @@ export function NavHeader() {
       <div className="mx-auto flex h-[84px] max-w-[1248px] items-center px-6 lg:px-8">
         <div className="flex items-center gap-10">
           <Link href="/" className="text-[18px] font-semibold tracking-tight text-primary-700">
-            buyer-v2
+            buyer-codex
           </Link>
 
           <nav className="hidden items-center gap-7 md:flex">

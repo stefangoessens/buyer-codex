@@ -1,7 +1,7 @@
 import type { PricingSection } from "@/lib/content/types";
 
 /**
- * Public pricing page content for buyer-v2 (KIN-773).
+ * Public pricing page content for buyer-codex (KIN-773).
  *
  * The pricing page is a single vertical stack of these sections. Each
  * section is either a value-prop block (no CTA), an explainer
@@ -13,7 +13,7 @@ export const PRICING_SECTIONS: PricingSection[] = [
     title: "Free to use. Paid from the seller's commission.",
     visibility: "public",
     body:
-      "buyer-v2 never charges buyers up front. Our fee is paid out of the buyer-agent commission at closing, and we rebate a portion of that commission back to you.",
+      "buyer-codex never charges buyers up front. Our fee is paid out of the buyer-agent commission at closing, and we rebate a portion of that commission back to you.",
     bullets: [
       "No sign-up fee, no monthly subscription, no hidden cost",
       "Buyer credit shows up on your closing disclosure",
@@ -40,7 +40,7 @@ export const PRICING_SECTIONS: PricingSection[] = [
     bullets: [
       "Total commission: historically 5–6% of purchase price",
       "Buyer-agent share: historically ~3%, now always negotiable",
-      "buyer-v2 rebate: a portion of the buyer-agent share, returned to you at closing",
+      "buyer-codex rebate: a portion of the buyer-agent share, returned to you at closing",
     ],
   },
   {

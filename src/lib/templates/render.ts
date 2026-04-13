@@ -20,7 +20,7 @@
 import type {
   CommunicationTemplateInputValue,
   CommunicationTemplateRenderInputs,
-} from "@buyer-v2/shared";
+} from "@buyer-codex/shared";
 
 // ─── Placeholder regex ─────────────────────────────────────────────────────
 //

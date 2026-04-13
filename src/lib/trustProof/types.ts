@@ -1,7 +1,7 @@
 /**
- * Typed trust-proof and case-study model for buyer-v2 (KIN-825).
+ * Typed trust-proof and case-study model for buyer-codex (KIN-825).
  *
- * buyer-v2 operates in two phases:
+ * buyer-codex operates in two phases:
  *   - **pre-revenue**: no closed transactions yet. Trust surfaces
  *     display illustrative case studies and demo proof blocks with
  *     explicit "illustrative" labels.
@@ -24,7 +24,7 @@
  *
  * - `illustrative` — demo content authored by marketing/legal for
  *                    pre-revenue surfaces. MUST be labeled.
- * - `liveTransaction` — derived from a closed buyer-v2 transaction.
+ * - `liveTransaction` — derived from a closed buyer-codex transaction.
  *                       Only usable if the buyer consented to public
  *                       display AND the record passes validation.
  */

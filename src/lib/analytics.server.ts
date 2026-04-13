@@ -27,7 +27,7 @@ export async function trackServerEvent<K extends AnalyticsEventName>(
         ) as AnalyticsEventMap[K])
       : properties;
   const context = resolveObservabilityContext({
-    defaultService: "buyer-v2-web",
+    defaultService: "buyer-codex-web",
   });
 
   try {

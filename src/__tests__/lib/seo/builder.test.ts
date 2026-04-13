@@ -28,7 +28,7 @@ function makeInput(overrides: Partial<SeoInput> = {}): SeoInput {
   return {
     title: "Pricing",
     description:
-      "Learn how buyer-v2's commission rebate model works for Florida buyers.",
+      "Learn how buyer-codex's commission rebate model works for Florida buyers.",
     path: "/pricing",
     visibility: "public",
     kind: "marketing",
@@ -208,8 +208,8 @@ describe("buildMetadata", () => {
 
   it("builds a complete Metadata object for a public marketing page", () => {
     const md = buildMetadata(makeInput());
-    expect(md.title).toBe("Pricing | buyer-v2");
-    expect(md.description).toContain("buyer-v2");
+    expect(md.title).toBe("Pricing | buyer-codex");
+    expect(md.description).toContain("buyer-codex");
     expect(md.alternates?.canonical).toBe("https://buyerv2.com/pricing");
     // Robots: public = index + follow
     expect(md.robots).toMatchObject({
@@ -253,7 +253,7 @@ describe("buildMetadata", () => {
     expect(md.openGraph).toMatchObject({
       title: "Pricing",
       url: "https://buyerv2.com/pricing",
-      siteName: "buyer-v2",
+      siteName: "buyer-codex",
       type: "website",
     });
   });

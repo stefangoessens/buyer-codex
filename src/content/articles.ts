@@ -3,7 +3,7 @@ import type { Article } from "@/lib/articles/types";
 /**
  * Seed article catalog for the public blog (KIN-812).
  *
- * These are real buyer-v2 editorial pieces, not placeholder copy —
+ * These are real buyer-codex editorial pieces, not placeholder copy —
  * they exercise every block type so any regression in the renderer
  * surfaces immediately. Add new articles here; the route + index
  * page will pick them up automatically.
@@ -15,10 +15,10 @@ export const ARTICLES: Article[] = [
     slug: "paste-a-link-walkthrough",
     title: "How the paste-a-link flow actually works",
     summary:
-      "A step-by-step walkthrough of what happens when you drop a Zillow URL into buyer-v2 — from fetching the listing to running the AI pricing analysis.",
+      "A step-by-step walkthrough of what happens when you drop a Zillow URL into buyer-codex — from fetching the listing to running the AI pricing analysis.",
     category: "buying_guide",
     author: {
-      name: "The buyer-v2 team",
+      name: "The buyer-codex team",
       bio: "Licensed Florida brokerage, AI-native, buyer-side only.",
     },
     publishedAt: "2026-04-05",
@@ -30,7 +30,7 @@ export const ARTICLES: Article[] = [
         kind: "paragraph",
         lede: true,
         text:
-          "Pasting a listing link is the single most productive thing you can do as a Florida homebuyer. In under ten seconds buyer-v2 turns a URL into a full deal room — pricing, comps, leverage, and a deal score — without you creating an account first. Here's what actually happens under the hood.",
+          "Pasting a listing link is the single most productive thing you can do as a Florida homebuyer. In under ten seconds buyer-codex turns a URL into a full deal room — pricing, comps, leverage, and a deal score — without you creating an account first. Here's what actually happens under the hood.",
       },
       {
         kind: "heading",
@@ -95,7 +95,7 @@ export const ARTICLES: Article[] = [
       {
         kind: "paragraph",
         text:
-          "Everything we computed lives in a semi-public deal room — anyone with the link can see the AI analysis and a teaser of the property data, but the full details (tour scheduling, offer templates, broker chat) require you to register. It's the fastest way to get a real buyer-v2 analysis without committing to anything.",
+          "Everything we computed lives in a semi-public deal room — anyone with the link can see the AI analysis and a teaser of the property data, but the full details (tour scheduling, offer templates, broker chat) require you to register. It's the fastest way to get a real buyer-codex analysis without committing to anything.",
       },
       {
         kind: "quote",
@@ -113,10 +113,10 @@ export const ARTICLES: Article[] = [
     slug: "florida-closing-costs-2026",
     title: "What Florida closing costs actually look like in 2026",
     summary:
-      "A plain-language breakdown of the fees you'll see on your Florida closing disclosure — lender, title, state, and brokerage — plus what buyer-v2 credits back.",
+      "A plain-language breakdown of the fees you'll see on your Florida closing disclosure — lender, title, state, and brokerage — plus what buyer-codex credits back.",
     category: "closing_process",
     author: {
-      name: "The buyer-v2 team",
+      name: "The buyer-codex team",
       bio: "Licensed Florida brokerage, AI-native, buyer-side only.",
     },
     publishedAt: "2026-04-02",
@@ -128,7 +128,7 @@ export const ARTICLES: Article[] = [
         kind: "paragraph",
         lede: true,
         text:
-          "Closing in Florida is mostly predictable — the same line items show up on almost every disclosure, with small variations by county and lender. Here's what to expect on a typical $500,000 purchase, with buyer-v2's commission rebate applied.",
+          "Closing in Florida is mostly predictable — the same line items show up on almost every disclosure, with small variations by county and lender. Here's what to expect on a typical $500,000 purchase, with buyer-codex's commission rebate applied.",
       },
       {
         kind: "heading",
@@ -180,12 +180,12 @@ export const ARTICLES: Article[] = [
       {
         kind: "paragraph",
         text:
-          "This is where buyer-v2 shows up. The total commission is paid by the seller out of proceeds — historically around 6% of the purchase price, split between the listing side and the buyer's side. Post-2024 NAR settlement, the buyer-agent portion is explicitly negotiated.",
+          "This is where buyer-codex shows up. The total commission is paid by the seller out of proceeds — historically around 6% of the purchase price, split between the listing side and the buyer's side. Post-2024 NAR settlement, the buyer-agent portion is explicitly negotiated.",
       },
       {
         kind: "paragraph",
         text:
-          "When you engage buyer-v2, we rebate a portion of the buyer-agent commission back to you at closing. On our default assumptions that's a buyer credit of about $4,950 on a $500k purchase — reducing the cash you need to bring to the table.",
+          "When you engage buyer-codex, we rebate a portion of the buyer-agent commission back to you at closing. On our default assumptions that's a buyer credit of about $4,950 on a $500k purchase — reducing the cash you need to bring to the table.",
       },
       {
         kind: "savings_calculator_cta",
@@ -201,14 +201,14 @@ export const ARTICLES: Article[] = [
       {
         kind: "paragraph",
         text:
-          "Total cash to close = down payment + lender fees + title and escrow + prepaid property tax and insurance − seller credits − buyer-v2 rebate. Your closing disclosure shows the full breakdown three business days before closing; read it carefully and flag anything that doesn't match your pre-approval estimates.",
+          "Total cash to close = down payment + lender fees + title and escrow + prepaid property tax and insurance − seller credits − buyer-codex rebate. Your closing disclosure shows the full breakdown three business days before closing; read it carefully and flag anything that doesn't match your pre-approval estimates.",
       },
       {
         kind: "callout",
         variant: "strong",
         label: "Not legal or tax advice",
         body:
-          "This article is an informational overview. Specific numbers depend on your lender, county, and closing company. Your buyer-v2 broker and closing agent will review every line item with you before you sign.",
+          "This article is an informational overview. Specific numbers depend on your lender, county, and closing company. Your buyer-codex broker and closing agent will review every line item with you before you sign.",
       },
     ],
   },

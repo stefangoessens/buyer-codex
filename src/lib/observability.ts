@@ -58,7 +58,7 @@ export function resolveObservabilityContext(
     source.OBSERVABILITY_SERVICE_NAME,
     source.RAILWAY_SERVICE_NAME,
     options.defaultService,
-  ) ?? "buyer-v2-web";
+  ) ?? "buyer-codex-web";
 
   return {
     environment,

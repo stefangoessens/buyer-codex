@@ -31,7 +31,7 @@ const steps = [
 
 const testimonials = [
   { quote: "I pasted a Zillow link and within seconds had a full pricing analysis. Saved us $18,000 on our first home in Tampa.", author: "Maria Gonzalez", role: "First-time buyer, Tampa", avatarSrc: "/images/marketing/testimonials/testimonial-1.jpg" },
-  { quote: "The AI analysis caught overpricing my agent missed. buyer-v2 gave us the confidence to negotiate hard and win.", author: "James Chen", role: "Homebuyer, Miami" },
+  { quote: "The AI analysis caught overpricing my agent missed. buyer-codex gave us the confidence to negotiate hard and win.", author: "James Chen", role: "Homebuyer, Miami" },
   { quote: "From paste to close in 23 days. The deal room kept everything organized and our broker was incredible.", author: "Sarah Mitchell", role: "Relocating buyer, Orlando" },
 ];
 
@@ -52,8 +52,8 @@ export default function Home() {
       <section className="w-full bg-white py-20 lg:py-28">
         <div className="mx-auto max-w-[1248px] px-6">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary-400">Why buyer-v2</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.003em] text-neutral-800 lg:text-[41px] lg:leading-[1.2]">How buyer-v2 works for you</h2>
+            <p className="text-sm font-semibold uppercase tracking-widest text-primary-400">Why buyer-codex</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.003em] text-neutral-800 lg:text-[41px] lg:leading-[1.2]">How buyer-codex works for you</h2>
             <p className="mt-4 text-lg leading-relaxed text-neutral-500">From paste to close, we handle every step of your home buying journey with AI precision and human expertise.</p>
           </div>
           <div className="mt-14 grid grid-cols-1 gap-8 md:grid-cols-3">
@@ -68,7 +68,7 @@ export default function Home() {
           <div className="overflow-hidden rounded-[24px] border border-neutral-200/80 bg-white shadow-lg">
             <Image
               src="/images/marketing/hero/product-dashboard.png"
-              alt="buyer-v2 property analysis dashboard"
+              alt="buyer-codex property analysis dashboard"
               width={1248}
               height={760}
               className="w-full"

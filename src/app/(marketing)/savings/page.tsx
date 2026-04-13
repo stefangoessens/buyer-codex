@@ -17,7 +17,7 @@ export default function SavingsPage() {
             See how much you could save
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-primary-100">
-            buyer-v2 rebates a portion of the buyer-agent commission back to
+            buyer-codex rebates a portion of the buyer-agent commission back to
             you at closing. Move the sliders below to see what that could look
             like on a Florida home.
           </p>

@@ -4,7 +4,7 @@ import {
   readEnv,
   validateEnv,
   webServerEnvSpec,
-} from "@buyer-v2/shared";
+} from "@buyer-codex/shared";
 
 type EnvSource = Record<string, string | undefined>;
 

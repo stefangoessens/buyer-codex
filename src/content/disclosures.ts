@@ -2,7 +2,7 @@ import type { DisclosureModule } from "@/lib/content/types";
 import { CALCULATOR_DISCLOSURES } from "@/lib/pricing/disclosures";
 
 /**
- * The canonical public disclosure catalog for buyer-v2 (KIN-773).
+ * The canonical public disclosure catalog for buyer-codex (KIN-773).
  *
  * Every disclosure has a stable id so analytics can track which ones
  * users have viewed and so legal review rounds can reference clauses
@@ -38,7 +38,7 @@ export const PUBLIC_DISCLOSURES: DisclosureModule[] = [
     severity: "emphasis",
     visibility: "public",
     body:
-      "As your buyer's brokerage, buyer-v2 owes you the duties of loyalty, confidentiality, obedience, full disclosure, accounting, and skill, care, and diligence required by Florida law. If a different relationship is ever proposed (e.g. transaction broker for a specific listing), we will disclose it in writing before you sign anything.",
+      "As your buyer's brokerage, buyer-codex owes you the duties of loyalty, confidentiality, obedience, full disclosure, accounting, and skill, care, and diligence required by Florida law. If a different relationship is ever proposed (e.g. transaction broker for a specific listing), we will disclose it in writing before you sign anything.",
   },
   {
     id: "dual_agency_prohibited",
@@ -46,7 +46,7 @@ export const PUBLIC_DISCLOSURES: DisclosureModule[] = [
     severity: "info",
     visibility: "public",
     body:
-      "buyer-v2 does not practice dual agency. We represent buyers only. If a listing requires dual representation, we will refer you to an independent brokerage for that specific transaction.",
+      "buyer-codex does not practice dual agency. We represent buyers only. If a listing requires dual representation, we will refer you to an independent brokerage for that specific transaction.",
   },
   {
     id: "fair_housing",
@@ -54,7 +54,7 @@ export const PUBLIC_DISCLOSURES: DisclosureModule[] = [
     severity: "info",
     visibility: "public",
     body:
-      "buyer-v2 complies with the federal Fair Housing Act and the Florida Fair Housing Act. We do not discriminate on the basis of race, color, national origin, religion, sex, familial status, disability, or any other protected class.",
+      "buyer-codex complies with the federal Fair Housing Act and the Florida Fair Housing Act. We do not discriminate on the basis of race, color, national origin, religion, sex, familial status, disability, or any other protected class.",
   },
   {
     id: "internal_ops_notes",

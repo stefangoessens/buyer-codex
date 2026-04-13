@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// buyer-v2 Chrome Extension — Background Service Worker (KIN-816)
+// buyer-codex Chrome Extension — Background Service Worker (KIN-816)
 //
 // Detects supported real estate listing pages (Zillow / Redfin / Realtor.com)
-// and updates the action badge so the user knows when the "Save to buyer-v2"
+// and updates the action badge so the user knows when the "Save to buyer-codex"
 // CTA is available.
 //
 // This script is plain JavaScript because Chrome extensions load modules
@@ -110,7 +110,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
  */
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "forward_to_intake" && typeof message.url === "string") {
-    const baseUrl = message.buyerV2BaseUrl || "https://buyer-v2.app";
+    const baseUrl = message.buyerCodexBaseUrl || "https://buyer-codex.app";
     const encoded = encodeURIComponent(message.url);
     const target = `${baseUrl.replace(/\/$/, "")}/intake?url=${encoded}&source=extension`;
     chrome.tabs.create({ url: target }).then(

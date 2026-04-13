@@ -135,7 +135,7 @@ def test_health() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["service"] == "buyer-v2-extraction"
+    assert data["service"] == "buyer-codex-extraction"
     assert data["version"] == "0.0.1"
     assert "release" in data
     assert "environment" in data

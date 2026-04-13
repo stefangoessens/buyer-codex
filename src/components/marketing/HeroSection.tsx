@@ -50,7 +50,7 @@ export function HeroSection({ children }: HeroSectionProps) {
                 <div className="relative h-full w-full overflow-hidden rounded-t-full bg-white">
                   <Image
                     src="/images/marketing/bento/bento-2.png"
-                    alt="buyer-v2 in action"
+                    alt="buyer-codex in action"
                     fill
                     priority
                     className="object-cover object-center"

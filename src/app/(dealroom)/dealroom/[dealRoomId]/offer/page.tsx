@@ -3,7 +3,7 @@ import { OfferCockpit } from "@/components/offer/OfferCockpit";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
 
 export const metadata: Metadata = {
-  title: "Offer cockpit | buyer-v2",
+  title: "Offer cockpit | buyer-codex",
   description:
     "Compare scenarios, fine-tune terms, and send a polished offer to your broker for review.",
 };

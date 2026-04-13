@@ -3,7 +3,7 @@ import {
   validateEnv,
   webPublicEnvSpec,
   webServerEnvSpec,
-} from "@buyer-v2/shared";
+} from "@buyer-codex/shared";
 import { describe, expect, it } from "vitest";
 import { getPublicEnvIssues, readPublicEnv } from "@/lib/env";
 

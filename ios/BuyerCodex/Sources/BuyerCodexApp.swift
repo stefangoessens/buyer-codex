@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct BuyerV2App: App {
+struct BuyerCodexApp: App {
 
     @State private var authService = AuthService()
 

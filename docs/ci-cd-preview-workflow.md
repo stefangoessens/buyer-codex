@@ -47,8 +47,8 @@ Supported placeholders:
 Example templates:
 
 ```text
-PREVIEW_WEB_URL_TEMPLATE=https://buyer-v2-pr-{PR_NUMBER}.up.railway.app
-PREVIEW_EXTRACTION_URL_TEMPLATE=https://buyer-v2-extraction-pr-{PR_NUMBER}.up.railway.app
+PREVIEW_WEB_URL_TEMPLATE=https://buyer-codex-pr-{PR_NUMBER}.up.railway.app
+PREVIEW_EXTRACTION_URL_TEMPLATE=https://buyer-codex-extraction-pr-{PR_NUMBER}.up.railway.app
 ```
 
 ## Railway service contract

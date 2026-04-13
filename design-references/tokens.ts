@@ -1,5 +1,5 @@
 /**
- * buyer-v2 Design Tokens — TypeScript Constants
+ * buyer-codex Design Tokens — TypeScript Constants
  * All color values extracted via getComputedStyle from live reference sites.
  * PayFit = aesthetic source, Hosman = structural source, RealAdvisor = data patterns
  */

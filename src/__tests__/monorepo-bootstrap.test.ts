@@ -7,14 +7,14 @@ import {
   webPublicEnvSpec,
   webServerEnvSpec,
   workspaceSurfaces,
-} from "@buyer-v2/shared";
+} from "@buyer-codex/shared";
 import { describe, expect, it } from "vitest";
 
 describe("monorepo bootstrap", () => {
   it("documents major workspace boundaries in the shared config package", () => {
     expect(workspaceSurfaces.web.path).toBe(".");
     expect(workspaceSurfaces.backend.path).toBe("convex");
-    expect(workspaceSurfaces.mobile.path).toBe("ios/BuyerV2");
+    expect(workspaceSurfaces.mobile.path).toBe("ios/BuyerCodex");
     expect(workspaceSurfaces.workers.path).toBe("python-workers");
     expect(workspaceSurfaces.extractionService.path).toBe("services/extraction");
   });

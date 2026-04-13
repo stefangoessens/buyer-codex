@@ -30,8 +30,8 @@ export default function PrivacyPage() {
       <h2 className="text-base font-semibold text-neutral-800">5. Contact</h2>
       <p>
         Questions? Email{" "}
-        <a className="font-medium text-primary-700 underline" href="mailto:hello@buyer-v2.com">
-          hello@buyer-v2.com
+        <a className="font-medium text-primary-700 underline" href="mailto:hello@buyer-codex.com">
+          hello@buyer-codex.com
         </a>
         .
       </p>

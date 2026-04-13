@@ -1,4 +1,4 @@
-# `@buyer-v2/shared`
+# `@buyer-codex/shared`
 
 Canonical shared package for repository-wide contracts, config metadata, and
 small reusable utilities.

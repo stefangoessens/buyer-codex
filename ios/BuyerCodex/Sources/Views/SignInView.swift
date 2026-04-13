@@ -18,7 +18,7 @@ struct SignInView: View {
                 Image(systemName: "house.fill")
                     .font(.system(size: 56))
                     .foregroundStyle(Color(hex: 0x1B2B65))
-                Text("buyer-v2")
+                Text("buyer-codex")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundStyle(Color(hex: 0x1B2B65))

@@ -27,9 +27,9 @@ import type {
 export const DEFAULT_LABELING_POLICY: LabelingPolicy = {
   illustrativeLabel: "Illustrative example",
   illustrativeAria:
-    "Illustrative example — not a live buyer-v2 transaction.",
+    "Illustrative example — not a live buyer-codex transaction.",
   illustrativeDetailNote:
-    "This is an illustrative example used to explain the buyer-v2 process. The figures shown are representative of typical Florida transactions and are not derived from a specific closed buyer-v2 deal. When buyer-v2 has live transaction data we will display it separately with explicit verification metadata.",
+    "This is an illustrative example used to explain the buyer-codex process. The figures shown are representative of typical Florida transactions and are not derived from a specific closed buyer-codex deal. When buyer-codex has live transaction data we will display it separately with explicit verification metadata.",
 };
 
 // MARK: - Validation errors

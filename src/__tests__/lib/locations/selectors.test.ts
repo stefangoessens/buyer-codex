@@ -27,7 +27,7 @@ function makeCity(overrides: Partial<CityPageConfig> = {}): CityPageConfig {
     state: "FL",
     pageTitle: "Buying a Home in Miami",
     summary:
-      "A comprehensive guide to buying a home in Miami, including market snapshots, neighborhoods, and how buyer-v2 helps Miami buyers save at closing.",
+      "A comprehensive guide to buying a home in Miami, including market snapshots, neighborhoods, and how buyer-codex helps Miami buyers save at closing.",
     heroHeadline: "Miami home buying",
     heroSubheadline: "Paste any Miami listing link",
     blocks: [{ kind: "hero_paragraph", text: "Miami overview paragraph." }],
@@ -46,7 +46,7 @@ function makeCommunity(
     citySlug: "miami",
     pageTitle: "Buying a Home in Brickell",
     summary:
-      "A guide to buying a home in the Brickell neighborhood of Miami, with market data and buyer-v2 analysis tips specific to the area.",
+      "A guide to buying a home in the Brickell neighborhood of Miami, with market data and buyer-codex analysis tips specific to the area.",
     heroHeadline: "Brickell home buying",
     heroSubheadline: "Paste any Brickell listing",
     blocks: [
@@ -453,16 +453,16 @@ describe("real LOCATION_CATALOG", () => {
   });
 
   // Codex P2 regression (PR #63): `buildMetadata` already appends
-  // " | buyer-v2" to every non-root title, so catalog `pageTitle`
+  // " | buyer-codex" to every non-root title, so catalog `pageTitle`
   // values must NOT include the suffix — otherwise the rendered
-  // <title> ends up with "... | buyer-v2 | buyer-v2".
+  // <title> ends up with "... | buyer-codex | buyer-codex".
   it("no pageTitle contains the site suffix", async () => {
     const { LOCATION_CATALOG } = await import("@/content/locations");
     for (const city of LOCATION_CATALOG.cities) {
-      expect(city.pageTitle).not.toMatch(/\|\s*buyer-v2/i);
+      expect(city.pageTitle).not.toMatch(/\|\s*buyer-codex/i);
     }
     for (const community of LOCATION_CATALOG.communities) {
-      expect(community.pageTitle).not.toMatch(/\|\s*buyer-v2/i);
+      expect(community.pageTitle).not.toMatch(/\|\s*buyer-codex/i);
     }
   });
 });

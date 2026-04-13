@@ -35,7 +35,7 @@ export const STATIC_SEO_PAGES = {
     seo: {
       title: "Get the best deal on your Florida home",
       description:
-        "Paste a Zillow, Redfin, or Realtor.com listing link to get instant AI pricing, comps, and expert Florida buyer representation with buyer-v2.",
+        "Paste a Zillow, Redfin, or Realtor.com listing link to get instant AI pricing, comps, and expert Florida buyer representation with buyer-codex.",
       path: "/",
       visibility: "public",
       kind: "marketing",
@@ -49,7 +49,7 @@ export const STATIC_SEO_PAGES = {
     seo: {
       title: "Free for buyers. Paid from the commission.",
       description:
-        "buyer-v2 never charges buyers up front. Our fee comes out of the buyer-agent commission at closing, and we rebate a portion of it back to you.",
+        "buyer-codex never charges buyers up front. Our fee comes out of the buyer-agent commission at closing, and we rebate a portion of it back to you.",
       path: "/pricing",
       visibility: "public",
       kind: "marketing",
@@ -63,7 +63,7 @@ export const STATIC_SEO_PAGES = {
     seo: {
       title: "Savings Calculator",
       description:
-        "Estimate your buyer credit on a Florida home purchase. See how buyer-v2's commission rebate model works and what you could save at closing.",
+        "Estimate your buyer credit on a Florida home purchase. See how buyer-codex's commission rebate model works and what you could save at closing.",
       path: "/savings",
       visibility: "public",
       kind: "marketing",
@@ -77,7 +77,7 @@ export const STATIC_SEO_PAGES = {
     seo: {
       title: "FAQ",
       description:
-        "How buyer-v2 works, how the buyer credit is calculated, and what happens when you engage us — in plain language.",
+        "How buyer-codex works, how the buyer credit is calculated, and what happens when you engage us — in plain language.",
       path: "/faq",
       visibility: "public",
       kind: "faq",
@@ -91,7 +91,7 @@ export const STATIC_SEO_PAGES = {
     seo: {
       title: "Articles for Florida homebuyers",
       description:
-        "Plain-language guides on pricing, offers, closing, commissions, and Florida market specifics — written by licensed brokers and the buyer-v2 team.",
+        "Plain-language guides on pricing, offers, closing, commissions, and Florida market specifics — written by licensed brokers and the buyer-codex team.",
       path: "/blog",
       visibility: "public",
       kind: "marketing",
@@ -104,7 +104,7 @@ export const STATIC_SEO_PAGES = {
   intake: {
     seo: {
       title: "Importing listing",
-      description: "Importing a listing into buyer-v2.",
+      description: "Importing a listing into buyer-codex.",
       path: "/intake",
       visibility: "gated",
       kind: "system",

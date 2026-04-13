@@ -3,7 +3,7 @@ import { CloseDashboard } from "@/components/close/CloseDashboard";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
 
 export const metadata: Metadata = {
-  title: "Close dashboard | buyer-v2",
+  title: "Close dashboard | buyer-codex",
   description:
     "Your close is on track — see what needs your attention, what's waiting on partners, and the plan for this week.",
 };

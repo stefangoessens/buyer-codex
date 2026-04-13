@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { LinkPastedSource } from "@buyer-v2/shared/launch-events";
+import type { LinkPastedSource } from "@buyer-codex/shared/launch-events";
 import { Input } from "@/components/ui/input";
 import { track } from "@/lib/analytics";
 

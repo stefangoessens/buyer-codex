@@ -1,7 +1,7 @@
 [project]
-name = "buyer-v2-extraction"
+name = "buyer-codex-extraction"
 version = "0.0.1"
-description = "Property data extraction worker for buyer-v2"
+description = "Property data extraction worker for buyer-codex"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115.0",

@@ -5,11 +5,11 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: "@buyer-v2/shared/",
+        find: "@buyer-codex/shared/",
         replacement: path.resolve(__dirname, "./packages/shared/src/"),
       },
       {
-        find: "@buyer-v2/shared",
+        find: "@buyer-codex/shared",
         replacement: path.resolve(__dirname, "./packages/shared/src/index.ts"),
       },
       {

@@ -2,10 +2,10 @@
 
 The full analytics catalog lives in `src/lib/analytics.ts`.
 
-Launch-critical events are defined once in `@buyer-v2/shared/launch-events` and then inherited into `AnalyticsEventMap`. That shared module also owns the runtime validator, emitter helpers, contract changelog, and the serializable contract snapshot used by downstream consumers/codegen.
+Launch-critical events are defined once in `@buyer-codex/shared/launch-events` and then inherited into `AnalyticsEventMap`. That shared module also owns the runtime validator, emitter helpers, contract changelog, and the serializable contract snapshot used by downstream consumers/codegen.
 
 ## Adding a new event
-1. If the event is launch-critical, add it to `@buyer-v2/shared/launch-events` and update the contract changelog there.
+1. If the event is launch-critical, add it to `@buyer-codex/shared/launch-events` and update the contract changelog there.
 2. Add a key to `AnalyticsEventMap` only for non-launch events. Include a JSDoc comment describing when the event fires.
 3. Add a matching entry in `EVENT_METADATA` with `{ category, owner, whenFired, piiSafe }`.
 4. Use `track("event_name", { ... })` at the call site — TypeScript enforces the shape.

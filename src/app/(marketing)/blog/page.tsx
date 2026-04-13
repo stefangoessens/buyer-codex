@@ -8,10 +8,10 @@ import type { ContentPageMeta } from "@/lib/content/types";
 
 const META: ContentPageMeta = {
   slug: "blog",
-  eyebrow: "The buyer-v2 blog",
+  eyebrow: "The buyer-codex blog",
   title: "Articles for Florida homebuyers",
   description:
-    "Plain-language guides on pricing, offers, closing, commissions, and Florida market specifics — written by licensed brokers and the buyer-v2 team.",
+    "Plain-language guides on pricing, offers, closing, commissions, and Florida market specifics — written by licensed brokers and the buyer-codex team.",
 };
 
 export const metadata: Metadata = metadataForStaticPage("blog");

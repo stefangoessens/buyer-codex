@@ -31,12 +31,12 @@ export default function AboutPage() {
         title={<>A buyer brokerage built for modern Florida homebuyers</>}
         description={
           <>
-            buyer-v2 combines instant AI-powered analysis with licensed Florida representation
+            buyer-codex combines instant AI-powered analysis with licensed Florida representation
             so you can negotiate from a position of strength.
           </>
         }
         imageSrc="/images/marketing/bento/bento-2.png"
-        imageAlt="Homebuyer using buyer-v2"
+        imageAlt="Homebuyer using buyer-codex"
       />
 
       <section className="w-full bg-white py-20 lg:py-28">

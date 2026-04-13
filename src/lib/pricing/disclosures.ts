@@ -40,7 +40,7 @@ export const CALCULATOR_DISCLOSURES: ReadonlyArray<Disclosure> = [
     label: "Estimate, not a guarantee",
     severity: "strong",
     body:
-      "This calculator is an illustrative estimate based on typical Florida market assumptions. Actual commissions, credits, and closing figures depend on the final executed purchase agreement, the listing's co-broke offer, and any negotiation between the parties. buyer-v2 does not guarantee any specific savings amount.",
+      "This calculator is an illustrative estimate based on typical Florida market assumptions. Actual commissions, credits, and closing figures depend on the final executed purchase agreement, the listing's co-broke offer, and any negotiation between the parties. buyer-codex does not guarantee any specific savings amount.",
   },
   {
     id: "commission_negotiable",
@@ -54,21 +54,21 @@ export const CALCULATOR_DISCLOSURES: ReadonlyArray<Disclosure> = [
     label: "Buyer credit conditions",
     severity: "info",
     body:
-      "Buyer credit is applied at closing as a reduction of closing costs or cash to close, subject to the buyer-v2 buyer representation agreement and lender approval. Some mortgage programs cap the amount of seller and agent credits a buyer can receive — buyer-v2 will always disclose any such cap before closing.",
+      "Buyer credit is applied at closing as a reduction of closing costs or cash to close, subject to the buyer-codex buyer representation agreement and lender approval. Some mortgage programs cap the amount of seller and agent credits a buyer can receive — buyer-codex will always disclose any such cap before closing.",
   },
   {
     id: "licensed_brokerage",
     label: "Licensed Florida brokerage",
     severity: "info",
     body:
-      "buyer-v2 is a licensed Florida real estate brokerage. All license-critical actions — buyer representation agreements, compensation disclosures, and contract execution — are reviewed by a licensed broker. Nothing in this calculator constitutes legal or tax advice.",
+      "buyer-codex is a licensed Florida real estate brokerage. All license-critical actions — buyer representation agreements, compensation disclosures, and contract execution — are reviewed by a licensed broker. Nothing in this calculator constitutes legal or tax advice.",
   },
   {
     id: "no_fee_offer_acceptance",
     label: "No hidden fees",
     severity: "info",
     body:
-      "buyer-v2 never charges the buyer directly for brokerage services. Our fee is paid out of the buyer-agent commission at closing. If a listing carries zero buyer-agent commission, we will tell you up front before you engage us.",
+      "buyer-codex never charges the buyer directly for brokerage services. Our fee is paid out of the buyer-agent commission at closing. If a listing carries zero buyer-agent commission, we will tell you up front before you engage us.",
   },
 ] as const;
 

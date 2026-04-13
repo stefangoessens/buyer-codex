@@ -365,13 +365,13 @@ export function buildIcsForMilestone(
   milestone: CloseDashboardMilestone,
   dealRoomId: string,
 ): string {
-  const uid = `${dealRoomId}-${milestone.id}@buyer-v2`;
+  const uid = `${dealRoomId}-${milestone.id}@buyer-codex`;
   const dtStart = icsCompactDate(milestone.dueDate);
   const dtEnd = nextDayDate(milestone.dueDate);
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//buyer-v2//close-dashboard//EN",
+    "PRODID:-//buyer-codex//close-dashboard//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
@@ -394,7 +394,7 @@ export function buildIcsForWeeklyPlan(
   const header = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//buyer-v2//close-dashboard-weekly//EN",
+    "PRODID:-//buyer-codex//close-dashboard-weekly//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
   ];
@@ -405,7 +405,7 @@ export function buildIcsForWeeklyPlan(
   }
   for (const item of unique.values()) {
     const m = item.milestone;
-    const uid = `${dealRoomId}-${m.id}-weekly@buyer-v2`;
+    const uid = `${dealRoomId}-${m.id}-weekly@buyer-codex`;
     const dtStart = icsCompactDate(m.dueDate);
     const dtEnd = nextDayDate(m.dueDate);
     events.push(

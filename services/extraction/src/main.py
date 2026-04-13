@@ -37,12 +37,12 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="buyer-v2 extraction worker",
+    title="buyer-codex extraction worker",
     version="0.0.1",
     lifespan=lifespan,
 )
 
-context = resolve_context(default_service="buyer-v2-extraction", version=app.version)
+context = resolve_context(default_service="buyer-codex-extraction", version=app.version)
 health_state = HealthState()
 sentry_enabled = init_sentry(context)
 allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")

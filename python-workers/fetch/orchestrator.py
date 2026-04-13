@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 _DEFAULT_MAX_CONCURRENT = 4
 _ORCHESTRATOR_VENDOR = "orchestrator"
-logger = logging.getLogger("buyer_v2.fetch.orchestrator")
+logger = logging.getLogger("buyer_codex.fetch.orchestrator")
 
 
 def _is_retryable(exc: BaseException) -> bool:

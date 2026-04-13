@@ -1,12 +1,12 @@
-# buyer-v2 Chrome Extension (KIN-816)
+# buyer-codex Chrome Extension (KIN-816)
 
-Chrome extension v1 for forwarding supported real estate listing pages into the buyer-v2 intake flow.
+Chrome extension v1 for forwarding supported real estate listing pages into the buyer-codex intake flow.
 
 ## What it does
 
 - Detects Zillow, Redfin, and Realtor.com listing pages in the active tab
 - Shows a green ✓ badge on the extension icon when a listing is detected
-- Popup offers a "Save to buyer-v2" CTA that opens the intake flow in a new tab
+- Popup offers a "Save to buyer-codex" CTA that opens the intake flow in a new tab
 
 ## Load in Chrome
 
@@ -27,10 +27,10 @@ The extension will register for `zillow.com`, `redfin.com`, and `realtor.com` ho
 Clicking the Save button sends a `forward_to_intake` message to the service worker, which opens:
 
 ```
-{buyerV2BaseUrl}/intake?url={encoded_listing_url}&source=extension
+{buyerCodexBaseUrl}/intake?url={encoded_listing_url}&source=extension
 ```
 
-- `buyerV2BaseUrl` defaults to `https://buyer-v2.app` (dev users edit `popup.js` to point at `localhost:3000` during local testing)
+- `buyerCodexBaseUrl` defaults to `https://buyer-codex.app` (dev users edit `popup.js` to point at `localhost:3000` during local testing)
 - `source=extension` feeds the KIN-860 analytics taxonomy so funnel attribution works correctly
 - The intake web flow (served by the Next.js app) handles signed-in / signed-out / duplicate routing — the extension does not know or care which branch the user ends up in
 
@@ -55,8 +55,8 @@ extension/
 
 - Content scripts (no DOM access required — URL alone is enough)
 - Background sync / offline queueing
-- Options page (buyerV2BaseUrl is hardcoded; will become configurable in v2)
+- Options page (buyerCodexBaseUrl is hardcoded; will become configurable in v2)
 - Firefox / Edge parity (Manifest v3 works on Edge; Firefox needs a separate manifest)
-- Custom icons — manifest omits `icons` / `default_icon` in v1 so the extension loads with Chrome's default puzzle-piece icon. Branded icons are a design follow-up (need 16/48/128 PNG exports of the buyer-v2 logo).
+- Custom icons — manifest omits `icons` / `default_icon` in v1 so the extension loads with Chrome's default puzzle-piece icon. Branded icons are a design follow-up (need 16/48/128 PNG exports of the buyer-codex logo).
 
 Follow-ups tracked under the same parent epic (KIN-743 Intake umbrella).

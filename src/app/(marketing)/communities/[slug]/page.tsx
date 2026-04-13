@@ -62,7 +62,7 @@ export default async function CommunityPage({
 
   // Resolve the parent city so the template can show a breadcrumb.
   // Draft parent cities return undefined here — the template handles
-  // that gracefully by falling back to the generic "Back to buyer-v2"
+  // that gracefully by falling back to the generic "Back to buyer-codex"
   // link. Note: `validateCatalog` already enforces that every
   // community references a city that exists, so the parent will
   // only be missing when the parent is in draft visibility.

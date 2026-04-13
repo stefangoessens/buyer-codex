@@ -1,5 +1,5 @@
 /**
- * Pure savings calculator for buyer-v2 (KIN-772).
+ * Pure savings calculator for buyer-codex (KIN-772).
  *
  * This module owns the math that drives the public savings calculator,
  * the homepage teaser, pricing pages, and any future campaign surface.
@@ -16,7 +16,7 @@
  * negotiable and the post-NAR-settlement landscape has made the split
  * explicitly up to the parties.
  *
- * buyer-v2's model: we are the buyer's brokerage, and we credit a
+ * buyer-codex's model: we are the buyer's brokerage, and we credit a
  * portion of the buyer-agent commission back to the buyer at closing
  * as a buyer credit (a.k.a. commission rebate). The calculator below
  * turns typed assumptions about price, total commission, buyer-agent
@@ -60,10 +60,10 @@ export type SavingsCalculatorInput = {
   buyerAgentCommissionPercent: number;
 
   /**
-   * Percentage of the buyer-agent commission that buyer-v2 credits
+   * Percentage of the buyer-agent commission that buyer-codex credits
    * back to the buyer at closing. Range: [0, 100].
    *
-   * A value of 33 means buyer-v2 keeps 67% of the buyer-agent
+   * A value of 33 means buyer-codex keeps 67% of the buyer-agent
    * commission as its service fee and credits 33% to the buyer.
    */
   buyerCreditPercent: number;
@@ -124,10 +124,10 @@ export type SavingsCalculatorResult = {
   buyerCreditAmount: number;
 
   /**
-   * Amount buyer-v2 retains as its fee in USD (buyerAgentCommissionAmount
+   * Amount buyer-codex retains as its fee in USD (buyerAgentCommissionAmount
    * minus buyerCreditAmount).
    */
-  buyerV2FeeAmount: number;
+  buyerCodexFeeAmount: number;
 
   /**
    * Effective commission percent the buyer ends up paying — computed
@@ -278,7 +278,7 @@ export function calculateSavings(
   const buyerCreditCents = Math.round(
     (buyerAgentCents * input.buyerCreditPercent) / 100
   );
-  const buyerV2FeeCents = Math.max(0, buyerAgentCents - buyerCreditCents);
+  const buyerCodexFeeCents = Math.max(0, buyerAgentCents - buyerCreditCents);
 
   const isZeroCommission =
     input.totalCommissionPercent === 0 ||
@@ -301,7 +301,7 @@ export function calculateSavings(
       totalCommissionAmount: Math.round(totalCommissionCents / 100),
       buyerAgentCommissionAmount: Math.round(buyerAgentCents / 100),
       buyerCreditAmount: Math.round(buyerCreditCents / 100),
-      buyerV2FeeAmount: Math.round(buyerV2FeeCents / 100),
+      buyerCodexFeeAmount: Math.round(buyerCodexFeeCents / 100),
       effectiveBuyerCommissionPercent,
       isZeroCommission,
     },

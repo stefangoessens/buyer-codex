@@ -32,7 +32,7 @@ for (const file of bootstrapFiles) {
 }
 
 console.log("");
-console.log("buyer-v2 bootstrap complete");
+console.log("buyer-codex bootstrap complete");
 console.log("");
 console.log("Web:       pnpm dev:web");
 console.log("Convex:    pnpm dev:backend");

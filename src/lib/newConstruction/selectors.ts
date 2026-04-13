@@ -34,7 +34,7 @@ export function isValidSlug(slug: string): boolean {
  *   - valid kebab-case slug format
  *   - every community references a builder that exists
  *   - every config has at least one block
- *   - pageTitle < 70 chars and does NOT contain the " | buyer-v2"
+ *   - pageTitle < 70 chars and does NOT contain the " | buyer-codex"
  *     site suffix (codex guardrail from PR #63 — `buildMetadata`
  *     appends the suffix already; storing it in the catalog would
  *     double it)
@@ -115,7 +115,7 @@ function validateTextBudgets(
   if (pageTitle.length > 70) {
     errors.push({ kind: "pageTitleTooLong", slug, length: pageTitle.length });
   }
-  if (/\|\s*buyer-v2/i.test(pageTitle)) {
+  if (/\|\s*buyer-codex/i.test(pageTitle)) {
     errors.push({ kind: "titleIncludesSiteSuffix", slug });
   }
 }

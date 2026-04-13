@@ -1,6 +1,6 @@
 # extraction worker service
 
-Deployable FastAPI worker surface for buyer-v2 extraction tasks.
+Deployable FastAPI worker surface for buyer-codex extraction tasks.
 
 ## Local commands
 

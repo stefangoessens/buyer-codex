@@ -27,7 +27,7 @@ export const SETTINGS_CATALOG: SettingsCatalog = {
       defaultValue: {
         kind: "richText",
         value:
-          "buyer-v2 represents the buyer in Florida residential real estate transactions. As a licensed Florida brokerage, we act as the buyer's exclusive agent on every transaction unless the buyer signs a different form of representation.",
+          "buyer-codex represents the buyer in Florida residential real estate transactions. As a licensed Florida brokerage, we act as the buyer's exclusive agent on every transaction unless the buyer signs a different form of representation.",
       },
       constraints: { minLength: 50, maxLength: 4000 },
     },
@@ -35,14 +35,14 @@ export const SETTINGS_CATALOG: SettingsCatalog = {
       key: "disclosure.fee_transparency",
       label: "Fee transparency disclosure",
       description:
-        "Short explanation of how buyer-v2's commission rebate interacts with builder and seller credits.",
+        "Short explanation of how buyer-codex's commission rebate interacts with builder and seller credits.",
       category: "disclosures",
       kind: "richText",
       writeRole: "admin",
       defaultValue: {
         kind: "richText",
         value:
-          "buyer-v2's commission rebate is calculated from the buyer-agent commission specified in the listing agreement. The rebate is delivered as a closing credit and does not stack with builder incentives unless the builder's written terms allow it.",
+          "buyer-codex's commission rebate is calculated from the buyer-agent commission specified in the listing agreement. The rebate is delivered as a closing credit and does not stack with builder incentives unless the builder's written terms allow it.",
       },
       constraints: { minLength: 50, maxLength: 2000 },
     },
@@ -130,7 +130,7 @@ export const SETTINGS_CATALOG: SettingsCatalog = {
       category: "branding",
       kind: "string",
       writeRole: "admin",
-      defaultValue: { kind: "string", value: "buyer-v2" },
+      defaultValue: { kind: "string", value: "buyer-codex" },
       constraints: { minLength: 1, maxLength: 50 },
     },
     {

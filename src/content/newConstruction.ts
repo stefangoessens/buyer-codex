@@ -20,14 +20,14 @@ export const NEW_CONSTRUCTION_CATALOG: NewConstructionCatalog = {
       tagline: "National builder with deep Florida inventory.",
       pageTitle: "Lennar New Construction in Florida",
       summary:
-        "A plain-language guide to buying a Lennar new-construction home in Florida with buyer-v2 — how the buyer-side commission works on new builds, what to expect at closing, and which incentive programs stack with a buyer-v2 rebate.",
+        "A plain-language guide to buying a Lennar new-construction home in Florida with buyer-codex — how the buyer-side commission works on new builds, what to expect at closing, and which incentive programs stack with a buyer-codex rebate.",
       heroHeadline: "Buying a Lennar new-construction home in Florida",
       heroSubheadline:
-        "Get buyer-v2's AI pricing and a rebate at closing while still keeping any Lennar builder incentives you qualify for.",
+        "Get buyer-codex's AI pricing and a rebate at closing while still keeping any Lennar builder incentives you qualify for.",
       blocks: [
         {
           kind: "hero_paragraph",
-          text: "Lennar is one of Florida's largest new-construction builders. buyer-v2 represents buyers on Lennar purchases the same way we represent buyers on resale listings: we run the same AI pricing engine, provide the same licensed broker representation, and rebate a portion of the buyer-agent commission at closing. The difference is that new construction commission structures and incentives are builder-specific, so our analysis surfaces which incentives stack and which are mutually exclusive.",
+          text: "Lennar is one of Florida's largest new-construction builders. buyer-codex represents buyers on Lennar purchases the same way we represent buyers on resale listings: we run the same AI pricing engine, provide the same licensed broker representation, and rebate a portion of the buyer-agent commission at closing. The difference is that new construction commission structures and incentives are builder-specific, so our analysis surfaces which incentives stack and which are mutually exclusive.",
         },
         {
           kind: "builder_facts",
@@ -40,15 +40,15 @@ export const NEW_CONSTRUCTION_CATALOG: NewConstructionCatalog = {
         },
         {
           kind: "savings_projection",
-          headline: "Illustrative buyer-v2 savings on a Lennar purchase",
+          headline: "Illustrative buyer-codex savings on a Lennar purchase",
           rows: [
             {
               label: "Lennar builder rate buydown",
               value: "Up to $10,000",
-              note: "Stackable with buyer-v2 rebate",
+              note: "Stackable with buyer-codex rebate",
             },
             {
-              label: "buyer-v2 commission rebate",
+              label: "buyer-codex commission rebate",
               value: "~$4,500",
               note: "On a $500k purchase — see savings calculator for your deal",
             },
@@ -84,14 +84,14 @@ export const NEW_CONSTRUCTION_CATALOG: NewConstructionCatalog = {
       tagline: "America's largest homebuilder, with strong FL volume.",
       pageTitle: "D.R. Horton New Construction in Florida",
       summary:
-        "A guide to buying a D.R. Horton new-construction home in Florida with buyer-v2 — how builder incentives interact with buyer representation and how to capture a buyer-v2 rebate alongside any D.R. Horton promotion.",
+        "A guide to buying a D.R. Horton new-construction home in Florida with buyer-codex — how builder incentives interact with buyer representation and how to capture a buyer-codex rebate alongside any D.R. Horton promotion.",
       heroHeadline: "D.R. Horton new construction in Florida",
       heroSubheadline:
         "AI pricing, licensed broker representation, and a rebate at closing — even on a D.R. Horton contract.",
       blocks: [
         {
           kind: "hero_paragraph",
-          text: "D.R. Horton sells a large share of Florida's entry-level new-construction inventory. buyer-v2 can represent you on a D.R. Horton purchase and rebate a portion of the buyer-agent commission at closing. The tricky part on any new-construction purchase is understanding which builder incentives are stackable — buyer-v2's analysis flags that upfront so you see the real, after-incentive delta.",
+          text: "D.R. Horton sells a large share of Florida's entry-level new-construction inventory. buyer-codex can represent you on a D.R. Horton purchase and rebate a portion of the buyer-agent commission at closing. The tricky part on any new-construction purchase is understanding which builder incentives are stackable — buyer-codex's analysis flags that upfront so you see the real, after-incentive delta.",
         },
         {
           kind: "builder_facts",
@@ -104,8 +104,8 @@ export const NEW_CONSTRUCTION_CATALOG: NewConstructionCatalog = {
         },
         {
           kind: "faq_ref",
-          heading: "D.R. Horton + buyer-v2 FAQs",
-          entryIds: ["what_is_buyer_v2", "how_is_the_rebate_calculated"],
+          heading: "D.R. Horton + buyer-codex FAQs",
+          entryIds: ["what_is_buyer_codex", "how_is_the_rebate_calculated"],
         },
         {
           kind: "cta",
@@ -145,14 +145,14 @@ export const NEW_CONSTRUCTION_CATALOG: NewConstructionCatalog = {
       state: "FL",
       pageTitle: "Villages at Tradition — Lennar (Port St. Lucie)",
       summary:
-        "Illustrative new-construction community from Lennar in Port St. Lucie. Shows how buyer-v2's analysis and rebate stack with builder incentives across phases of a master-planned community.",
+        "Illustrative new-construction community from Lennar in Port St. Lucie. Shows how buyer-codex's analysis and rebate stack with builder incentives across phases of a master-planned community.",
       heroHeadline: "Villages at Tradition — Lennar in Port St. Lucie",
       heroSubheadline:
-        "A master-planned community with multiple phases, builder incentives, and buyer-v2 representation at closing.",
+        "A master-planned community with multiple phases, builder incentives, and buyer-codex representation at closing.",
       blocks: [
         {
           kind: "hero_paragraph",
-          text: "Villages at Tradition is an illustrative new-construction community used to demonstrate how buyer-v2 represents buyers on phased master-planned developments. The key thing to understand about multi-phase communities is that builder incentives often change between phases — buyer-v2's analysis locks in the incentive structure at the moment you sign so the quoted savings don't evaporate at closing.",
+          text: "Villages at Tradition is an illustrative new-construction community used to demonstrate how buyer-codex represents buyers on phased master-planned developments. The key thing to understand about multi-phase communities is that builder incentives often change between phases — buyer-codex's analysis locks in the incentive structure at the moment you sign so the quoted savings don't evaporate at closing.",
         },
         {
           kind: "urgency",
@@ -202,7 +202,7 @@ export const NEW_CONSTRUCTION_CATALOG: NewConstructionCatalog = {
               note: "Builder incentive",
             },
             {
-              label: "buyer-v2 commission rebate",
+              label: "buyer-codex commission rebate",
               value: "-$4,725",
               note: "~0.9% of purchase price",
             },
@@ -232,14 +232,14 @@ export const NEW_CONSTRUCTION_CATALOG: NewConstructionCatalog = {
       state: "FL",
       pageTitle: "Heron Preserve — D.R. Horton (Ocala)",
       summary:
-        "Illustrative D.R. Horton community in Ocala. Shows how buyer-v2 handles entry-level new construction where the builder's default incentive is a rate buydown rather than a price reduction.",
+        "Illustrative D.R. Horton community in Ocala. Shows how buyer-codex handles entry-level new construction where the builder's default incentive is a rate buydown rather than a price reduction.",
       heroHeadline: "Heron Preserve — D.R. Horton in Ocala",
       heroSubheadline:
-        "Entry-level new-construction community with paired AI pricing analysis and buyer-v2 rebate.",
+        "Entry-level new-construction community with paired AI pricing analysis and buyer-codex rebate.",
       blocks: [
         {
           kind: "hero_paragraph",
-          text: "Heron Preserve is an illustrative entry-level new-construction community in Ocala. buyer-v2's analysis focuses on whether the D.R. Horton default incentive (typically a rate buydown from their preferred lender) is actually the best deal available, or whether paying a slightly higher rate in exchange for a price concession leaves the buyer better off over the life of the loan.",
+          text: "Heron Preserve is an illustrative entry-level new-construction community in Ocala. buyer-codex's analysis focuses on whether the D.R. Horton default incentive (typically a rate buydown from their preferred lender) is actually the best deal available, or whether paying a slightly higher rate in exchange for a price concession leaves the buyer better off over the life of the loan.",
         },
         {
           kind: "urgency",
@@ -278,14 +278,14 @@ export const NEW_CONSTRUCTION_CATALOG: NewConstructionCatalog = {
       state: "FL",
       pageTitle: "Silver Oak Reserve — Lennar (Orlando)",
       summary:
-        "Illustrative Lennar community in Orlando showing how buyer-v2 handles mid-tier move-up new construction with the combined buyer rebate and preferred lender incentive stack.",
+        "Illustrative Lennar community in Orlando showing how buyer-codex handles mid-tier move-up new construction with the combined buyer rebate and preferred lender incentive stack.",
       heroHeadline: "Silver Oak Reserve — Lennar in Orlando",
       heroSubheadline:
-        "A mid-tier Lennar community in Orlando with buyer-v2 representation and a commission rebate at closing.",
+        "A mid-tier Lennar community in Orlando with buyer-codex representation and a commission rebate at closing.",
       blocks: [
         {
           kind: "hero_paragraph",
-          text: "Silver Oak Reserve is an illustrative mid-tier Lennar community in Orlando. The move-up price point (typically $450k–$600k) is where builder incentives tend to be most negotiable — buyer-v2's analysis surfaces the specific levers (closing cost credit vs rate buydown vs price concession) that move the needle most for your specific financing profile.",
+          text: "Silver Oak Reserve is an illustrative mid-tier Lennar community in Orlando. The move-up price point (typically $450k–$600k) is where builder incentives tend to be most negotiable — buyer-codex's analysis surfaces the specific levers (closing cost credit vs rate buydown vs price concession) that move the needle most for your specific financing profile.",
         },
         {
           kind: "savings_projection",
@@ -297,7 +297,7 @@ export const NEW_CONSTRUCTION_CATALOG: NewConstructionCatalog = {
               value: "-$8,000",
             },
             {
-              label: "buyer-v2 commission rebate",
+              label: "buyer-codex commission rebate",
               value: "-$4,400",
             },
             { label: "Estimated net cost", value: "$477,500" },

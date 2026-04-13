@@ -8,7 +8,7 @@ This repository now contains the implementation that had been landing in the wro
 
 - GitHub repo and branch/project naming for this repository are `buyer-codex`.
 - Linear source of truth is the `buyer-codex` project on the `Kindservices` team.
-- Some runtime package names and product-facing strings still use `buyer-v2`; those are application identifiers, not cross-repo routing.
+- Some runtime package names and product-facing strings still use `buyer-codex`; those are application identifiers, not cross-repo routing.
 
 ## Quick Start
 
@@ -25,7 +25,7 @@ pnpm dev:web
 .
 ├── .                         # web app workspace
 ├── convex/                   # Convex backend workspace
-├── ios/BuyerV2/              # Swift Package / SwiftUI app workspace
+├── ios/BuyerCodex/              # Swift Package / SwiftUI app workspace
 ├── packages/shared/          # shared contracts and TS utilities
 ├── python-workers/           # reusable Python worker library
 └── services/extraction/      # deployable FastAPI extraction worker

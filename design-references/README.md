@@ -1,6 +1,6 @@
 # Design References
 
-Reference materials for the buyer-v2 design system.
+Reference materials for the buyer-codex design system.
 
 ## Files
 

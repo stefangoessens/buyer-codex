@@ -1,10 +1,10 @@
 import posthog from "posthog-js";
-import type { LaunchEventMap } from "@buyer-v2/shared/launch-events";
+import type { LaunchEventMap } from "@buyer-codex/shared/launch-events";
 import { resolveObservabilityContext } from "@/lib/observability";
 import { deepScrubPii } from "@/lib/security/pii-guard";
 
 /**
- * Canonical analytics event catalog for buyer-v2.
+ * Canonical analytics event catalog for buyer-codex.
  *
  * Each key is an event name (snake_case verb_noun). Each value is the
  * typed properties shape for that event. Adding a new event requires:
@@ -475,7 +475,7 @@ export function track<K extends AnalyticsEventName>(
 ): void {
   const metadata = EVENT_METADATA[event];
   const context = resolveObservabilityContext({
-    defaultService: "buyer-v2-web",
+    defaultService: "buyer-codex-web",
   });
   // For non-piiSafe events, run deep scrubbing that walks BOTH field
   // names AND string values. This catches PII that leaks into free-text

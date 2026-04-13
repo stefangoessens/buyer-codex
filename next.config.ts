@@ -8,7 +8,7 @@ const workspaceRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: workspaceRoot,
-  transpilePackages: ["@buyer-v2/shared"],
+  transpilePackages: ["@buyer-codex/shared"],
 };
 
 const serverEnv = readEnv(webServerEnvSpec, process.env);

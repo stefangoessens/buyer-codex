@@ -4,7 +4,7 @@
  * Pure TS — imported by both the extension build and Vitest. The
  * extension background worker calls `detectListingPage(tab.url)` on
  * every tab update to decide whether to enable the action badge and
- * offer the "Save to buyer-v2" CTA.
+ * offer the "Save to buyer-codex" CTA.
  *
  * Detection reuses the canonical listing URL parser from KIN-774
  * (parseListingUrl) so supported portal rules live in exactly one
@@ -13,7 +13,7 @@
  * Convex mutations handle the rest.
  */
 
-import type { LinkPastedSource } from "@buyer-v2/shared/launch-events";
+import type { LinkPastedSource } from "@buyer-codex/shared/launch-events";
 import { parseListingUrl } from "@/lib/intake/parser";
 
 export type DetectionStatus =
@@ -70,7 +70,7 @@ export function detectListingPage(url: string | undefined): DetectionResult {
       platform: parsed.data.platform,
       listingId: parsed.data.listingId,
       normalizedUrl: parsed.data.normalizedUrl,
-      message: `${portalLabel(parsed.data.platform)} listing detected. Click to save to buyer-v2.`,
+      message: `${portalLabel(parsed.data.platform)} listing detected. Click to save to buyer-codex.`,
     };
   }
 
@@ -88,7 +88,7 @@ export function detectListingPage(url: string | undefined): DetectionResult {
       return {
         status: "unsupported_portal",
         message:
-          "Not a supported listing portal. buyer-v2 supports Zillow, Redfin, and Realtor.com.",
+          "Not a supported listing portal. buyer-codex supports Zillow, Redfin, and Realtor.com.",
       };
     default:
       return { status: "unsupported_portal", message: "Not a supported listing." };
@@ -107,7 +107,7 @@ function portalLabel(platform: "zillow" | "redfin" | "realtor"): string {
 }
 
 /**
- * Build the buyer-v2 intake URL that the extension should forward the
+ * Build the buyer-codex intake URL that the extension should forward the
  * detected listing to. The extension opens this in a new tab, which
  * lands the user on the canonical intake flow regardless of auth state
  * — the web app handles signed-in / signed-out / duplicate routing.
@@ -116,11 +116,11 @@ function portalLabel(platform: "zillow" | "redfin" | "realtor"): string {
  * attribute the intake correctly (matches KIN-860 analytics taxonomy).
  */
 export function buildIntakeForwardUrl(
-  buyerV2BaseUrl: string,
+  buyerCodexBaseUrl: string,
   normalizedListingUrl: string,
 ): string {
   const source: Extract<LinkPastedSource, "extension"> = "extension";
-  const base = buyerV2BaseUrl.replace(/\/$/, "");
+  const base = buyerCodexBaseUrl.replace(/\/$/, "");
   const encoded = encodeURIComponent(normalizedListingUrl);
   return `${base}/intake?url=${encoded}&source=${source}`;
 }

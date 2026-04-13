@@ -11,17 +11,17 @@ import type { FAQEntry } from "@/lib/content/types";
 export const FAQ_ENTRIES: FAQEntry[] = [
   // ─── Getting started ───────────────────────────────────────────────
   {
-    id: "what_is_buyer_v2",
+    id: "what_is_buyer_codex",
     category: "getting_started",
-    question: "What is buyer-v2?",
+    question: "What is buyer-codex?",
     answer:
-      "buyer-v2 is an AI-native Florida buyer brokerage. We help you analyze any listing you paste, negotiate on your behalf, and rebate a portion of the buyer-agent commission back to you at closing.",
+      "buyer-codex is an AI-native Florida buyer brokerage. We help you analyze any listing you paste, negotiate on your behalf, and rebate a portion of the buyer-agent commission back to you at closing.",
     visibility: "public",
   },
   {
-    id: "who_can_use_buyer_v2",
+    id: "who_can_use_buyer_codex",
     category: "getting_started",
-    question: "Who can use buyer-v2?",
+    question: "Who can use buyer-codex?",
     answer:
       "Anyone buying a home in Florida. We're a licensed Florida real estate brokerage. If you're shopping outside Florida today, join our waitlist — we'll let you know when we expand.",
     visibility: "public",
@@ -39,9 +39,9 @@ export const FAQ_ENTRIES: FAQEntry[] = [
   {
     id: "how_much_does_it_cost",
     category: "pricing",
-    question: "How much does buyer-v2 cost?",
+    question: "How much does buyer-codex cost?",
     answer:
-      "buyer-v2 is free to browse and free to engage. Our fee comes out of the buyer-agent commission at closing — we never charge you up front. If a listing has no buyer-agent commission, we'll tell you before you engage.",
+      "buyer-codex is free to browse and free to engage. Our fee comes out of the buyer-agent commission at closing — we never charge you up front. If a listing has no buyer-agent commission, we'll tell you before you engage.",
     visibility: "public",
   },
   {
@@ -89,11 +89,11 @@ export const FAQ_ENTRIES: FAQEntry[] = [
 
   // ─── Legal ─────────────────────────────────────────────────────────
   {
-    id: "is_buyer_v2_a_broker",
+    id: "is_buyer_codex_a_broker",
     category: "legal",
-    question: "Is buyer-v2 a licensed real estate brokerage?",
+    question: "Is buyer-codex a licensed real estate brokerage?",
     answer:
-      "Yes. buyer-v2 is a licensed Florida real estate brokerage. All license-critical actions — buyer representation agreements, compensation disclosures, and contract execution — are reviewed by a licensed broker.",
+      "Yes. buyer-codex is a licensed Florida real estate brokerage. All license-critical actions — buyer representation agreements, compensation disclosures, and contract execution — are reviewed by a licensed broker.",
     visibility: "public",
   },
   {

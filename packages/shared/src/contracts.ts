@@ -19,7 +19,7 @@ export const dealStatuses = [
   "withdrawn",
 ] as const;
 
-/** Status of a deal in the buyer-v2 pipeline */
+/** Status of a deal in the buyer-codex pipeline */
 export type DealStatus = (typeof dealStatuses)[number];
 
 export const aiReviewStates = ["pending", "approved", "rejected"] as const;
@@ -500,7 +500,7 @@ export function mapApprovedOfferToFloridaContract(
     warnings.push({
       code: "seller_name_missing",
       message:
-        "Seller party data is not currently populated in buyer-v2 and may need ops follow-up inside Form Simplicity.",
+        "Seller party data is not currently populated in buyer-codex and may need ops follow-up inside Form Simplicity.",
     });
   }
 

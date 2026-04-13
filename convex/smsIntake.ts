@@ -204,7 +204,7 @@ function getAppBaseUrl(): string {
   return (
     process.env.NEXT_PUBLIC_APP_URL ??
     process.env.APP_BASE_URL ??
-    "https://buyer-v2.local"
+    "https://buyer-codex.local"
   );
 }
 
@@ -228,7 +228,7 @@ function getSignedLinkSecret(): string {
   if (isLocal) {
     // Explicit dev/test placeholder. Never used in production because
     // the isLocal guard is false in any hosted runtime.
-    return "buyer-v2-dev-placeholder-secret-do-not-use-in-prod";
+    return "buyer-codex-dev-placeholder-secret-do-not-use-in-prod";
   }
 
   throw new Error(
@@ -242,11 +242,11 @@ function getSignedLinkSecret(): string {
 
 const REPLY_COPY = {
   stop:
-    "You've been unsubscribed from buyer-v2 SMS. Reply START to opt back in.",
+    "You've been unsubscribed from buyer-codex SMS. Reply START to opt back in.",
   start:
-    "You're opted in to buyer-v2 SMS. Send a Zillow, Redfin, or Realtor.com listing link to get started.",
+    "You're opted in to buyer-codex SMS. Send a Zillow, Redfin, or Realtor.com listing link to get started.",
   help:
-    "buyer-v2 — paste a Zillow, Redfin, or Realtor.com listing link to create a deal room. Reply STOP to opt out. Msg/data rates may apply.",
+    "buyer-codex — paste a Zillow, Redfin, or Realtor.com listing link to create a deal room. Reply STOP to opt out. Msg/data rates may apply.",
   invalidUrl:
     "We couldn't find a listing link in your message. Please send a Zillow, Redfin, or Realtor.com listing link.",
   unsupportedUrl:

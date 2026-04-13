@@ -1,5 +1,5 @@
 /**
- * SEO route registry for buyer-v2 (KIN-815).
+ * SEO route registry for buyer-codex (KIN-815).
  *
  * Every public surface that should appear in the sitemap and every
  * gated route that must be excluded from indexing is declared here.

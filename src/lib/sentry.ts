@@ -3,7 +3,7 @@ import { resolveObservabilityContext } from "@/lib/observability";
 import { deepScrubPii } from "@/lib/security/pii-guard";
 
 const observabilityContext = resolveObservabilityContext({
-  defaultService: "buyer-v2-web",
+  defaultService: "buyer-codex-web",
 });
 
 function readContextString(

@@ -28,7 +28,7 @@ function makeBuilder(
     tagline: "National builder",
     pageTitle: "Lennar New Construction in Florida",
     summary:
-      "A thorough illustrative builder summary describing buyer-v2's representation on new-construction Lennar homes across Florida with enough detail to exceed the minimum length.",
+      "A thorough illustrative builder summary describing buyer-codex's representation on new-construction Lennar homes across Florida with enough detail to exceed the minimum length.",
     heroHeadline: "Lennar in Florida",
     heroSubheadline: "Paste a Lennar listing to get started",
     blocks: [{ kind: "hero_paragraph", text: "Lennar overview" }],
@@ -198,7 +198,7 @@ describe("validateCatalog", () => {
   it("detects pageTitle that contains the site suffix", () => {
     const catalog: NewConstructionCatalog = {
       builders: [
-        makeBuilder({ pageTitle: "Lennar New Construction | buyer-v2" }),
+        makeBuilder({ pageTitle: "Lennar New Construction | buyer-codex" }),
       ],
       communities: [],
     };
@@ -451,10 +451,10 @@ describe("real NEW_CONSTRUCTION_CATALOG", () => {
       "@/content/newConstruction"
     );
     for (const builder of NEW_CONSTRUCTION_CATALOG.builders) {
-      expect(builder.pageTitle).not.toMatch(/\|\s*buyer-v2/i);
+      expect(builder.pageTitle).not.toMatch(/\|\s*buyer-codex/i);
     }
     for (const community of NEW_CONSTRUCTION_CATALOG.communities) {
-      expect(community.pageTitle).not.toMatch(/\|\s*buyer-v2/i);
+      expect(community.pageTitle).not.toMatch(/\|\s*buyer-codex/i);
     }
   });
 

@@ -70,7 +70,7 @@ export default async function NewConstructionCommunityPage({
 
   // Look up the parent builder — undefined when the parent is
   // draft-visibility. The template renders a generic "Back to
-  // buyer-v2" breadcrumb in that case.
+  // buyer-codex" breadcrumb in that case.
   const parentBuilder = findPublicBuilder(
     NEW_CONSTRUCTION_CATALOG,
     community.builderSlug

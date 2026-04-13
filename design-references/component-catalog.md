@@ -1,6 +1,6 @@
 # Component Catalog
 
-Design component patterns harvested from reference sites (PayFit, Hosman, RealAdvisor), mapped to buyer-v2 surfaces.
+Design component patterns harvested from reference sites (PayFit, Hosman, RealAdvisor), mapped to buyer-codex surfaces.
 
 ---
 

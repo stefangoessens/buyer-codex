@@ -19,7 +19,7 @@ export function AppSidebar({ buyerName, buyerEmail }: AppSidebarProps) {
           bv
         </div>
         <div>
-          <p className="text-sm font-semibold text-neutral-900">buyer-v2</p>
+          <p className="text-sm font-semibold text-neutral-900">buyer-codex</p>
           <p className="text-xs text-neutral-500">Your deals home</p>
         </div>
       </div>

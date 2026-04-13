@@ -6,7 +6,7 @@ test.describe("Homepage", () => {
 
     // Nav header
     await expect(page.getByRole("banner")).toBeVisible();
-    await expect(page.getByText("buyer-v2").first()).toBeVisible();
+    await expect(page.getByText("buyer-codex").first()).toBeVisible();
 
     // Hero section
     await expect(page.locator("h1")).toBeVisible();

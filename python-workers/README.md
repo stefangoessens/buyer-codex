@@ -1,6 +1,6 @@
-# buyer-v2 python workers
+# buyer-codex python workers
 
-Python services that support property ingestion for buyer-v2: portal fetch
+Python services that support property ingestion for buyer-codex: portal fetch
 orchestration, deterministic extractors, and Browser Use fallback. Python 3.13,
 async-first.
 
@@ -35,7 +35,7 @@ mypy .          # typecheck
 | Variable                                    | Default                 | Purpose                                          |
 | -------------------------------------------- | ----------------------- | ------------------------------------------------ |
 | `BRIGHT_DATA_UNLOCKER_TOKEN`                | _empty_                 | Bearer token for the Bright Data Unlocker API.   |
-| `BRIGHT_DATA_ZONE`                          | `buyer_v2_unlocker`     | Unlocker zone name.                              |
+| `BRIGHT_DATA_ZONE`                          | `buyer_codex_unlocker`     | Unlocker zone name.                              |
 | `BRIGHT_DATA_MAX_CONCURRENT`                | `4`                     | Orchestrator concurrency semaphore size.         |
 | `BRIGHT_DATA_MAX_REQUESTS_PER_MIN`          | `60`                    | Client-side token-bucket rate limit.             |
 | `BRIGHT_DATA_MONTHLY_BUDGET_USD`            | `500`                   | Hard cap before requests are refused.            |

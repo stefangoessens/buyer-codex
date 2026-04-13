@@ -35,7 +35,7 @@ export default function GetStartedPage() {
           </>
         }
         imageSrc="/images/marketing/hero/product-dashboard.png"
-        imageAlt="buyer-v2 analysis dashboard"
+        imageAlt="buyer-codex analysis dashboard"
         imageClassName="object-top"
       />
 

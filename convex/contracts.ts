@@ -22,7 +22,7 @@ import {
   mapApprovedOfferToFloridaContract,
   type ApprovedOfferContractSource,
   type FloridaContractFieldMap,
-} from "@buyer-v2/shared/contracts";
+} from "@buyer-codex/shared/contracts";
 import {
   deriveContractMilestones,
   extractMilestones,

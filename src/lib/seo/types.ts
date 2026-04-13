@@ -1,5 +1,5 @@
 /**
- * Typed metadata model for buyer-v2's public surfaces (KIN-815).
+ * Typed metadata model for buyer-codex's public surfaces (KIN-815).
  *
  * Every public page passes through `buildMetadata` in `builder.ts`
  * which consumes a `SeoInput` and emits a Next.js `Metadata` object

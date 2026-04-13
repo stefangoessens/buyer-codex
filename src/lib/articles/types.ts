@@ -1,5 +1,5 @@
 /**
- * Typed article / blog content schema for buyer-v2 (KIN-812).
+ * Typed article / blog content schema for buyer-codex (KIN-812).
  *
  * Articles are structured, not MDX — the content is a list of typed
  * `ArticleBlock` values, each of which maps to a specific renderer in

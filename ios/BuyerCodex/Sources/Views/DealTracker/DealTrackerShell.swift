@@ -22,7 +22,7 @@ struct DealTrackerShell: View {
             case .noDeal:
                 NavigationStack {
                     NoDealView()
-                        .navigationTitle("buyer-v2")
+                        .navigationTitle("buyer-codex")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar { accountMenuToolbar }
                 }
@@ -31,7 +31,7 @@ struct DealTrackerShell: View {
             case .error(let message):
                 NavigationStack {
                     errorView(message: message)
-                        .navigationTitle("buyer-v2")
+                        .navigationTitle("buyer-codex")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar { accountMenuToolbar }
                 }

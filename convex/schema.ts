@@ -37,7 +37,7 @@ import {
 } from "./lib/validators";
 import { buyerProfileRecordFields } from "./lib/buyerProfile";
 
-// ─── buyer-v2 Convex Schema ─────────────────────────────────────────────────
+// ─── buyer-codex Convex Schema ─────────────────────────────────────────────────
 // System of record for the AI-native Florida buyer brokerage platform.
 // Every query, mutation, and AI engine reads from this schema.
 //

@@ -32,7 +32,7 @@ describe("Convex session helpers", () => {
     expect(inferAuthProviderFromIssuer("https://kindservices.clerk.accounts.dev")).toBe(
       "clerk",
     );
-    expect(inferAuthProviderFromIssuer("https://buyer-v2.us.auth0.com/")).toBe(
+    expect(inferAuthProviderFromIssuer("https://buyer-codex.us.auth0.com/")).toBe(
       "auth0",
     );
     expect(inferAuthProviderFromIssuer("https://example.com")).toBeUndefined();

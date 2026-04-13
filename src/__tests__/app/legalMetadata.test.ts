@@ -47,7 +47,7 @@ describe("legal [slug] generateMetadata (codex PR #49 regression)", () => {
     const md = await generateMetadata({
       params: Promise.resolve({ slug: "bogus" }),
     });
-    // Title goes through the builder's template → "Not found | buyer-v2"
+    // Title goes through the builder's template → "Not found | buyer-codex"
     expect(md.title).toMatch(/Not found/);
   });
 });

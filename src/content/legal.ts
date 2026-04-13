@@ -20,35 +20,35 @@ export const TERMS_OF_SERVICE: LegalDocument = {
   title: "Terms of Service",
   effectiveDate: "2026-04-01",
   summary:
-    "These terms govern your use of buyer-v2's website, deal room, and brokerage services. By using the service you agree to these terms.",
+    "These terms govern your use of buyer-codex's website, deal room, and brokerage services. By using the service you agree to these terms.",
   sections: [
     {
       id: "1_acceptance",
       heading: "1. Acceptance of these terms",
       visibility: "public",
       body:
-        "By accessing buyer-v2 or engaging our brokerage services, you agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree, do not use the service.",
+        "By accessing buyer-codex or engaging our brokerage services, you agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree, do not use the service.",
     },
     {
       id: "2_eligibility",
       heading: "2. Eligibility",
       visibility: "public",
       body:
-        "You must be at least 18 years old and legally able to enter into a real estate purchase contract in Florida. buyer-v2 currently serves Florida only; multi-state expansion is documented but not yet available.",
+        "You must be at least 18 years old and legally able to enter into a real estate purchase contract in Florida. buyer-codex currently serves Florida only; multi-state expansion is documented but not yet available.",
     },
     {
       id: "3_services",
       heading: "3. Description of services",
       visibility: "public",
       body:
-        "buyer-v2 provides AI-assisted listing analysis, deal room collaboration tools, and licensed buyer brokerage representation for Florida residential real estate transactions. AI output is informational and never a substitute for a licensed broker's review of license-critical actions.",
+        "buyer-codex provides AI-assisted listing analysis, deal room collaboration tools, and licensed buyer brokerage representation for Florida residential real estate transactions. AI output is informational and never a substitute for a licensed broker's review of license-critical actions.",
     },
     {
       id: "4_commission",
       heading: "4. Compensation and buyer credit",
       visibility: "public",
       body:
-        "buyer-v2's compensation is paid from the buyer-agent commission offered on the listing, as negotiated and disclosed in your buyer representation agreement. We rebate a portion of that commission to you at closing, subject to the terms of the agreement and any lender or program caps on buyer credits.",
+        "buyer-codex's compensation is paid from the buyer-agent commission offered on the listing, as negotiated and disclosed in your buyer representation agreement. We rebate a portion of that commission to you at closing, subject to the terms of the agreement and any lender or program caps on buyer credits.",
     },
     {
       id: "5_ai_outputs",
@@ -76,7 +76,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       heading: "8. Disclaimer and limitation of liability",
       visibility: "public",
       body:
-        "Except as required by Florida real estate law, the service is provided \"as is\" without warranties of any kind. To the fullest extent permitted by law, buyer-v2's total liability for any claim arising out of the service is limited to the greater of (a) the compensation buyer-v2 actually received from a specific closed transaction that is the subject of the claim, or (b) $100.",
+        "Except as required by Florida real estate law, the service is provided \"as is\" without warranties of any kind. To the fullest extent permitted by law, buyer-codex's total liability for any claim arising out of the service is limited to the greater of (a) the compensation buyer-codex actually received from a specific closed transaction that is the subject of the claim, or (b) $100.",
     },
     {
       id: "9_governing_law",
@@ -101,14 +101,14 @@ export const PRIVACY_POLICY: LegalDocument = {
   title: "Privacy Policy",
   effectiveDate: "2026-04-01",
   summary:
-    "This policy explains what data buyer-v2 collects, how we use it, who we share it with, and your choices.",
+    "This policy explains what data buyer-codex collects, how we use it, who we share it with, and your choices.",
   sections: [
     {
       id: "1_scope",
       heading: "1. Scope",
       visibility: "public",
       body:
-        "This policy applies to personal information buyer-v2 collects when you use our website, deal room, and brokerage services.",
+        "This policy applies to personal information buyer-codex collects when you use our website, deal room, and brokerage services.",
     },
     {
       id: "2_data_we_collect",
@@ -157,7 +157,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       heading: "8. Children",
       visibility: "public",
       body:
-        "buyer-v2 is not directed to children under 18 and we do not knowingly collect personal information from anyone under 18.",
+        "buyer-codex is not directed to children under 18 and we do not knowingly collect personal information from anyone under 18.",
     },
   ],
 };
@@ -168,21 +168,21 @@ export const BROKERAGE_DISCLOSURES: LegalDocument = {
   title: "Brokerage Disclosures",
   effectiveDate: "2026-04-01",
   summary:
-    "Required Florida real estate disclosures that apply to every buyer-v2 transaction.",
+    "Required Florida real estate disclosures that apply to every buyer-codex transaction.",
   sections: [
     {
       id: "1_single_agency",
       heading: "1. Single agent — buyer representation",
       visibility: "public",
       body:
-        "buyer-v2 operates as a single agent representing buyers only. We owe you the duties of loyalty, confidentiality, obedience, full disclosure, accounting, and skill, care, and diligence required by Florida Statutes § 475.278.",
+        "buyer-codex operates as a single agent representing buyers only. We owe you the duties of loyalty, confidentiality, obedience, full disclosure, accounting, and skill, care, and diligence required by Florida Statutes § 475.278.",
     },
     {
       id: "2_no_dual_agency",
       heading: "2. No dual agency",
       visibility: "public",
       body:
-        "buyer-v2 does not practice dual agency. If a listing would require dual representation, we will refer you to an independent brokerage for that specific transaction before proceeding.",
+        "buyer-codex does not practice dual agency. If a listing would require dual representation, we will refer you to an independent brokerage for that specific transaction before proceeding.",
     },
     {
       id: "3_compensation",
@@ -196,7 +196,7 @@ export const BROKERAGE_DISCLOSURES: LegalDocument = {
       heading: "4. Fair housing",
       visibility: "public",
       body:
-        "buyer-v2 complies with the federal Fair Housing Act and the Florida Fair Housing Act. We do not discriminate on the basis of race, color, national origin, religion, sex, familial status, disability, or any other protected class.",
+        "buyer-codex complies with the federal Fair Housing Act and the Florida Fair Housing Act. We do not discriminate on the basis of race, color, national origin, religion, sex, familial status, disability, or any other protected class.",
     },
     {
       id: "5_ai_outputs",

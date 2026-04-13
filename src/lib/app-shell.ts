@@ -25,8 +25,8 @@ export const appSurfaceDefinitions = {
     metadata: {
       metadataBase: appOrigin,
       title: {
-        default: "buyer-v2",
-        template: "%s | buyer-v2",
+        default: "buyer-codex",
+        template: "%s | buyer-codex",
       },
       description: "AI-native Florida buyer brokerage.",
     },
@@ -39,8 +39,8 @@ export const appSurfaceDefinitions = {
     dynamic: "force-dynamic",
     metadata: {
       title: {
-        default: "Deal Room | buyer-v2",
-        template: "%s | buyer-v2 Deal Room",
+        default: "Deal Room | buyer-codex",
+        template: "%s | buyer-codex Deal Room",
       },
       description: "Gated property analysis, pricing context, and negotiation workflows.",
       robots: {
@@ -57,8 +57,8 @@ export const appSurfaceDefinitions = {
     dynamic: "force-dynamic",
     metadata: {
       title: {
-        default: "Buyer App | buyer-v2",
-        template: "%s | buyer-v2",
+        default: "Buyer App | buyer-codex",
+        template: "%s | buyer-codex",
       },
       description: "Authenticated buyer workspace for deals, tours, and reports.",
       robots: {

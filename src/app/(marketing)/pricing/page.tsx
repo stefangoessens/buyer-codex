@@ -18,7 +18,7 @@ const META: ContentPageMeta = {
   eyebrow: "Pricing",
   title: "Free for buyers. Paid from the commission.",
   description:
-    "buyer-v2 never charges buyers up front. Our fee comes out of the buyer-agent commission at closing, and we rebate a portion of it back to you.",
+    "buyer-codex never charges buyers up front. Our fee comes out of the buyer-agent commission at closing, and we rebate a portion of it back to you.",
 };
 
 export const metadata: Metadata = metadataForStaticPage("pricing");

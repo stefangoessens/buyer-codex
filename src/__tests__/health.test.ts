@@ -38,7 +38,7 @@ describe("GET /api/health", () => {
     expect(data.version).toBe("0.0.0");
     expect(data.release).toBeDefined();
     expect(data.environment).toBe("test");
-    expect(data.service).toBe("buyer-v2-web");
+    expect(data.service).toBe("buyer-codex-web");
     expect(data.timestamp).toBeDefined();
     expect(data.checks.web.status).toBe("ok");
     expect(data.checks.convex.status).toBe("ok");

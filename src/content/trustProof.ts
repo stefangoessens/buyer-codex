@@ -1,9 +1,9 @@
 import type { CaseStudy, ProofBlock } from "@/lib/trustProof/types";
 
 /**
- * Canonical trust-proof catalog for buyer-v2 (KIN-825).
+ * Canonical trust-proof catalog for buyer-codex (KIN-825).
  *
- * buyer-v2 is pre-revenue. All case studies and proof blocks below
+ * buyer-codex is pre-revenue. All case studies and proof blocks below
  * are `illustrative` and must render with the "Illustrative example"
  * label (enforced by `src/lib/trustProof/policy.ts`). When live
  * transactions start closing, we append new records with
@@ -21,9 +21,9 @@ export const CASE_STUDIES: CaseStudy[] = [
     source: "illustrative",
     headline: "Saved $18,000 on a first home in Tampa",
     summary:
-      "A first-time buyer pasted a Zillow link on lunch break and had a full analysis before they got back to their desk. buyer-v2 ran the pricing, comps, and leverage engines, then negotiated a $12,400 credit at closing.",
+      "A first-time buyer pasted a Zillow link on lunch break and had a full analysis before they got back to their desk. buyer-codex ran the pricing, comps, and leverage engines, then negotiated a $12,400 credit at closing.",
     body:
-      "In this illustrative scenario, a first-time buyer in Tampa pastes a Zillow listing URL into buyer-v2. Within seconds the AI engines produce a fair-value estimate, five comparable sales, and a 7.4 / 10 competitiveness score. The pricing engine flags the listing as slightly overpriced relative to comps. Our broker then negotiates a rebated buyer-agent commission at closing, totaling approximately $18,000 between the price reduction and the rebate. The buyer walks away with a keys-in-hand closing in 23 days.\n\nThis is an illustrative example that demonstrates how the platform works end-to-end. Actual outcomes depend on the listing, negotiation, market conditions, and individual circumstances.",
+      "In this illustrative scenario, a first-time buyer in Tampa pastes a Zillow listing URL into buyer-codex. Within seconds the AI engines produce a fair-value estimate, five comparable sales, and a 7.4 / 10 competitiveness score. The pricing engine flags the listing as slightly overpriced relative to comps. Our broker then negotiates a rebated buyer-agent commission at closing, totaling approximately $18,000 between the price reduction and the rebate. The buyer walks away with a keys-in-hand closing in 23 days.\n\nThis is an illustrative example that demonstrates how the platform works end-to-end. Actual outcomes depend on the listing, negotiation, market conditions, and individual circumstances.",
     outcomes: {
       purchasePrice: 485_000,
       buyerSavings: 18_000,
@@ -44,7 +44,7 @@ export const CASE_STUDIES: CaseStudy[] = [
     summary:
       "A relocating family used the savings calculator to model their buyer credit before paste-a-linking their shortlist. The AI flagged two overpriced listings and they closed on the third with a negotiated credit.",
     body:
-      "Illustrative scenario. A relocating family uses buyer-v2's savings calculator to model their expected buyer credit, then pastes three shortlisted listings from Zillow. The pricing engine flags two of them as above fair value. They focus on the third, which the leverage engine identifies as highly negotiable (long days on market, recent price drop). Our broker negotiates a $14,000 price reduction plus the $8,400 buyer credit at closing.\n\nAs with all illustrative examples on this page, the outcomes are representative, not drawn from a specific closed buyer-v2 transaction.",
+      "Illustrative scenario. A relocating family uses buyer-codex's savings calculator to model their expected buyer credit, then pastes three shortlisted listings from Zillow. The pricing engine flags two of them as above fair value. They focus on the third, which the leverage engine identifies as highly negotiable (long days on market, recent price drop). Our broker negotiates a $14,000 price reduction plus the $8,400 buyer credit at closing.\n\nAs with all illustrative examples on this page, the outcomes are representative, not drawn from a specific closed buyer-codex transaction.",
     outcomes: {
       purchasePrice: 825_000,
       buyerSavings: 22_400,
@@ -63,9 +63,9 @@ export const CASE_STUDIES: CaseStudy[] = [
     source: "illustrative",
     headline: "First townhome in Orlando with a $9,200 credit",
     summary:
-      "A young couple used buyer-v2 to analyze three new-construction townhome listings, picked the one the AI rated highest for value, and closed with a rebated commission.",
+      "A young couple used buyer-codex to analyze three new-construction townhome listings, picked the one the AI rated highest for value, and closed with a rebated commission.",
     body:
-      "Illustrative example. A young couple looking for their first townhome in Orlando analyzes three new-construction listings through buyer-v2. The comps engine produces five nearby recent sales for each, and the competitiveness engine rates one listing significantly higher for value. They proceed with that listing, and our broker negotiates a $9,200 buyer credit at closing.\n\nRepresentative outcome — actual figures depend on the specific listing, builder terms, and negotiation.",
+      "Illustrative example. A young couple looking for their first townhome in Orlando analyzes three new-construction listings through buyer-codex. The comps engine produces five nearby recent sales for each, and the competitiveness engine rates one listing significantly higher for value. They proceed with that listing, and our broker negotiates a $9,200 buyer credit at closing.\n\nRepresentative outcome — actual figures depend on the specific listing, builder terms, and negotiation.",
     outcomes: {
       purchasePrice: 395_000,
       buyerSavings: 9_200,
@@ -117,7 +117,7 @@ export const PROOF_BLOCKS: ProofBlock[] = [
     value: "100%",
     label: "Licensed Florida brokerage",
     description:
-      "buyer-v2 is a fully licensed Florida real estate brokerage. Every license-critical action is reviewed by a licensed broker.",
+      "buyer-codex is a fully licensed Florida real estate brokerage. Every license-critical action is reviewed by a licensed broker.",
     visibility: "public",
   },
   {

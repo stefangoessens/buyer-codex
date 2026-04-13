@@ -191,7 +191,7 @@ export const LAUNCH_EVENT_CONTRACT_CHANGELOG = [
   {
     version: CURRENT_LAUNCH_EVENT_CONTRACT_VERSION,
     releasedOn: CURRENT_LAUNCH_EVENT_CONTRACT_DATE,
-    summary: "Moved the launch catalog into @buyer-v2/shared and aligned the typed web event map.",
+    summary: "Moved the launch catalog into @buyer-codex/shared and aligned the typed web event map.",
     changes: [
       "Promoted the launch event catalog, validator, and emit helpers into the shared package.",
       "Added contract serialization and versioned changelog metadata for downstream review/codegen consumers.",

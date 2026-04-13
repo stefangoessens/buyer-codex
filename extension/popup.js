@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// buyer-v2 Chrome Extension — Popup Controller (KIN-816)
+// buyer-codex Chrome Extension — Popup Controller (KIN-816)
 //
 // Reads the current tab's URL, runs the same detection rules as the
 // background worker, and renders one of five UI states in popup.html:
@@ -66,7 +66,7 @@ function detect(url) {
     if (!portal) {
       return {
         status: "unsupported",
-        message: "Not a supported listing portal. buyer-v2 supports Zillow, Redfin, and Realtor.com.",
+        message: "Not a supported listing portal. buyer-codex supports Zillow, Redfin, and Realtor.com.",
       };
     }
     if (looksLikeListing(parsed, portal)) {
@@ -75,7 +75,7 @@ function detect(url) {
       return {
         status: "supported",
         portal,
-        message: `${label} listing detected. Click to save to buyer-v2.`,
+        message: `${label} listing detected. Click to save to buyer-codex.`,
       };
     }
     return {
@@ -105,14 +105,14 @@ async function main() {
         url: tab.url,
         // In a real deploy, this is set via extension options. For v1 we
         // hardcode the production base — devs can swap at load time.
-        buyerV2BaseUrl: "https://buyer-v2.app",
+        buyerCodexBaseUrl: "https://buyer-codex.app",
       });
       if (response?.ok) {
-        statusEl.textContent = "Opened in buyer-v2.";
+        statusEl.textContent = "Opened in buyer-codex.";
       } else {
         statusEl.textContent = "Failed to open. Try again.";
         saveBtn.disabled = false;
-        saveBtn.textContent = "Save to buyer-v2";
+        saveBtn.textContent = "Save to buyer-codex";
       }
     });
   }

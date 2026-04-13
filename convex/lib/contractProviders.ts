@@ -4,7 +4,7 @@ import type {
   ContractAdapterResult,
   FloridaContractFormKey,
   SabalSignatureRequest,
-} from "@buyer-v2/shared/contracts";
+} from "@buyer-codex/shared/contracts";
 import type { Id } from "../_generated/dataModel";
 
 export interface ContractProviderConfig {

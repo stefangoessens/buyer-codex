@@ -24,8 +24,8 @@ export default function ContactPage() {
               <h2 className="text-xl font-semibold tracking-tight text-neutral-800">Send a message</h2>
               <p className="mt-2 text-sm text-neutral-500">
                 Prefer email? Write to{" "}
-                <a className="font-medium text-primary-700 underline" href="mailto:hello@buyer-v2.com">
-                  hello@buyer-v2.com
+                <a className="font-medium text-primary-700 underline" href="mailto:hello@buyer-codex.com">
+                  hello@buyer-codex.com
                 </a>
                 .
               </p>

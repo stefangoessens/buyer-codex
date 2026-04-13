@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "buyer-v2 Listing Saver",
+  "name": "buyer-codex Listing Saver",
   "version": "0.1.0",
-  "description": "Save Zillow, Redfin, and Realtor.com listings directly to your buyer-v2 deal room.",
+  "description": "Save Zillow, Redfin, and Realtor.com listings directly to your buyer-codex deal room.",
   "action": {
-    "default_title": "Save to buyer-v2",
+    "default_title": "Save to buyer-codex",
     "default_popup": "popup.html"
   },
   "background": {

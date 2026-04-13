@@ -116,7 +116,7 @@ function CalculatorControls({
         Estimate your savings
       </h3>
       <p className="mt-1 text-sm text-neutral-600">
-        Adjust the assumptions to see how buyer-v2 stacks up against a standard
+        Adjust the assumptions to see how buyer-codex stacks up against a standard
         Florida commission.
       </p>
 
@@ -381,7 +381,7 @@ function CommissionEducation() {
         <EducationBlock
           step="3"
           title="We rebate part back to you"
-          body="buyer-v2 credits a portion of the buyer-agent commission to you at closing. You keep the rebate; we keep a smaller service fee."
+          body="buyer-codex credits a portion of the buyer-agent commission to you at closing. You keep the rebate; we keep a smaller service fee."
         />
       </div>
     </section>

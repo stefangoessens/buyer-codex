@@ -26,7 +26,7 @@ export default function DesignSystemPage() {
         title={<>Tokens and reusable marketing components</>}
         description={<>A living reference page for our PayFit-style tokens and Hosman-style layout primitives.</>}
         imageSrc="/images/marketing/hero/product-dashboard.png"
-        imageAlt="buyer-v2 UI"
+        imageAlt="buyer-codex UI"
         imageClassName="object-top"
       />
 

@@ -15,7 +15,7 @@ final class InboundRouteResolver {
 
     private let authService: AuthService
 
-    /// The set of URL hosts this resolver accepts as the buyer-v2 app.
+    /// The set of URL hosts this resolver accepts as the buyer-codex app.
     /// Anything else is treated as an unsupported scheme.
     static let acceptedHosts: Set<String> = [
         "buyerv2.com",

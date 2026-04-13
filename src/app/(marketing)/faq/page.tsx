@@ -17,7 +17,7 @@ const META: ContentPageMeta = {
   eyebrow: "Frequently asked questions",
   title: "Everything you want to know",
   description:
-    "How buyer-v2 works, how the buyer credit is calculated, and what happens when you engage us — in plain language.",
+    "How buyer-codex works, how the buyer credit is calculated, and what happens when you engage us — in plain language.",
 };
 
 export const metadata: Metadata = metadataForStaticPage("faq");

@@ -1,12 +1,12 @@
 # KIN-962 - Convex Auth Viability
 
 Status: Proposed
-Scope: buyer-v2 web app, Convex backend, iOS app session model
+Scope: buyer-codex web app, Convex backend, iOS app session model
 Date: 2026-04-12
 
 ## Decision Summary
 
-Convex Auth library is not sufficient for the buyer-v2 architecture. Convex's own docs describe Convex Auth as beta, and Next.js SSR support as experimental. That makes it a poor primary auth product for this repo's chosen web and native architecture.
+Convex Auth library is not sufficient for the buyer-codex architecture. Convex's own docs describe Convex Auth as beta, and Next.js SSR support as experimental. That makes it a poor primary auth product for this repo's chosen web and native architecture.
 
 Primary session provider: Clerk.
 
@@ -28,7 +28,7 @@ Current repo state already splits auth by platform:
 - The repo does not currently define `convex/auth.config.ts`, and no `/auth/login`, `/auth/refresh`, or `/auth/validate` backend implementation exists in this tree.
 - This spike should preserve the current data/role model while changing the auth provider strategy.
 
-The question for KIN-962 is not whether auth works today. It is whether buyer-v2 should center its session model on an external OIDC provider and treat Convex as backend authorization/realtime infrastructure. The answer is yes.
+The question for KIN-962 is not whether auth works today. It is whether buyer-codex should center its session model on an external OIDC provider and treat Convex as backend authorization/realtime infrastructure. The answer is yes.
 
 ## Supported vs Unsupported Patterns
 
@@ -186,7 +186,7 @@ Repo evidence:
 - `convex/lib/session.ts` already treats the Convex auth context plus `users.role` lookup as the backend authorization boundary.
 - `convex/adminShell.ts` already returns `null` for unauthenticated or role-mismatched internal-console requests.
 - `src/app/providers.tsx` and `src/lib/convex.tsx` currently mount a generic `ConvexProvider` client-only path rather than a provider-specific auth adapter.
-- `ios/BuyerV2/Sources/Services/AuthService.swift` and related services currently depend on a custom token lifecycle and bearer-token HTTP helpers.
+- `ios/BuyerCodex/Sources/Services/AuthService.swift` and related services currently depend on a custom token lifecycle and bearer-token HTTP helpers.
 
 External product evidence:
 
@@ -222,7 +222,7 @@ What already exists and should be preserved:
 - `src/components/admin/AdminShell.tsx` already uses `useQuery(api.adminShell.getCurrentSession)` and treats `undefined` as loading and `null` as denied.
 - `convex/lib/session.ts` already resolves the current user from the Convex auth context and role-gates by user record.
 - `convex/adminShell.ts` already enforces broker/admin access and returns a role-filtered session payload.
-- `ios/BuyerV2/Sources/Services/AuthService.swift` already exposes the right high-level lifecycle states, but its custom transport is a migration target, not the long-term architecture.
+- `ios/BuyerCodex/Sources/Services/AuthService.swift` already exposes the right high-level lifecycle states, but its custom transport is a migration target, not the long-term architecture.
 
 What should not be changed in this spike:
 

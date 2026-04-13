@@ -3,7 +3,7 @@ import { resolveObservabilityContext } from "./src/lib/observability";
 import { deepScrubPii } from "./src/lib/security/pii-guard";
 
 const context = resolveObservabilityContext({
-  defaultService: "buyer-v2-web",
+  defaultService: "buyer-codex-web",
 });
 
 Sentry.init({

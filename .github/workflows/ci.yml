@@ -96,7 +96,7 @@ jobs:
       - name: Build
         run: pnpm build:web
         env:
-          NEXT_PUBLIC_APP_URL: https://preview.buyer-v2.local
+          NEXT_PUBLIC_APP_URL: https://preview.buyer-codex.local
           NEXT_PUBLIC_CONVEX_URL: https://example.convex.cloud
           NEXT_PUBLIC_POSTHOG_KEY: test-posthog-key
           NEXT_PUBLIC_POSTHOG_HOST: https://us.i.posthog.com
@@ -172,9 +172,9 @@ jobs:
 
       - name: Test Swift package
         run: |
-          cd ios/BuyerV2
+          cd ios/BuyerCodex
           xcodebuild test \
-            -scheme BuyerV2 \
+            -scheme BuyerCodex \
             -destination "platform=iOS Simulator,name=iPhone 16"
 
   workers:

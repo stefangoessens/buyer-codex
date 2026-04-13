@@ -6,19 +6,19 @@ import { generateMetadata as generateArticleMetadata } from "@/app/(marketing)/b
 
 describe("route metadata pipeline", () => {
   it("homepage uses the shared public metadata definition", () => {
-    expect(homeMetadata.title).toBe("Get the best deal on your Florida home | buyer-v2");
+    expect(homeMetadata.title).toBe("Get the best deal on your Florida home | buyer-codex");
     expect(homeMetadata.alternates?.canonical).toBe("http://localhost:3000/");
     expect(homeMetadata.robots).toMatchObject({ index: true, follow: true });
   });
 
   it("intake stays non-indexable with a canonical route-level definition", () => {
-    expect(intakeMetadata.title).toBe("Importing listing | buyer-v2");
+    expect(intakeMetadata.title).toBe("Importing listing | buyer-codex");
     expect(intakeMetadata.alternates?.canonical).toBe("http://localhost:3000/intake");
     expect(intakeMetadata.robots).toMatchObject({ index: false, follow: false });
   });
 
   it("dashboard inherits the shared gated metadata definition", () => {
-    expect(dashboardMetadata.title).toBe("Dashboard | buyer-v2");
+    expect(dashboardMetadata.title).toBe("Dashboard | buyer-codex");
     expect(dashboardMetadata.alternates?.canonical).toBe("http://localhost:3000/dashboard");
     expect(dashboardMetadata.robots).toMatchObject({ index: false, follow: false });
   });
@@ -28,7 +28,7 @@ describe("route metadata pipeline", () => {
       params: Promise.resolve({ slug: "paste-a-link-walkthrough" }),
     });
 
-    expect(metadata.title).toBe("How the paste-a-link flow actually works | buyer-v2");
+    expect(metadata.title).toBe("How the paste-a-link flow actually works | buyer-codex");
     expect(metadata.alternates?.canonical).toBe(
       "http://localhost:3000/blog/paste-a-link-walkthrough"
     );

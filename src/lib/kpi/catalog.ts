@@ -349,7 +349,7 @@ const AI_KPIS: readonly KpiDefinition[] = [
     source: {
       kind: "external",
       system: "posthog",
-      reference: "buyer-v2 / AI engine latency",
+      reference: "buyer-codex / AI engine latency",
     },
     cadence: "hourly",
     presentation: "duration_ms",
@@ -369,7 +369,7 @@ const AI_KPIS: readonly KpiDefinition[] = [
     source: {
       kind: "external",
       system: "posthog",
-      reference: "buyer-v2 / AI fallback funnel",
+      reference: "buyer-codex / AI fallback funnel",
     },
     cadence: "hourly",
     presentation: "percentage",
@@ -389,7 +389,7 @@ const AI_KPIS: readonly KpiDefinition[] = [
     source: {
       kind: "external",
       system: "posthog",
-      reference: "buyer-v2 / AI cost per deal room",
+      reference: "buyer-codex / AI cost per deal room",
     },
     cadence: "daily",
     presentation: "currency_usd",
@@ -409,7 +409,7 @@ const AI_KPIS: readonly KpiDefinition[] = [
     source: {
       kind: "external",
       system: "github_actions",
-      reference: "buyer-v2 / scripts/ai-eval.ts",
+      reference: "buyer-codex / scripts/ai-eval.ts",
     },
     cadence: "daily",
     presentation: "score",
@@ -429,7 +429,7 @@ const AI_KPIS: readonly KpiDefinition[] = [
     source: {
       kind: "external",
       system: "github_actions",
-      reference: "buyer-v2 / scripts/ai-eval.ts drift",
+      reference: "buyer-codex / scripts/ai-eval.ts drift",
     },
     cadence: "weekly",
     presentation: "ratio",

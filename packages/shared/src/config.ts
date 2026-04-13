@@ -14,18 +14,18 @@ export const workspaceSurfaces = {
     path: ".",
     language: "typescript",
     boundary:
-      "Owns the Next.js App Router surface and may import from @buyer-v2/shared plus its local src tree.",
+      "Owns the Next.js App Router surface and may import from @buyer-codex/shared plus its local src tree.",
     localCommands: ["pnpm dev:web", "pnpm build:web", "pnpm typecheck:web"],
   },
   backend: {
     path: "convex",
     language: "typescript",
     boundary:
-      "Owns the Convex schema/functions surface and may import from @buyer-v2/shared, but never from web-only src modules.",
+      "Owns the Convex schema/functions surface and may import from @buyer-codex/shared, but never from web-only src modules.",
     localCommands: ["pnpm dev:backend", "pnpm build:backend", "pnpm typecheck:backend"],
   },
   mobile: {
-    path: "ios/BuyerV2",
+    path: "ios/BuyerCodex",
     language: "swift",
     boundary:
       "Owns the SwiftUI app package and consumes backend contracts over network boundaries rather than importing JS or Python code.",
@@ -184,7 +184,7 @@ export const webServerEnvSpec = {
     required: true,
   },
   SENTRY_PROJECT: {
-    defaultValue: "buyer-v2-web",
+    defaultValue: "buyer-codex-web",
     description: "Sentry project used for Next.js releases.",
     visibility: "server",
     required: true,

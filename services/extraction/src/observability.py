@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover - optional runtime integration
 REDACTED = "[REDACTED]"
 _PII_PATTERNS = ("authorization", "cookie", "token", "secret", "email", "phone")
 
-logger = logging.getLogger("buyer_v2.extraction")
+logger = logging.getLogger("buyer_codex.extraction")
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 

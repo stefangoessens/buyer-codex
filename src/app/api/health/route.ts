@@ -65,7 +65,7 @@ async function runConvexCheck(): Promise<CheckResult> {
 
 export async function GET() {
   const context = resolveObservabilityContext({
-    defaultService: "buyer-v2-web",
+    defaultService: "buyer-codex-web",
     defaultVersion: "0.0.0",
   });
   const timestamp = new Date().toISOString();

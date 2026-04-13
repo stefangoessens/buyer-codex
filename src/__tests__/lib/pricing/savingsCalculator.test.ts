@@ -32,8 +32,8 @@ describe("calculateSavings — happy path", () => {
     expect(result.result.buyerAgentCommissionAmount).toBe(15_000);
     // 15k * 33% = 4,950 credit
     expect(result.result.buyerCreditAmount).toBe(4_950);
-    // 15k - 4,950 = 10,050 retained by buyer-v2
-    expect(result.result.buyerV2FeeAmount).toBe(10_050);
+    // 15k - 4,950 = 10,050 retained by buyer-codex
+    expect(result.result.buyerCodexFeeAmount).toBe(10_050);
     // Effective buyer commission: (15k - 4,950) / 500k * 100 = 2.01%
     expect(result.result.effectiveBuyerCommissionPercent).toBeCloseTo(2.01, 2);
     expect(result.result.isZeroCommission).toBe(false);
@@ -85,8 +85,8 @@ describe("calculateSavings — zero-comp states", () => {
     if (result.kind !== "ok") throw new Error("expected ok");
     expect(result.result.isZeroCommission).toBe(false);
     expect(result.result.buyerCreditAmount).toBe(0);
-    // Full buyer-agent commission goes to buyer-v2
-    expect(result.result.buyerV2FeeAmount).toBe(15_000);
+    // Full buyer-agent commission goes to buyer-codex
+    expect(result.result.buyerCodexFeeAmount).toBe(15_000);
   });
 });
 
@@ -191,11 +191,11 @@ describe("calculateSavings — boundary values", () => {
     expect(result.errors[0].kind).toBe("inconsistentSplit");
   });
 
-  it("buyer credit of exactly 100% yields full rebate and zero buyer-v2 fee", () => {
+  it("buyer credit of exactly 100% yields full rebate and zero buyer-codex fee", () => {
     const result = calculateSavings(baseInput({ buyerCreditPercent: 100 }));
     if (result.kind !== "ok") throw new Error("expected ok");
     expect(result.result.buyerCreditAmount).toBe(15_000);
-    expect(result.result.buyerV2FeeAmount).toBe(0);
+    expect(result.result.buyerCodexFeeAmount).toBe(0);
     expect(result.result.effectiveBuyerCommissionPercent).toBe(0);
   });
 

@@ -58,7 +58,7 @@ export default async function IntakePage({ searchParams }: IntakePageProps) {
         <h1 className="text-2xl font-semibold">We couldn&apos;t import that link</h1>
         <p className="mt-4 text-neutral-600">
           {parsed.error.code === "unsupported_url"
-            ? "buyer-v2 currently supports Zillow, Redfin, and Realtor.com listings."
+            ? "buyer-codex currently supports Zillow, Redfin, and Realtor.com listings."
             : "The forwarded URL was not recognized as a listing. Try pasting it on the homepage."}
         </p>
         <p className="mt-2 text-sm text-neutral-500 break-all">URL: {url}</p>
@@ -83,7 +83,7 @@ export default async function IntakePage({ searchParams }: IntakePageProps) {
     <main className="mx-auto max-w-xl px-6 py-16">
       <h1 className="text-2xl font-semibold">Importing from {portalLabel}</h1>
       <p className="mt-4 text-neutral-600">
-        We detected a valid {portalLabel} listing. Continue to buyer-v2 to see
+        We detected a valid {portalLabel} listing. Continue to buyer-codex to see
         your pricing panel, comps, and leverage analysis.
       </p>
       <dl className="mt-6 rounded-lg border border-neutral-200 p-4 text-sm">
@@ -106,7 +106,7 @@ export default async function IntakePage({ searchParams }: IntakePageProps) {
         href={`/?intake=${encodeURIComponent(parsed.data.normalizedUrl)}`}
         className="mt-6 inline-block rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white"
       >
-        Continue to buyer-v2
+        Continue to buyer-codex
       </Link>
     </main>
   );

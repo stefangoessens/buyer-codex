@@ -1,7 +1,7 @@
 [project]
-name = "buyer-v2-python-workers"
+name = "buyer-codex-python-workers"
 version = "0.1.0"
-description = "Python workers for buyer-v2: portal fetch orchestration, deterministic extractors, Browser Use fallback"
+description = "Python workers for buyer-codex: portal fetch orchestration, deterministic extractors, Browser Use fallback"
 requires-python = ">=3.13"
 dependencies = [
   "httpx>=0.28.0",

@@ -1,4 +1,4 @@
-import { hasValue, readEnv, validateEnv, webPublicEnvSpec } from "@buyer-v2/shared";
+import { hasValue, readEnv, validateEnv, webPublicEnvSpec } from "@buyer-codex/shared";
 
 type EnvSource = Record<string, string | undefined>;
 

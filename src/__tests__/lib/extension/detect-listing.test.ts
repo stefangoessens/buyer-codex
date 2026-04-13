@@ -94,7 +94,7 @@ describe("detectListingPage — supported listings (happy path)", () => {
     const result = detectListingPage(
       "https://www.zillow.com/homedetails/123-Main-St/12345678_zpid/"
     );
-    expect(result.message).toMatch(/save to buyer-v2/i);
+    expect(result.message).toMatch(/save to buyer-codex/i);
   });
 });
 
@@ -137,16 +137,16 @@ describe("detectListingPage — invalid URLs", () => {
 describe("buildIntakeForwardUrl", () => {
   it("builds a well-formed intake URL", () => {
     const url = buildIntakeForwardUrl(
-      "https://buyer-v2.app",
+      "https://buyer-codex.app",
       "https://www.zillow.com/homedetails/123-Main-St/12345_zpid/"
     );
-    expect(url).toMatch(/^https:\/\/buyer-v2\.app\/intake\?url=/);
+    expect(url).toMatch(/^https:\/\/buyer-codex\.app\/intake\?url=/);
     expect(url).toContain("source=extension");
   });
 
   it("URL-encodes the forwarded listing URL", () => {
     const url = buildIntakeForwardUrl(
-      "https://buyer-v2.app",
+      "https://buyer-codex.app",
       "https://www.zillow.com/homedetails/123 Main St/12345_zpid/"
     );
     expect(url).not.toContain("123 Main St");
@@ -155,19 +155,19 @@ describe("buildIntakeForwardUrl", () => {
 
   it("strips trailing slash from base URL", () => {
     const url = buildIntakeForwardUrl(
-      "https://buyer-v2.app/",
+      "https://buyer-codex.app/",
       "https://www.zillow.com/homedetails/123/12345_zpid/"
     );
-    expect(url).toMatch(/^https:\/\/buyer-v2\.app\/intake\?/);
+    expect(url).toMatch(/^https:\/\/buyer-codex\.app\/intake\?/);
     expect(url).not.toMatch(/app\/\/intake/);
   });
 
   it("handles staging/preview subdomains", () => {
     const url = buildIntakeForwardUrl(
-      "https://preview-abc123.buyer-v2.app",
+      "https://preview-abc123.buyer-codex.app",
       "https://www.redfin.com/FL/Miami/home/12345"
     );
-    expect(url).toContain("preview-abc123.buyer-v2.app/intake");
+    expect(url).toContain("preview-abc123.buyer-codex.app/intake");
   });
 });
 

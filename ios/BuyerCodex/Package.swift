@@ -2,21 +2,21 @@
 import PackageDescription
 
 let package = Package(
-    name: "BuyerV2",
+    name: "BuyerCodex",
     platforms: [
         .iOS(.v17)
     ],
     products: [
-        .library(name: "BuyerV2", targets: ["BuyerV2"])
+        .library(name: "BuyerCodex", targets: ["BuyerCodex"])
     ],
     targets: [
         .target(
-            name: "BuyerV2",
+            name: "BuyerCodex",
             path: "Sources"
         ),
         .testTarget(
-            name: "BuyerV2Tests",
-            dependencies: ["BuyerV2"],
+            name: "BuyerCodexTests",
+            dependencies: ["BuyerCodex"],
             path: "Tests"
         )
     ]
