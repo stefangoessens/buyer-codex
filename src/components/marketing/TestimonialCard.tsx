@@ -6,6 +6,8 @@ interface TestimonialCardProps {
   role?: string;
   avatarSrc?: string;
   rating?: number;
+  eyebrow?: string;
+  eyebrowAriaLabel?: string;
 }
 
 /* PayFit star icon — extracted from payfit.com */
@@ -17,9 +19,25 @@ function StarIcon() {
   );
 }
 
-export function TestimonialCard({ quote, author, role, avatarSrc, rating = 5 }: TestimonialCardProps) {
+export function TestimonialCard({
+  quote,
+  author,
+  role,
+  avatarSrc,
+  rating = 5,
+  eyebrow,
+  eyebrowAriaLabel,
+}: TestimonialCardProps) {
   return (
     <div className="flex h-full flex-col rounded-[24px] border border-neutral-200 bg-white p-8">
+      {eyebrow && (
+        <p
+          className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-accent-700"
+          aria-label={eyebrowAriaLabel ?? eyebrow}
+        >
+          {eyebrow}
+        </p>
+      )}
       <div className="flex gap-0.5" role="img" aria-label={`${rating} out of 5 stars`}>
         {Array.from({ length: rating }).map((_, i) => (
           <StarIcon key={i} />
