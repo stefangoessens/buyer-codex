@@ -13,6 +13,7 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "paths": {
+      "@/*": ["src/*"],
       "@buyer-codex/shared": ["packages/shared/src/index.ts"],
       "@buyer-codex/shared/*": ["packages/shared/src/*"]
     },

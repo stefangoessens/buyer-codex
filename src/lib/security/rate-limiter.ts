@@ -107,6 +107,15 @@ export type RateLimitState =
     };
 
 /**
+ * Caller-facing denial shape. UI surfaces only care whether the caller
+ * should retry later or is currently blocked, plus when the gate lifts.
+ */
+export interface ExplicitRateLimitState {
+  status: "retry_later" | "blocked";
+  retryAt: string;
+}
+
+/**
  * Minimal persisted shape of a rate-limit bucket. The Convex table wraps
  * this with `throttleKey`, `channel`, timestamps, and indexes, but the
  * pure functions below only need the fields below.
@@ -115,6 +124,32 @@ export interface BucketSnapshot {
   requestTimestamps: string[];
   consecutiveFailures: number;
   blockedUntil?: string;
+}
+
+export function toExplicitRateLimitState(
+  state: Extract<RateLimitState, { allowed: false }>,
+): ExplicitRateLimitState {
+  return {
+    status: state.reason === "block_active" ? "blocked" : "retry_later",
+    retryAt: state.blockedUntil,
+  };
+}
+
+export function shouldFlagSuspiciousSpike(
+  channel: Channel,
+  previousActiveCount: number,
+  nextActiveCount: number,
+): boolean {
+  if (nextActiveCount <= previousActiveCount) {
+    return false;
+  }
+
+  const threshold = Math.max(
+    3,
+    Math.ceil(CHANNEL_CONFIGS[channel].maxRequests * 0.8),
+  );
+
+  return previousActiveCount < threshold && nextActiveCount >= threshold;
 }
 
 /**

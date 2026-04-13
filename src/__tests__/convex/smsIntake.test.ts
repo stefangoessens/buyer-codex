@@ -17,6 +17,18 @@ vi.mock("../../../convex/lib/rateLimitBuckets", () => ({
 
 import { processInboundSms } from "../../../convex/smsIntake";
 
+type ProcessInboundSmsResult = {
+  outcome: string;
+  intakeId: string;
+  replyBody: string;
+  replySent: boolean;
+  dealRoomId?: string;
+  sourceListingId?: string;
+  replyLink?: string;
+  rateLimitState?: "retry_later" | "blocked";
+  retryAt?: string;
+};
+
 const processInboundSmsHandler = (
   processInboundSms as unknown as {
     _handler: (
@@ -27,7 +39,7 @@ const processInboundSmsHandler = (
         toPhone: string;
         body: string;
       },
-    ) => Promise<unknown>;
+    ) => Promise<ProcessInboundSmsResult>;
   }
 )._handler;
 
