@@ -1,4 +1,5 @@
 // Weekly action plan panel — surfaces the upcoming week's buyer actions + deadlines.
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
   WeeklyPlan,
@@ -27,6 +28,10 @@ function Section({
       : tone === "warning"
         ? "text-warning-700"
         : "text-neutral-600";
+  const trackClass = (trackState: WeeklyPlanItem["trackState"]) =>
+    trackState === "off_track"
+      ? "border-error-200 bg-error-50 text-error-700"
+      : "border-success-200 bg-success-50 text-success-700";
   return (
     <div>
       <p className={cn("text-xs font-semibold uppercase tracking-wide", toneClass)}>
@@ -44,6 +49,20 @@ function Section({
               <p className="font-medium text-neutral-900">
                 {item.milestone.name}
               </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Badge
+                  variant="outline"
+                  className="border-neutral-200 bg-neutral-50 text-neutral-600"
+                >
+                  {item.ownerLabel}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className={cn("font-medium", trackClass(item.trackState))}
+                >
+                  {item.trackLabel}
+                </Badge>
+              </div>
               <p className="mt-0.5 text-xs text-neutral-500">
                 {item.reason} · due {item.milestone.dueDate}
               </p>

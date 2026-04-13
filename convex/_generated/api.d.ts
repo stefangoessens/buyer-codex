@@ -25,6 +25,7 @@ import type * as communicationTemplates from "../communicationTemplates.js";
 import type * as contracts from "../contracts.js";
 import type * as copilot from "../copilot.js";
 import type * as dashboard from "../dashboard.js";
+import type * as dealRoomCaseOverview from "../dealRoomCaseOverview.js";
 import type * as dealRooms from "../dealRooms.js";
 import type * as deviceTokens from "../deviceTokens.js";
 import type * as enrichment from "../enrichment.js";
@@ -91,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   contracts: typeof contracts;
   copilot: typeof copilot;
   dashboard: typeof dashboard;
+  dealRoomCaseOverview: typeof dealRoomCaseOverview;
   dealRooms: typeof dealRooms;
   deviceTokens: typeof deviceTokens;
   enrichment: typeof enrichment;

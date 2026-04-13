@@ -1,6 +1,17 @@
 {
-  "status": "provisional-until-realadvisor-is-unblocked",
+  "status": "accepted-payfit-hosman-shadcn-core",
   "capturedAt": "2026-04-13",
+  "scope": {
+    "requiredReferences": [
+      "payfit",
+      "hosman",
+      "shadcn-b2D0wqNxS"
+    ],
+    "supplementaryDeferred": [
+      "realadvisor"
+    ],
+    "note": "RealAdvisor remained Cloudflare-blocked and is excluded from the accepted token baseline for KIN-946."
+  },
   "adopted": {
     "color": {
       "page": "rgb(252, 251, 255)",
@@ -103,12 +114,13 @@
       "fontFamily": "Geist, \"Geist Fallback\""
     }
   },
-  "blocked": {
+  "supplementaryDeferred": {
     "realadvisor": {
       "reason": "Cloudflare challenge in Chrome DevTools and raw HTTP 403 cf-mitigated: challenge",
-      "impact": [
-        "score-badge styling remains provisional",
-        "search-density decisions remain provisional"
+      "notBlocking": true,
+      "futureUses": [
+        "optional score-badge refinements",
+        "optional search-density refinements"
       ]
     }
   }

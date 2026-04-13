@@ -1,25 +1,6 @@
-// ═══════════════════════════════════════════════════════════════════════════
-// /intake — Landing page for inbound URL forwards (KIN-816)
-//
-// This route accepts a `?url=<listing-url>&source=<channel>` query string
-// and hands off to the main intake flow. It's deliberately minimal in
-// v1: the extension (KIN-816) and SMS handler (KIN-776) forward here, and a
-// follow-up card will wire in the
-// auth-aware signed-in / signed-out / duplicate branching.
-//
-// For now this page:
-//   1. Validates the forwarded URL with the canonical parser
-//   2. Shows the buyer the detected listing metadata
-//   3. Offers a "Continue" CTA that returns to the homepage where the
-//      existing PasteLinkInput handles the next step
-//
-// The page is a server component so we can read searchParams without a
-// client roundtrip and so SEO can mark the route as noindex (intake is
-// not a discoverable surface).
-// ═══════════════════════════════════════════════════════════════════════════
-
 import Link from "next/link";
 import type { Metadata } from "next";
+import { BuyerOnboardingFlow } from "@/components/onboarding/BuyerOnboardingFlow";
 import {
   getExtensionIntakeViewModel,
   type ExtensionIntakeAuthState,
@@ -86,7 +67,7 @@ export default async function IntakePage({ searchParams }: IntakePageProps) {
             ? "buyer-codex currently supports Zillow, Redfin, and Realtor.com listings."
             : "The forwarded URL was not recognized as a listing. Try pasting it on the homepage."}
         </p>
-        <p className="mt-2 text-sm text-neutral-500 break-all">URL: {url}</p>
+        <p className="mt-2 break-all text-sm text-neutral-500">URL: {url}</p>
         <Link
           href="/"
           className="mt-6 inline-block rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white"
@@ -122,56 +103,14 @@ export default async function IntakePage({ searchParams }: IntakePageProps) {
       : null;
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-16">
-      <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">
-        {extensionViewModel?.eyebrow ?? `Importing from ${portalLabel}`}
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold">
-        {extensionViewModel?.title ?? `Importing from ${portalLabel}`}
-      </h1>
-      <p className="mt-4 text-neutral-600">
-        {extensionViewModel?.body ??
-          `We detected a valid ${portalLabel} listing. Continue to buyer-codex to see your pricing panel, comps, and leverage analysis.`}
-      </p>
-      <dl className="mt-6 rounded-lg border border-neutral-200 p-4 text-sm">
-        <div className="flex justify-between">
-          <dt className="text-neutral-500">Portal</dt>
-          <dd className="font-medium">{portalLabel}</dd>
-        </div>
-        <div className="mt-2 flex justify-between">
-          <dt className="text-neutral-500">Listing ID</dt>
-          <dd className="font-medium font-mono text-xs">{parsed.data.listingId}</dd>
-        </div>
-        {source ? (
-          <div className="mt-2 flex justify-between">
-            <dt className="text-neutral-500">Source</dt>
-            <dd className="font-medium">{source}</dd>
-          </div>
-        ) : null}
-        {extensionViewModel ? (
-          <div className="mt-2 flex justify-between">
-            <dt className="text-neutral-500">State</dt>
-            <dd className="font-medium">{extensionViewModel.statusLabel}</dd>
-          </div>
-        ) : null}
-      </dl>
-      <Link
-        href={
-          extensionViewModel?.primaryHref ??
-          `/?intake=${encodeURIComponent(parsed.data.normalizedUrl)}`
-        }
-        className="mt-6 inline-block rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white"
-      >
-        {extensionViewModel?.primaryLabel ?? "Continue to buyer-codex"}
-      </Link>
-      {extensionViewModel?.secondaryHref && extensionViewModel.secondaryLabel ? (
-        <Link
-          href={extensionViewModel.secondaryHref}
-          className="mt-3 inline-block text-sm font-medium text-neutral-600 underline-offset-2 hover:underline"
-        >
-          {extensionViewModel.secondaryLabel}
-        </Link>
-      ) : null}
+    <main className="min-h-screen bg-neutral-50">
+      <BuyerOnboardingFlow
+        listingUrl={parsed.data.normalizedUrl}
+        portalLabel={portalLabel}
+        summaryTitle={extensionViewModel?.title}
+        summaryBody={extensionViewModel?.body}
+        initialSourcePlatform={parsed.data.platform}
+      />
     </main>
   );
 }

@@ -38,10 +38,12 @@
     "ci:workers": "pnpm workers:test",
     "lint": "next lint",
     "eval": "tsx scripts/ai-eval.ts",
-    "eval:drift": "tsx scripts/ai-eval.ts drift"
+    "eval:drift": "tsx scripts/ai-eval.ts drift",
+    "tokens:sync": "tsx scripts/sync-design-tokens.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
+    "@clerk/nextjs": "7.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.35.1",

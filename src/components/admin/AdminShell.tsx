@@ -1,9 +1,12 @@
 "use client";
 
-import { type ReactNode } from "react";
+import Link from "next/link";
+import { type ReactNode, useState } from "react";
 import { useQuery } from "convex/react";
 import { usePathname } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
+import { SurfaceDrawer } from "@/components/product/SurfaceDrawer";
+import { findActiveNavSlug, groupNavItemsBySection } from "@/lib/admin/nav";
 import { convex } from "@/lib/convex";
 import { AdminSidebar } from "./AdminSidebar";
 import { AdminTopbar } from "./AdminTopbar";
@@ -104,10 +107,19 @@ function AdminShellLive({ children }: { children: ReactNode }) {
         <AdminTopbar
           user={session.user}
           snapshot={session.snapshot}
+          mobileNavigation={
+            <AdminMobileNavigation
+              navItems={navItems}
+              pathname={pathname}
+              role={session.user.role}
+              openReviewItems={session.snapshot.openReviewItems}
+              urgentReviewItems={session.snapshot.urgentReviewItems}
+            />
+          }
         />
         <main
           id="admin-main"
-          className="flex-1 min-w-0 px-8 py-8"
+          className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8"
           role="main"
         >
           {children}
@@ -119,3 +131,105 @@ function AdminShellLive({ children }: { children: ReactNode }) {
 
 // Re-export nav types so pages can import them without reaching across layers.
 export type { NavItem, NavSection };
+
+function AdminMobileNavigation({
+  navItems,
+  pathname,
+  role,
+  openReviewItems,
+  urgentReviewItems,
+}: {
+  navItems: NavItem[];
+  pathname: string | null;
+  role: InternalConsoleRole;
+  openReviewItems: number;
+  urgentReviewItems: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const sections = groupNavItemsBySection(navItems);
+  const activeSlug = findActiveNavSlug(navItems, pathname);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700"
+        onClick={() => setOpen(true)}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="size-4"
+          aria-hidden="true"
+        >
+          <path d="M3 6h18" />
+          <path d="M3 12h18" />
+          <path d="M3 18h18" />
+        </svg>
+        Menu
+      </button>
+
+      <SurfaceDrawer
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Internal console"
+        description="Review queues, metrics, notes, and overrides."
+        footer={
+          <div className="flex items-center justify-between text-xs text-neutral-500">
+            <span>Role</span>
+            <span className="rounded-full bg-neutral-100 px-2 py-1 font-medium uppercase tracking-[0.16em] text-neutral-700">
+              {role}
+            </span>
+          </div>
+        }
+      >
+        <nav className="space-y-6" aria-label="Internal console navigation">
+          {sections.map((section) => (
+            <div key={section.section} className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
+                {section.label}
+              </p>
+              <div className="space-y-2">
+                {section.items.map((item) => {
+                  const active = item.slug === activeSlug;
+                  const showQueueBadge =
+                    item.slug === "queues" && openReviewItems > 0;
+                  return (
+                    <Link
+                      key={item.slug}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={
+                        active
+                          ? "flex items-center justify-between rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-3 text-sm font-medium text-primary-700"
+                          : "flex items-center justify-between rounded-xl border border-neutral-200 px-4 py-3 text-sm text-neutral-700"
+                      }
+                    >
+                      <span>{item.label}</span>
+                      {showQueueBadge ? (
+                        <span
+                          className={
+                            urgentReviewItems > 0
+                              ? "rounded-full bg-error-100 px-2 py-0.5 text-xs font-medium text-error-700"
+                              : "rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700"
+                          }
+                        >
+                          {openReviewItems}
+                        </span>
+                      ) : null}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+      </SurfaceDrawer>
+    </>
+  );
+}

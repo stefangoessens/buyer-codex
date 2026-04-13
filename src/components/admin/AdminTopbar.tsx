@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { formatConsoleTimestamp, initialsFromName } from "@/lib/admin/format";
 import { roleLabel, type InternalConsoleRole } from "@/lib/admin/roles";
 
@@ -15,6 +16,7 @@ interface AdminTopbarProps {
     latestKpiComputedAt: string | null;
     pendingOverrideCount: number;
   };
+  mobileNavigation?: ReactNode;
 }
 
 /**
@@ -22,7 +24,11 @@ interface AdminTopbarProps {
  * their role, and the queue/override freshness. No action buttons — each
  * page adds its own.
  */
-export function AdminTopbar({ user, snapshot }: AdminTopbarProps) {
+export function AdminTopbar({
+  user,
+  snapshot,
+  mobileNavigation,
+}: AdminTopbarProps) {
   const initials = initialsFromName(user.name);
   const kpiFreshness = snapshot.latestKpiComputedAt
     ? formatConsoleTimestamp(snapshot.latestKpiComputedAt)
@@ -30,10 +36,11 @@ export function AdminTopbar({ user, snapshot }: AdminTopbarProps) {
 
   return (
     <header
-      className="flex h-16 items-center justify-between border-b border-neutral-200 bg-white px-8"
+      className="flex h-16 items-center justify-between border-b border-neutral-200 bg-white px-4 sm:px-6 lg:px-8"
       role="banner"
     >
       <div className="flex items-center gap-6 text-sm text-neutral-600">
+        {mobileNavigation ? <div className="md:hidden">{mobileNavigation}</div> : null}
         <div className="flex items-center gap-2">
           <span className="inline-flex size-2 rounded-full bg-success-500" aria-hidden="true" />
           <span>Live</span>

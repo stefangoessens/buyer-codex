@@ -1,5 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { KPICard } from "@/components/product/KPICard";
 import { computeDelta, formatKpiValue } from "@/lib/admin/kpiFormat";
 import type { KpiMetricDef } from "@/lib/admin/kpiCatalog";
 
@@ -27,54 +26,21 @@ export function KpiMetricTile({ metric, value }: KpiMetricTileProps) {
   const formatted = formatKpiValue(current, metric.unit);
 
   return (
-    <Card
-      className={cn(
-        "gap-2 transition-shadow hover:shadow-md",
-        value.source === "unavailable" && "border-dashed border-neutral-300",
-      )}
-    >
-      <CardHeader className="pb-0">
-        <CardDescription className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
-          {metric.label}
-        </CardDescription>
-        <CardTitle className="text-3xl font-semibold tracking-tight text-neutral-900">
-          {formatted}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex items-baseline justify-between gap-3 text-xs">
-        <span className="text-neutral-500">{metric.description}</span>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <span
-            className={cn(
-              "font-medium tabular-nums",
-              delta.tone === "positive" && "text-success-700",
-              delta.tone === "negative" && "text-error-700",
-              delta.tone === "neutral" && "text-neutral-500",
-            )}
-          >
-            {delta.direction === "up"
-              ? "▲"
-              : delta.direction === "down"
-                ? "▼"
-                : "—"}{" "}
-            {delta.text}
-          </span>
-          <span
-            className={cn(
-              "text-[10px] uppercase tracking-wider",
-              value.source === "snapshot" && "text-primary-600",
-              value.source === "computed" && "text-neutral-400",
-              value.source === "unavailable" && "text-error-600",
-            )}
-          >
-            {value.source === "snapshot"
-              ? "Snapshot"
-              : value.source === "computed"
-                ? "Computed"
-                : "No data"}
-          </span>
-        </div>
-      </CardContent>
-    </Card>
+    <KPICard
+      label={metric.label}
+      value={formatted}
+      description={`${metric.description} · ${
+        value.source === "snapshot"
+          ? "Snapshot"
+          : value.source === "computed"
+            ? "Computed"
+            : "No data"
+      }`}
+      tone={value.source === "unavailable" ? "warning" : "default"}
+      trend={{
+        direction: delta.direction,
+        text: delta.text,
+      }}
+    />
   );
 }

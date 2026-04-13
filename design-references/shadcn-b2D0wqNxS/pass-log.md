@@ -28,5 +28,5 @@
   - `screenshots/pass-3-mobile-preview-full.png`
   - `screenshots/pass-3-mobile-stack.png`
 - New findings:
-  - Cards stack cleanly with no new shell primitives.
-  - Coverage stabilized for card/form surface decisions, but not for left-nav shell decisions because the source preview never exposed them.
+  - Cards stack cleanly with no new mobile-specific primitives.
+  - Coverage stabilized for the live preset preview surfaces; exact shell geometry is already covered in `dashboard-shell-contract.md`.

@@ -2,9 +2,9 @@
 
 Role in hierarchy: supplementary reference for score badges, ranking chips, and data-dense property/search surfaces.
 
-## Blocker Status
+## Deferred Status
 
-RealAdvisor is currently blocked by Cloudflare in both the required Chrome DevTools workflow and raw HTTP fetches.
+RealAdvisor is retained here as supplementary evidence only. A persistent Cloudflare challenge blocked live Chrome DevTools capture and raw HTTP fetches, so this reference was explicitly deferred and does not block the accepted PayFit + Hosman + shadcn reference pack.
 
 Routes attempted:
 
@@ -34,9 +34,9 @@ cf-mitigated: challenge
 server: cloudflare
 ```
 
-## Impact
+## Impact On Accepted Pack
 
-The following decisions remain provisional:
+The accepted reference pack closes without this source. These areas remain optional future refinements rather than open blockers:
 
 - score badge styling
 - ranking chip styling
@@ -47,6 +47,6 @@ Temporary fallback until unblocked:
 - use Hosman's property rail and DPE-like chip density
 - use shadcn metric chips/cards for compact score framing
 
-## Unblock Requirement
+## Resume Condition
 
-This reference needs a non-blocked browser path. The capture pack here is intentionally explicit so the next agent can resume from a verified blocker instead of re-running blind attempts.
+If a non-blocked browser path becomes available later, another agent can resume from this evidence pack instead of re-running blind attempts.

@@ -7,12 +7,14 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./analytics-events": "./src/analytics-events.ts",
     "./auth": "./src/auth.ts",
     "./config": "./src/config.ts",
     "./contracts": "./src/contracts.ts",
     "./external-access": "./src/external-access.ts",
     "./launch-events": "./src/launch-events.ts",
     "./prompt-registry": "./src/prompt-registry.ts",
+    "./theme": "./src/theme.ts",
     "./utils": "./src/utils.ts"
   },
   "scripts": {

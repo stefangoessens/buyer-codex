@@ -2,9 +2,11 @@
 
 Role in hierarchy: authenticated app card density and component surface reference.
 
-## Important Caveat
+## Capture Scope
 
-The current preset preview URL does not expose the full left-nav dashboard shell described in `KIN-946`. What it does expose is a dense component lab with stable app-card, chart, form, and button patterns. Use it for app surface styling, not for nav shell geometry.
+This directory records the live multi-pass capture of the preset preview URL itself. The preview exposes a dense component lab with stable app-card, chart, form, and button patterns.
+
+Exact buyer dashboard shell geometry is already documented separately in `dashboard-shell-contract.md`, which remains the source of truth for left-nav rhythm, header zoning, and authenticated page scaffolding.
 
 ## What Was Captured
 
@@ -19,7 +21,7 @@ The current preset preview URL does not expose the full left-nav dashboard shell
 - Primary action button uses a strong indigo tone with pale foreground text.
 - Cards are white, heavily rounded (`26px`), ringed, and use a medium app shadow.
 - Interior spacing is usually `16-24px`.
-- The preview confirms a strong card language for dashboards, but not a canonical sidebar frame.
+- The preview confirms a strong card language for dashboards and internal tooling.
 
 ## Adopt
 
@@ -28,13 +30,10 @@ The current preset preview URL does not expose the full left-nav dashboard shell
 - Dense-but-readable form grouping
 - Pill buttons for app surfaces
 
-## Hold
+## Shell Boundary
 
-- Sidebar shell geometry
-- Search-grid composition
-- Top CTA rail inside the authenticated shell
-
-Those are still provisional until the correct preset view is visible.
+- Use `dashboard-shell-contract.md` for sidebar shell geometry, header zoning, and dashboard-shell composition.
+- Use this directory for the live preset preview evidence behind card density, form grouping, and analytics-surface choices.
 
 ## Screenshot Set
 

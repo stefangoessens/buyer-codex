@@ -32,8 +32,8 @@
 
 ## Stop Condition
 
-- Coverage did not stabilize because the reference UI never became accessible.
-- This is an active blocker, not an ambiguous capture gap.
+- The reference UI never became accessible across repeated attempts.
+- Because RealAdvisor is supplementary in the accepted hierarchy, capture stops here as durable blocker evidence rather than an open gating requirement.
 
 ## Pass 4
 
@@ -52,4 +52,5 @@
 
 Conclusion:
 
-- The blocker is still active after a fresh isolated-context retry.
+- The challenge is still active after a fresh isolated-context retry.
+- RealAdvisor remains deferred supplementary evidence and does not block KIN-946 closure.

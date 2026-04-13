@@ -240,7 +240,7 @@ export function ManualAddressInput() {
         <Button
           type="submit"
           disabled={disabled || value.trim().length === 0}
-          className="h-[60px] rounded-[12px] bg-primary-400 px-5 text-base font-medium text-white hover:bg-primary-500 disabled:bg-primary-200"
+          className="h-[60px] rounded-[12px] bg-primary-500 px-5 text-base font-medium text-white hover:bg-primary-600 disabled:bg-primary-200"
         >
           {state.status === "submitting" ? "Matching address..." : "Find property"}
         </Button>

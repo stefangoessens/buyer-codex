@@ -4,6 +4,7 @@ import {
   buildFallbackDedupeKey,
   decideEscalation,
   errorCodeToFallbackReason,
+  normalizeBrowserUseFallbackResult,
 } from "@/lib/enrichment/fallback";
 import {
   FALLBACK_REASONS,
@@ -11,6 +12,18 @@ import {
 } from "@/lib/enrichment/types";
 
 const NOW = new Date("2026-04-12T12:00:00Z");
+const BASE_FALLBACK_RESULT = {
+  sourceUrl: "https://zillow.com/homedetails/123",
+  portal: "zillow" as const,
+  canonicalFields: {
+    listPrice: 500_000,
+    beds: 3,
+  },
+  confidence: 0.82,
+  evidence: [{ kind: "screenshot" as const, url: "s3://bucket/fallback.png" }],
+  reason: "parser_schema_drift" as const,
+  capturedAt: "2026-04-12T12:05:00Z",
+};
 
 function baseInput(overrides = {}) {
   return {
@@ -181,6 +194,61 @@ describe("enrichment/fallback", () => {
       const a = buildFallbackDedupeKey("p1", "https://a.com/x", 0, before);
       const b = buildFallbackDedupeKey("p1", "https://a.com/x", 0, after);
       expect(a).not.toBe(b);
+    });
+  });
+
+  describe("normalizeBrowserUseFallbackResult", () => {
+    it("unwraps the worker payload and strips empty canonical fields", () => {
+      const normalized = normalizeBrowserUseFallbackResult({
+        result: {
+          ...BASE_FALLBACK_RESULT,
+          canonicalFields: {
+            ...BASE_FALLBACK_RESULT.canonicalFields,
+            hoaFee: null,
+            description: "",
+            taxAnnual: undefined,
+          },
+          evidence: [
+            ...BASE_FALLBACK_RESULT.evidence,
+            { kind: "bad-kind", url: "s3://bucket/skip-me.png" },
+          ],
+        },
+      });
+
+      expect(normalized).toEqual({
+        ...BASE_FALLBACK_RESULT,
+        canonicalFields: {
+          listPrice: 500_000,
+          beds: 3,
+        },
+      });
+    });
+
+    it("accepts a flat Browser Use result payload", () => {
+      const normalized = normalizeBrowserUseFallbackResult(BASE_FALLBACK_RESULT);
+
+      expect(normalized?.portal).toBe("zillow");
+      expect(normalized?.reason).toBe("parser_schema_drift");
+      expect(normalized?.canonicalFields.listPrice).toBe(500_000);
+    });
+
+    it("returns null for malformed payloads", () => {
+      expect(
+        normalizeBrowserUseFallbackResult({
+          result: {
+            ...BASE_FALLBACK_RESULT,
+            confidence: Number.NaN,
+          },
+        }),
+      ).toBeNull();
+      expect(
+        normalizeBrowserUseFallbackResult({
+          result: {
+            ...BASE_FALLBACK_RESULT,
+            canonicalFields: "not-an-object",
+          },
+        }),
+      ).toBeNull();
     });
   });
 

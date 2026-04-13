@@ -1,25 +1,38 @@
 # Design References
 
-Durable capture pack for `KIN-946`.
+Reference materials for the buyer-codex design system.
 
-## Reference Status
+Canonical implementation now lives in `packages/shared/src/theme.ts`.
+Run `pnpm tokens:sync` after token edits to regenerate:
 
-| Reference | Status | Directory |
-| --- | --- | --- |
-| PayFit | Captured | `design-references/payfit/` |
-| Hosman | Captured | `design-references/hosman/` |
-| shadcn preset `b2D0wqNxS` | Captured with preview mismatch note | `design-references/shadcn-b2D0wqNxS/` |
-| RealAdvisor | Blocked by Cloudflare | `design-references/realadvisor/` |
+- `design-references/tokens.css`
+- `ios/BuyerCodex/Sources/Design/BrandTheme.swift`
 
-## Shared Outputs
+## Files
 
-- `component-catalog.md` - harvested components, adoption status, and surface mapping for `KIN-945`
-- `core-primitives.md` - shared primitives and provisional gaps for `KIN-945`
-- `token-candidates.json` - machine-readable token proposal for `KIN-944`
-- `tokens.ts` - TypeScript export of the adopted candidate tokens
-- `tokens.css` - CSS custom properties mirroring the adopted candidate tokens
+- `tokens.css` — generated CSS custom properties for web theme consumption
+- `tokens.ts` — TypeScript re-export of the canonical shared token contract
+- `token-candidates.json` — machine-readable token candidate snapshot from the reference harvest
+- `component-catalog.md` — Harvested component patterns with usage notes
+- `component-library.md` — Shared library slot rules, usage examples, and code-backed consumers
+- `shadcn-b2D0wqNxS/dashboard-shell-contract.md` — Explicit buyer dashboard shell contract, reference captures, and annotated zone maps
 
-## Notes
+## Capture Packs
 
-- The PayFit/Hosman/shadcn captures are stable enough for downstream agents to work from without re-opening those sources.
-- RealAdvisor is the only unresolved reference. Its blocker pack includes screenshots and raw transport evidence so a future agent can resume from a concrete stopping point instead of rediscovering the failure mode.
+- `payfit/README.md` + `payfit/pass-log.md` — multi-pass aesthetic capture pack and screenshot inventory
+- `hosman/README.md` + `hosman/pass-log.md` — multi-pass structural capture pack and screenshot inventory
+- `shadcn-b2D0wqNxS/README.md` + `shadcn-b2D0wqNxS/pass-log.md` — live preset preview capture pack for card, form, and analytics surfaces
+- `realadvisor/README.md` + `realadvisor/pass-log.md` — supplementary deferred evidence only; retained to document the persistent Cloudflare challenge and avoid re-running blind attempts
+
+## Reference Sites
+
+- [PayFit](https://payfit.com/) — Primary aesthetic (color, type, spacing, motion)
+- [Hosman](https://www.hosman.co/) — Primary structure (page architecture, conversion flows)
+- [RealAdvisor](https://realadvisor.ch/en/find-agent) — Supplementary only; deferred after repeated Cloudflare challenge
+- [shadcn preset b2D0wqNxS](https://ui.shadcn.com/create?item=preview&preset=b2D0wqNxS) — Authenticated shell scaffold, left-rail rhythm, and dashboard card density reference
+
+## North Star
+
+> PayFit aesthetic in Hosman structural form.
+
+See DESIGN.md for full design system documentation.

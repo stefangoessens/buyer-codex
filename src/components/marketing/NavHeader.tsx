@@ -33,7 +33,7 @@ export function NavHeader() {
 
         <Link
           href="/get-started"
-          className="ml-auto rounded-[12px] bg-primary-400 px-4 py-3 text-base font-medium text-white shadow-sm transition-colors duration-[var(--duration-fast)] hover:bg-primary-500"
+          className="ml-auto rounded-[12px] bg-primary-500 px-4 py-3 text-base font-medium text-white shadow-sm transition-colors duration-[var(--duration-fast)] hover:bg-primary-600"
         >
           Get Started
         </Link>
