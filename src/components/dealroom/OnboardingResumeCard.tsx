@@ -5,19 +5,23 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { buildListingIntakeHref } from "@/lib/intake/pasteLink";
+import { trackDealRoomUnlocked } from "@/lib/intake/pasteLinkFunnel";
 import {
   getSourceListingStatusReference,
   linkFirstPropertyReference,
 } from "@/lib/onboarding/api";
 import { setBuyerOnboardingPropertyStatus } from "@/lib/onboarding/state";
 import { useStoredBuyerOnboardingDraft } from "@/lib/onboarding/storage";
+import { SourceListingRecoveryBanner } from "@/components/onboarding/SourceListingRecoveryBanner";
 
 export function OnboardingResumeCard() {
   const router = useRouter();
   const { draft, isHydrated, setDraft, clearDraft } = useStoredBuyerOnboardingDraft();
   const linkFirstProperty = useMutation(linkFirstPropertyReference);
+  const markAttemptDossierReady = useMutation(api.intake.markAttemptDossierReady);
   const [isLinking, setIsLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
 
@@ -62,6 +66,18 @@ export function OnboardingResumeCard() {
       void linkFirstProperty({ sourceListingId })
         .then((result) => {
           if (result.status === "deal_room_ready") {
+            if (activeDraft.intakeAttemptId) {
+              void markAttemptDossierReady({
+                attemptId: activeDraft.intakeAttemptId as Id<"intakeAttempts">,
+                readyAt: new Date().toISOString(),
+              });
+            }
+            trackDealRoomUnlocked({
+              dealRoomId: String(result.dealRoomId),
+              propertyId: String(result.propertyId),
+              sourceListingId: activeDraft.sourceListingId ?? undefined,
+              platform: activeDraft.sourcePlatform ?? undefined,
+            });
             clearDraft();
             router.push(`/dealroom/${result.dealRoomId}`);
             return;
@@ -109,6 +125,7 @@ export function OnboardingResumeCard() {
     isLinking,
     linkError,
     linkFirstProperty,
+    markAttemptDossierReady,
     router,
     setDraft,
     sourceListingId,
@@ -128,41 +145,18 @@ export function OnboardingResumeCard() {
       ? "pending_source_listing"
       : activeDraft.property.status);
 
-  if (currentStatus === "source_listing_failed") {
+  if (
+    sourceListingStatus &&
+    (sourceListingStatus.status === "source_listing_failed" ||
+      sourceListingStatus.status === "source_listing_partial" ||
+      sourceListingStatus.recoveryState === "review_required")
+  ) {
     return (
-      <Card
-        className="border-error-200 bg-error-50/70"
-        data-onboarding-property-status={currentStatus}
-      >
-        <CardContent className="flex flex-col gap-4 p-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-error-700">
-              Onboarding follow-up
-            </p>
-            <h2 className="mt-1 text-lg font-semibold text-neutral-900">
-              We couldn&apos;t finish that first property.
-            </h2>
-            <p className="mt-2 text-sm text-neutral-600">
-              Your buyer profile is saved, but this listing needs another pass
-              through intake before it can appear in your dashboard.
-            </p>
-          </div>
-          <p className="break-all rounded-xl border border-error-200 bg-white px-4 py-3 text-sm text-neutral-600">
-            {activeDraft.listingUrl}
-          </p>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href={intakeHref}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-error-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-error-700"
-            >
-              Retry this listing
-            </Link>
-            <span className="inline-flex h-11 items-center text-sm text-neutral-500">
-              You can also paste a different listing above.
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+      <SourceListingRecoveryBanner
+        resolution={sourceListingStatus}
+        listingUrl={activeDraft.listingUrl}
+        intakeHref={intakeHref}
+      />
     );
   }
 

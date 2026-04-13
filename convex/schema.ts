@@ -225,6 +225,63 @@ export default defineSchema({
     .index("by_propertyId", ["propertyId"])
     .index("by_status", ["status"]),
 
+  intakeAttempts: defineTable({
+    sourceListingId: v.optional(v.id("sourceListings")),
+    sourcePlatform: v.optional(
+      v.union(
+        v.literal("zillow"),
+        v.literal("redfin"),
+        v.literal("realtor"),
+        v.literal("manual")
+      )
+    ),
+    intakeChannel: v.union(
+      v.literal("hero"),
+      v.literal("compact"),
+      v.literal("home"),
+      v.literal("blog"),
+      v.literal("city"),
+      v.literal("community"),
+      v.literal("newconstruction"),
+      v.literal("extension"),
+      v.literal("share_import"),
+      v.literal("sms"),
+      v.literal("manual_address"),
+      v.literal("unknown")
+    ),
+    rawInput: v.string(),
+    normalizedInput: v.optional(v.string()),
+    submittedAt: v.string(),
+    teaserViewedAt: v.optional(v.string()),
+    dossierReadyAt: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("ready"),
+      v.literal("partial"),
+      v.literal("failed"),
+      v.literal("unsupported")
+    ),
+    failureMode: v.optional(
+      v.union(
+        v.literal("unsupported_url"),
+        v.literal("malformed_url"),
+        v.literal("missing_listing_id"),
+        v.literal("parser_failed"),
+        v.literal("partial_extraction"),
+        v.literal("no_match"),
+        v.literal("ambiguous_match"),
+        v.literal("low_confidence_match"),
+        v.literal("unknown")
+      )
+    ),
+    retryable: v.optional(v.boolean()),
+    missingFields: v.optional(v.array(v.string())),
+  })
+    .index("by_sourceListingId", ["sourceListingId"])
+    .index("by_submittedAt", ["submittedAt"])
+    .index("by_sourcePlatform_and_submittedAt", ["sourcePlatform", "submittedAt"])
+    .index("by_status_and_submittedAt", ["status", "submittedAt"]),
+
   // ═══════════════════════════════════════════════════════════════════════════
   // DEAL ROOMS & AGREEMENTS
   // ═══════════════════════════════════════════════════════════════════════════

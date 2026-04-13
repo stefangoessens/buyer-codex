@@ -110,12 +110,15 @@ describe("track() — dashboard category", () => {
 });
 
 describe("track() — deal_room category", () => {
-  it("accepts deal_room_unlocked with ids", () => {
+  it("accepts deal_room_unlocked with intake provenance and latency", () => {
     expect(() =>
       track("deal_room_unlocked", {
         dealRoomId: "dr_1",
         propertyId: "prop_1",
         accessLevel: "registered",
+        sourceListingId: "sl_1",
+        platform: "zillow",
+        latencyMs: 18250,
       }),
     ).not.toThrow();
   });

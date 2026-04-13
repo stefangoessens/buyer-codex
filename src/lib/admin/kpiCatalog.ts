@@ -72,6 +72,38 @@ export const KPI_CATALOG: readonly KpiMetricDef[] = [
     description: "Registrations divided by unique visits.",
     direction: "higher_better",
   },
+  {
+    key: "funnel.intake_usable_rate",
+    label: "Usable intake rate",
+    category: "funnel",
+    unit: "percent",
+    description: "Share of intake attempts that reached ready or partial output.",
+    direction: "higher_better",
+  },
+  {
+    key: "funnel.intake_failure_rate",
+    label: "Intake failure rate",
+    category: "funnel",
+    unit: "percent",
+    description: "Share of intake attempts that ended in failed or unsupported states.",
+    direction: "lower_better",
+  },
+  {
+    key: "funnel.time_to_teaser_ms",
+    label: "Median time to teaser",
+    category: "funnel",
+    unit: "duration_ms",
+    description: "Median time from intake submission to teaser visibility.",
+    direction: "lower_better",
+  },
+  {
+    key: "funnel.time_to_dossier_ms",
+    label: "Median time to dossier",
+    category: "funnel",
+    unit: "duration_ms",
+    description: "Median time from intake submission to first dossier-ready deal room.",
+    direction: "lower_better",
+  },
 
   // ─── Deal room engagement ───────────────────────────────────────────────
   {

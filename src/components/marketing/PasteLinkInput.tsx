@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation } from "convex/react";
 import type { LinkPastedSource } from "@buyer-codex/shared/launch-events";
+import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,6 +29,7 @@ export function PasteLinkInput({
 }: PasteLinkInputProps) {
   const [value, setValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const recordAttemptFailure = useMutation(api.intake.recordAttemptFailure);
 
   const isHero = variant === "hero";
   const canSubmit = value.trim().length > 0;
@@ -34,9 +37,17 @@ export function PasteLinkInput({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
+    const submittedAt = new Date().toISOString();
     const submission = prepareListingIntakeSubmission(value, variant);
     if (!submission.ok) {
       setErrorMessage(submission.message);
+      void recordAttemptFailure({
+        url: value,
+        source: variant,
+        submittedAt,
+      }).catch(() => {
+        // Metrics must never block the inline recovery path.
+      });
       return;
     }
 

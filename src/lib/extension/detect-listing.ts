@@ -59,6 +59,7 @@ export interface ExtensionIntakeSuccessResult {
   listingId: string;
   normalizedUrl: string;
   sourceListingId: string;
+  attemptId: string;
 }
 
 export interface ExtensionIntakeFailureResult {
@@ -164,6 +165,7 @@ export function buildExtensionIntakeRedirectUrl(
     platform: result.platform,
     listingId: result.listingId,
     sourceListingId: result.sourceListingId,
+    attemptId: result.attemptId,
   });
 
   return `${base}/intake?${params.toString()}`;

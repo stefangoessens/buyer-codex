@@ -7,6 +7,8 @@ import {
   type LinkPastedSource,
 } from "@buyer-codex/shared/launch-events";
 import { BuyerOnboardingFlow } from "@/components/onboarding/BuyerOnboardingFlow";
+import { IntakeFailureState } from "@/components/onboarding/IntakeFailureState";
+import { ManualAddressInput } from "@/components/marketing/ManualAddressInput";
 import {
   getExtensionIntakeViewModel,
   type ExtensionIntakeAuthState,
@@ -49,6 +51,7 @@ export function IntakePageClient({ searchParams }: IntakePageClientProps) {
   const listingId = resolvedSearchParams.get("listingId") ?? undefined;
   const sourceListingId =
     resolvedSearchParams.get("sourceListingId") ?? undefined;
+  const attemptId = resolvedSearchParams.get("attemptId") ?? undefined;
 
   if (!url) {
     return (
@@ -77,21 +80,9 @@ export function IntakePageClient({ searchParams }: IntakePageClientProps) {
 
   if (!parsed.success) {
     return (
-      <main className="mx-auto max-w-xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">We couldn&apos;t import that link</h1>
-        <p className="mt-4 text-neutral-600">
-          {parsed.error.code === "unsupported_url"
-            ? "buyer-codex currently supports Zillow, Redfin, and Realtor.com listings."
-            : "The forwarded URL was not recognized as a listing. Try pasting it on the homepage."}
-        </p>
-        <p className="mt-2 break-all text-sm text-neutral-500">URL: {url}</p>
-        <Link
-          href="/"
-          className="mt-6 inline-block rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white"
-        >
-          Try again from homepage
-        </Link>
-      </main>
+      <IntakeFailureState code={parsed.error.code} url={url}>
+        <ManualAddressInput />
+      </IntakeFailureState>
     );
   }
 
@@ -108,7 +99,8 @@ export function IntakePageClient({ searchParams }: IntakePageClientProps) {
     isExtensionAuthState(auth) &&
     (platform === "zillow" || platform === "redfin" || platform === "realtor") &&
     typeof listingId === "string" &&
-    typeof sourceListingId === "string"
+    typeof sourceListingId === "string" &&
+    typeof attemptId === "string"
       ? getExtensionIntakeViewModel({
           kind: result,
           authState: auth,
@@ -116,6 +108,7 @@ export function IntakePageClient({ searchParams }: IntakePageClientProps) {
           listingId,
           normalizedUrl: parsed.data.normalizedUrl,
           sourceListingId,
+          attemptId,
         } satisfies ExtensionIntakeSuccessResult)
       : null;
 
@@ -129,6 +122,8 @@ export function IntakePageClient({ searchParams }: IntakePageClientProps) {
         intakeSource={intakeSource}
         submittedAtMs={submittedAtMs}
         initialSourcePlatform={parsed.data.platform}
+        initialSourceListingId={sourceListingId ?? null}
+        initialAttemptId={attemptId ?? null}
       />
     </main>
   );

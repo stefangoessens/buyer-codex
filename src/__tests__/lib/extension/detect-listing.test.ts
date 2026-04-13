@@ -173,12 +173,14 @@ describe("buildExtensionIntakeRedirectUrl", () => {
       listingId: "123456",
       normalizedUrl: "https://www.redfin.com/FL/Miami/home/123456",
       sourceListingId: "sl_123456",
+      attemptId: "att_123456",
     });
 
     expect(url).toContain("source=extension");
     expect(url).toContain("result=duplicate");
     expect(url).toContain("auth=signed_in");
     expect(url).toContain("sourceListingId=sl_123456");
+    expect(url).toContain("attemptId=att_123456");
   });
 });
 
@@ -191,6 +193,7 @@ describe("getExtensionIntakeViewModel", () => {
       listingId: "12345",
       normalizedUrl: "https://www.zillow.com/homedetails/12345_zpid/",
       sourceListingId: "sl_existing",
+      attemptId: "att_existing",
     });
 
     expect(model.primaryHref).toBe("/dashboard");
@@ -207,6 +210,7 @@ describe("getExtensionIntakeViewModel", () => {
       normalizedUrl:
         "https://www.realtor.com/realestateandhomes-detail/123-Main-St_Miami_FL_33131_M12345-67890",
       sourceListingId: "sl_new",
+      attemptId: "att_new",
     });
 
     expect(model.primaryHref).toBe("/");
