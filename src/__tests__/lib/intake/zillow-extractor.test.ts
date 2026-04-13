@@ -4,77 +4,32 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { extractZillowListingHtml } from "@/lib/intake";
+import {
+  loadParserFixtureCases,
+  readParserFixture,
+} from "@/test/parser-fixtures";
 
 const TS_FIXTURE_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../../test/fixtures/zillow",
 );
-const WORKER_FIXTURE_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../../../python-workers/fixtures/html/zillow",
-);
+
+const CONTRACT_CASES = loadParserFixtureCases("zillow");
 
 const SOUTH_FLORIDA_FIXTURES = [
-  {
-    name: "zillow_condo_miami.html",
-    address: "482 Bayshore Ct, Unit 1204, Miami, FL 33131",
-    city: "Miami",
-    price: 675000,
-    propertyType: "Condo",
-    beds: 2,
-    bathsFull: 2,
-    bathsHalf: 0,
-    sqftLiving: 1080,
-    primaryStrategy: "apollo-cache",
-  },
-  {
-    name: "zillow_sfh_boca_raton.html",
-    address: "7421 Mirabella Way, Boca Raton, FL 33433",
-    city: "Boca Raton",
-    price: 1250000,
-    propertyType: "Single Family",
-    beds: 4,
-    bathsFull: 3,
-    bathsHalf: 0,
-    sqftLiving: 2800,
-    primaryStrategy: "apollo-cache",
-  },
-  {
-    name: "zillow_townhome_fort_lauderdale.html",
-    address: "1150 Riverwalk Ln, Fort Lauderdale, FL 33301",
-    city: "Fort Lauderdale",
-    price: 540000,
-    propertyType: "Townhouse",
-    beds: 3,
-    bathsFull: 2,
-    bathsHalf: 1,
-    sqftLiving: 1750,
-    primaryStrategy: "html-text",
-  },
-  {
-    name: "zillow_new_construction_doral.html",
-    address: "9088 Palmera Isle Blvd, Doral, FL 33172",
-    city: "Doral",
-    price: 1450000,
-    propertyType: "New Construction",
-    beds: 5,
-    bathsFull: 4,
-    bathsHalf: 0,
-    sqftLiving: 3400,
-    primaryStrategy: "apollo-cache",
-  },
-  {
-    name: "zillow_sfh_homestead.html",
-    address: "2644 SW 145th Pl, Homestead, FL 33032",
-    city: "Homestead",
-    price: 395000,
-    propertyType: "Single Family",
-    beds: 3,
-    bathsFull: 2,
-    bathsHalf: 0,
-    sqftLiving: 1440,
-    primaryStrategy: "apollo-cache",
-  },
+  ...CONTRACT_CASES.map((fixtureCase) => ({
+    name: fixtureCase.fixture,
+    sourceUrl: fixtureCase.sourceUrl,
+    address: fixtureCase.canonical.addressFormatted,
+    city: fixtureCase.canonical.city,
+    price: fixtureCase.canonical.priceUsd,
+    propertyType: fixtureCase.canonical.propertyTypeDisplay,
+    beds: fixtureCase.canonical.beds,
+    bathsFull: fixtureCase.canonical.bathsFull,
+    bathsHalf: fixtureCase.canonical.bathsHalf,
+    sqftLiving: fixtureCase.canonical.livingAreaSqft,
+    primaryStrategy: fixtureCase.webParser?.primaryStrategy,
+  })),
 ] as const;
 
 function loadFixture(name: string): string {
@@ -82,15 +37,7 @@ function loadFixture(name: string): string {
 }
 
 function loadWorkerFixture(name: string): string {
-  return fs.readFileSync(path.join(WORKER_FIXTURE_DIR, name), "utf8");
-}
-
-function workerFixtureUrl(html: string): string {
-  const sourceUrl = html.match(/<meta property="og:url" content="([^"]+)"/)?.[1];
-  if (!sourceUrl) {
-    throw new Error("Worker fixture is missing og:url metadata");
-  }
-  return sourceUrl;
+  return readParserFixture("zillow", name);
 }
 
 describe("extractZillowListingHtml", () => {
@@ -124,6 +71,7 @@ describe("extractZillowListingHtml", () => {
     "extracts canonical Zillow payloads from $name",
     ({
       name,
+      sourceUrl,
       address,
       city,
       price,
@@ -135,7 +83,6 @@ describe("extractZillowListingHtml", () => {
       primaryStrategy,
     }) => {
       const html = loadWorkerFixture(name);
-      const sourceUrl = workerFixtureUrl(html);
       const result = extractZillowListingHtml({
         html,
         sourceUrl,

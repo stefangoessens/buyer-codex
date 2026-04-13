@@ -106,6 +106,11 @@ export type RateLimitState =
       reason: "window_exceeded" | "block_active";
     };
 
+export interface ExplicitRateLimitState {
+  status: "retry_later" | "blocked";
+  retryAt: string;
+}
+
 /**
  * Caller-facing denial shape. UI surfaces only care whether the caller
  * should retry later or is currently blocked, plus when the gate lifts.

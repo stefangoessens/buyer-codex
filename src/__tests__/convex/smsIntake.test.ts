@@ -17,6 +17,13 @@ vi.mock("../../../convex/lib/rateLimitBuckets", () => ({
 
 import { processInboundSms } from "../../../convex/smsIntake";
 
+type ProcessInboundSmsArgs = {
+  messageSid: string;
+  fromPhone: string;
+  toPhone: string;
+  body: string;
+};
+
 type ProcessInboundSmsResult = {
   outcome: string;
   intakeId: string;
@@ -33,12 +40,7 @@ const processInboundSmsHandler = (
   processInboundSms as unknown as {
     _handler: (
       ctx: unknown,
-      args: {
-        messageSid: string;
-        fromPhone: string;
-        toPhone: string;
-        body: string;
-      },
+      args: ProcessInboundSmsArgs,
     ) => Promise<ProcessInboundSmsResult>;
   }
 )._handler;
@@ -162,12 +164,12 @@ describe("convex/smsIntake.processInboundSms", () => {
   it("creates intake state and replies with a signed intake link", async () => {
     const db = new FakeDb();
 
-    const result = (await processInboundSmsHandler({ db } as never, {
+    const result = await processInboundSmsHandler({ db } as never, {
       messageSid: "SM-success",
       fromPhone: "+13055551234",
       toPhone: "+13055550000",
       body: "Check this out https://www.zillow.com/homedetails/Test/123456_zpid/?utm_source=sms",
-    })) as Awaited<ReturnType<typeof processInboundSmsHandler>>;
+    });
 
     expect(result.outcome).toBe("url_processed");
     expect(result.replySent).toBe(true);
@@ -204,12 +206,12 @@ describe("convex/smsIntake.processInboundSms", () => {
   it("returns an explicit invalid reply state for unsupported text input", async () => {
     const db = new FakeDb();
 
-    const result = (await processInboundSmsHandler({ db } as never, {
+    const result = await processInboundSmsHandler({ db } as never, {
       messageSid: "SM-invalid",
       fromPhone: "+13055551234",
       toPhone: "+13055550000",
       body: "hello there",
-    })) as Awaited<ReturnType<typeof processInboundSmsHandler>>;
+    });
 
     expect(result.outcome).toBe("invalid_url");
     expect(result.replySent).toBe(true);
@@ -236,12 +238,12 @@ describe("convex/smsIntake.processInboundSms", () => {
       updatedAt: "2026-04-13T00:00:00.000Z",
     });
 
-    const result = (await processInboundSmsHandler({ db } as never, {
+    const result = await processInboundSmsHandler({ db } as never, {
       messageSid: "SM-suppressed",
       fromPhone: "+13055551234",
       toPhone: "+13055550000",
       body: "https://www.zillow.com/homedetails/Test/123456_zpid/",
-    })) as Awaited<ReturnType<typeof processInboundSmsHandler>>;
+    });
 
     expect(result.outcome).toBe("suppressed");
     expect(result.replySent).toBe(false);
@@ -259,14 +261,14 @@ describe("convex/smsIntake.processInboundSms", () => {
       body: "https://www.redfin.com/FL/Miami/home/99999",
     };
 
-    const first = (await processInboundSmsHandler(
+    const first = await processInboundSmsHandler(
       { db } as never,
       args,
-    )) as Awaited<ReturnType<typeof processInboundSmsHandler>>;
-    const second = (await processInboundSmsHandler(
+    );
+    const second = await processInboundSmsHandler(
       { db } as never,
       args,
-    )) as Awaited<ReturnType<typeof processInboundSmsHandler>>;
+    );
 
     expect(first.outcome).toBe("url_processed");
     expect(second.outcome).toBe("duplicate");

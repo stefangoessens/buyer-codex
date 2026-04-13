@@ -8,11 +8,11 @@ run for real and we assert on the :class:`CanonicalProperty` output.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
+from fixtures.parser_cases import load_portal_expectations, read_portal_fixture
 from common.parser_errors import MalformedHTMLError, SchemaShiftError
 from common.property import CanonicalProperty, PropertyPhoto
 from parsers.redfin import RedfinExtractor, _normalize_property_type
@@ -21,80 +21,16 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 
-_FIXTURE_DIR = Path(__file__).parent.parent / "fixtures" / "html" / "redfin"
-
-
 def _load(name: str) -> str:
     """Read a Redfin fixture by filename."""
-    return (_FIXTURE_DIR / name).read_text(encoding="utf-8")
+    return read_portal_fixture("redfin", name)
 
 
 # Expected values for each fixture. These match the values the fixtures
 # were hand-built with; the extractor must recover them from whichever
 # data source the fixture exposes (JSON-LD, Redux/__INITIAL_STATE__,
 # or plain HTML).
-_EXPECTED: Mapping[str, Mapping[str, object]] = {
-    "redfin_condo_miami_beach.html": {
-        "source_url": "https://www.redfin.com/FL/Miami-Beach/1420-Ocean-Dr-33139/unit-402/home/20000001",
-        "city": "Miami Beach",
-        "state": "FL",
-        "postal_code": "33139",
-        "price_usd": 725_000,
-        "beds": 2.0,
-        "baths": 2.0,
-        "living_area_sqft": 1_150,
-        "year_built": 2016,
-        "property_type": "condo",
-    },
-    "redfin_sfh_weston.html": {
-        "source_url": "https://www.redfin.com/FL/Weston/2885-Lakeside-Pl-33326/home/20000002",
-        "city": "Weston",
-        "state": "FL",
-        "postal_code": "33326",
-        "price_usd": 1_400_000,
-        "beds": 5.0,
-        "baths": 4.0,
-        "living_area_sqft": 3_400,
-        "year_built": 2010,
-        "property_type": "single_family",
-    },
-    "redfin_new_construction_parkland.html": {
-        "source_url": "https://www.redfin.com/FL/Parkland/14500-Heron-Bay-Blvd-33076/home/20000004",
-        "city": "Parkland",
-        "state": "FL",
-        "postal_code": "33076",
-        "price_usd": 1_850_000,
-        "beds": 6.0,
-        "baths": 5.0,
-        "living_area_sqft": 4_200,
-        "year_built": 2026,
-        "property_type": "new_construction",
-    },
-    "redfin_sfh_cutler_bay.html": {
-        "source_url": "https://www.redfin.com/FL/Cutler-Bay/19850-Old-Cutler-Rd-33189/home/20000005",
-        "city": "Cutler Bay",
-        "state": "FL",
-        "postal_code": "33189",
-        "price_usd": 485_000,
-        "beds": 4.0,
-        "baths": 3.0,
-        "living_area_sqft": 1_680,
-        "year_built": 2000,
-        "property_type": "single_family",
-    },
-    "redfin_townhome_delray.html": {
-        "source_url": "https://www.redfin.com/FL/Delray-Beach/710-Palm-Trail-33444/home/20000003",
-        "city": "Delray Beach",
-        "state": "FL",
-        "postal_code": "33444",
-        "price_usd": 620_000,
-        "beds": 3.0,
-        "baths": 2.5,
-        "living_area_sqft": 1_850,
-        "year_built": 2018,
-        "property_type": "townhouse",
-    },
-}
+_EXPECTED: Mapping[str, Mapping[str, object]] = load_portal_expectations("redfin")
 
 
 class TestHappyPath:

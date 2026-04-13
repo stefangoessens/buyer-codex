@@ -1,25 +1,31 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { extractRedfinListingHtml } from "@/lib/intake";
+import {
+  loadParserFixtureCases,
+  readParserFixture,
+} from "@/test/parser-fixtures";
 
-const FIXTURE_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../../../python-workers/fixtures/html/redfin",
+const CONTRACT_CASES = loadParserFixtureCases("redfin");
+const CONDO_CASE = CONTRACT_CASES.find(
+  (fixtureCase) => fixtureCase.fixture === "redfin_condo_miami_beach.html",
+);
+const HTML_ONLY_CASE = CONTRACT_CASES.find(
+  (fixtureCase) => fixtureCase.fixture === "redfin_townhome_delray.html",
+);
+const REDUX_CASE = CONTRACT_CASES.find(
+  (fixtureCase) => fixtureCase.fixture === "redfin_sfh_cutler_bay.html",
 );
 
 function loadFixture(name: string): string {
-  return fs.readFileSync(path.join(FIXTURE_DIR, name), "utf8");
+  return readParserFixture("redfin", name);
 }
 
 describe("extractRedfinListingHtml", () => {
   it("extracts a condo listing from JSON-LD first", () => {
     const result = extractRedfinListingHtml({
-      html: loadFixture("redfin_condo_miami_beach.html"),
-      sourceUrl:
-        "https://www.redfin.com/FL/Miami-Beach/1420-Ocean-Dr-33139/unit-402/home/20000001",
+      html: loadFixture(CONDO_CASE!.fixture),
+      sourceUrl: CONDO_CASE!.sourceUrl,
       fetchedAt: "2026-04-12T12:00:00Z",
     });
 
@@ -28,18 +34,22 @@ describe("extractRedfinListingHtml", () => {
 
     expect(result.payload.reviewState).toBe("partial");
     expect(result.payload.data.address.formatted).toBe(
-      "1420 Ocean Dr, Unit 402, Miami Beach, FL 33139",
+      CONDO_CASE!.canonical.addressFormatted,
     );
     expect(result.payload.data.coordinates).toEqual({
       lat: 25.783,
       lng: -80.13,
     });
-    expect(result.payload.data.listPrice).toBe(725000);
-    expect(result.payload.data.propertyType).toBe("Condo");
-    expect(result.payload.data.beds).toBe(2);
-    expect(result.payload.data.bathsFull).toBe(2);
-    expect(result.payload.data.bathsHalf).toBe(0);
-    expect(result.payload.data.sqftLiving).toBe(1150);
+    expect(result.payload.data.listPrice).toBe(CONDO_CASE!.canonical.priceUsd);
+    expect(result.payload.data.propertyType).toBe(
+      CONDO_CASE!.canonical.propertyTypeDisplay,
+    );
+    expect(result.payload.data.beds).toBe(CONDO_CASE!.canonical.beds);
+    expect(result.payload.data.bathsFull).toBe(CONDO_CASE!.canonical.bathsFull);
+    expect(result.payload.data.bathsHalf).toBe(CONDO_CASE!.canonical.bathsHalf);
+    expect(result.payload.data.sqftLiving).toBe(
+      CONDO_CASE!.canonical.livingAreaSqft,
+    );
     expect(result.payload.data.hoaFee).toBe(675);
     expect(result.payload.data.daysOnMarket).toBe(9);
     expect(result.payload.data.mlsNumber).toBe("A11500001");
@@ -50,9 +60,8 @@ describe("extractRedfinListingHtml", () => {
 
   it("extracts a single-family listing from Redux state", () => {
     const result = extractRedfinListingHtml({
-      html: loadFixture("redfin_sfh_cutler_bay.html"),
-      sourceUrl:
-        "https://www.redfin.com/FL/Cutler-Bay/19850-Old-Cutler-Rd-33189/home/20000005",
+      html: loadFixture(REDUX_CASE!.fixture),
+      sourceUrl: REDUX_CASE!.sourceUrl,
       fetchedAt: "2026-04-12T12:00:00Z",
     });
 
@@ -64,12 +73,16 @@ describe("extractRedfinListingHtml", () => {
     expect(result.payload.data.address.formatted).toBe(
       "19850 Old Cutler Rd, Cutler Bay, FL 33189",
     );
-    expect(result.payload.data.listPrice).toBe(485000);
-    expect(result.payload.data.propertyType).toBe("Single Family");
-    expect(result.payload.data.beds).toBe(4);
-    expect(result.payload.data.bathsFull).toBe(3);
-    expect(result.payload.data.bathsHalf).toBe(0);
-    expect(result.payload.data.sqftLiving).toBe(1680);
+    expect(result.payload.data.listPrice).toBe(REDUX_CASE!.canonical.priceUsd);
+    expect(result.payload.data.propertyType).toBe(
+      REDUX_CASE!.canonical.propertyTypeDisplay,
+    );
+    expect(result.payload.data.beds).toBe(REDUX_CASE!.canonical.beds);
+    expect(result.payload.data.bathsFull).toBe(REDUX_CASE!.canonical.bathsFull);
+    expect(result.payload.data.bathsHalf).toBe(REDUX_CASE!.canonical.bathsHalf);
+    expect(result.payload.data.sqftLiving).toBe(
+      REDUX_CASE!.canonical.livingAreaSqft,
+    );
     expect(result.payload.data.lotSize).toBe(8712);
     expect(result.payload.data.yearBuilt).toBe(2000);
     expect(result.payload.data.daysOnMarket).toBe(34);
@@ -80,9 +93,8 @@ describe("extractRedfinListingHtml", () => {
 
   it("falls back to HTML-only markup for townhouse variants", () => {
     const result = extractRedfinListingHtml({
-      html: loadFixture("redfin_townhome_delray.html"),
-      sourceUrl:
-        "https://www.redfin.com/FL/Delray-Beach/710-Palm-Trail-33444/home/20000003",
+      html: loadFixture(HTML_ONLY_CASE!.fixture),
+      sourceUrl: HTML_ONLY_CASE!.sourceUrl,
       fetchedAt: "2026-04-12T12:00:00Z",
     });
 
@@ -91,15 +103,25 @@ describe("extractRedfinListingHtml", () => {
 
     expect(result.payload.reviewState).toBe("complete");
     expect(result.payload.data.address.formatted).toBe(
-      "710 Palm Trl, Delray Beach, FL 33444",
+      HTML_ONLY_CASE!.canonical.addressFormatted,
     );
-    expect(result.payload.data.listPrice).toBe(620000);
-    expect(result.payload.data.propertyType).toBe("Townhouse");
-    expect(result.payload.data.beds).toBe(3);
-    expect(result.payload.data.bathsFull).toBe(2);
-    expect(result.payload.data.bathsHalf).toBe(1);
-    expect(result.payload.data.sqftLiving).toBe(1850);
-    expect(result.payload.data.yearBuilt).toBe(2018);
+    expect(result.payload.data.listPrice).toBe(HTML_ONLY_CASE!.canonical.priceUsd);
+    expect(result.payload.data.propertyType).toBe(
+      HTML_ONLY_CASE!.canonical.propertyTypeDisplay,
+    );
+    expect(result.payload.data.beds).toBe(HTML_ONLY_CASE!.canonical.beds);
+    expect(result.payload.data.bathsFull).toBe(
+      HTML_ONLY_CASE!.canonical.bathsFull,
+    );
+    expect(result.payload.data.bathsHalf).toBe(
+      HTML_ONLY_CASE!.canonical.bathsHalf,
+    );
+    expect(result.payload.data.sqftLiving).toBe(
+      HTML_ONLY_CASE!.canonical.livingAreaSqft,
+    );
+    expect(result.payload.data.yearBuilt).toBe(
+      HTML_ONLY_CASE!.canonical.yearBuilt,
+    );
     expect(result.payload.data.hoaFee).toBe(320);
     expect(result.payload.data.hoaFrequency).toBe("monthly");
     expect(result.payload.data.daysOnMarket).toBe(15);

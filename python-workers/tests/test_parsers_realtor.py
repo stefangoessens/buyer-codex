@@ -8,11 +8,11 @@ run for real and we assert on the :class:`CanonicalProperty` output.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
+from fixtures.parser_cases import load_portal_expectations, read_portal_fixture
 from common.parser_errors import MalformedHTMLError, SchemaShiftError
 from common.property import CanonicalProperty, PropertyPhoto
 from parsers.realtor import (
@@ -36,95 +36,15 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 
-_FIXTURE_DIR = Path(__file__).parent.parent / "fixtures" / "html" / "realtor"
-
-
 def _load(name: str) -> str:
     """Read a Realtor.com fixture by filename."""
-    return (_FIXTURE_DIR / name).read_text(encoding="utf-8")
+    return read_portal_fixture("realtor", name)
 
 
 # Expected values for each fixture. These match the values the fixtures were
 # hand-built with; the extractor must recover them from whichever data source
 # the fixture exposes (JSON-LD, __NEXT_DATA__, or HTML fallback).
-_EXPECTED: Mapping[str, Mapping[str, object]] = {
-    "realtor_condo_hollywood.html": {
-        "source_url": "https://www.realtor.com/realestateandhomes-detail/2450-Oceanfront-Blvd-Apt-503_Hollywood_FL_33019_M30001-12345",
-        "address_line1": "2450 Oceanfront Blvd Apt 503",
-        "city": "Hollywood",
-        "state": "FL",
-        "postal_code": "33019",
-        "price_usd": 550_000,
-        "beds": 2.0,
-        "baths": 2.0,
-        "living_area_sqft": 950,
-        "year_built": 2014,
-        "property_type": "condo",
-        "days_on_market": 14,
-        "hoa_monthly_usd": 440,
-    },
-    "realtor_sfh_pembroke_pines.html": {
-        "source_url": "https://www.realtor.com/realestateandhomes-detail/18220-NW-23rd-St_Pembroke-Pines_FL_33029_M40002-67890",
-        "address_line1": "18220 NW 23rd St",
-        "city": "Pembroke Pines",
-        "state": "FL",
-        "postal_code": "33029",
-        "price_usd": 850_000,
-        "beds": 4.0,
-        "baths": 3.0,
-        "living_area_sqft": 2_450,
-        "year_built": 2008,
-        "property_type": "single_family",
-        "days_on_market": 0,
-        "hoa_monthly_usd": 0,
-        "lot_size_sqft": 10_890,
-    },
-    "realtor_townhome_sunrise.html": {
-        "source_url": "https://www.realtor.com/realestateandhomes-detail/9840-Sawgrass-Point-Dr_Sunrise_FL_33323_M50003-24680",
-        "address_line1": "9840 Sawgrass Point Dr",
-        "city": "Sunrise",
-        "state": "FL",
-        "postal_code": "33323",
-        "price_usd": 475_000,
-        "beds": 3.0,
-        "baths": 2.5,
-        "living_area_sqft": 1_620,
-        "year_built": 2013,
-        "property_type": "townhouse",
-        "days_on_market": 22,
-        "hoa_monthly_usd": 295,
-    },
-    "realtor_sfh_kendall.html": {
-        "source_url": "https://www.realtor.com/realestateandhomes-detail/14322-SW-112th-St_Miami_FL_33196_M60004-11223",
-        "address_line1": "14322 SW 112th St",
-        "city": "Miami",
-        "state": "FL",
-        "postal_code": "33196",
-        "price_usd": 615_000,
-        "beds": 4.0,
-        "baths": 2.0,
-        "living_area_sqft": 1_980,
-        "year_built": 2002,
-        "property_type": "single_family",
-        "days_on_market": 18,
-        "lot_size_sqft": 8_250,
-    },
-    "realtor_new_construction_palm_beach_gardens.html": {
-        "source_url": "https://www.realtor.com/realestateandhomes-detail/7411-Avenir-Grove-Way_Palm-Beach-Gardens_FL_33418_M70005-99887",
-        "address_line1": "7411 Avenir Grove Way",
-        "city": "Palm Beach Gardens",
-        "state": "FL",
-        "postal_code": "33418",
-        "price_usd": 2_100_000,
-        "beds": 5.0,
-        "baths": 5.0,
-        "living_area_sqft": 4_100,
-        "year_built": 2026,
-        "property_type": "new_construction",
-        "days_on_market": 3,
-        "hoa_monthly_usd": 625,
-    },
-}
+_EXPECTED: Mapping[str, Mapping[str, object]] = load_portal_expectations("realtor")
 
 
 class TestHappyPath:
