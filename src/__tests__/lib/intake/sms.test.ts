@@ -5,7 +5,9 @@ import {
   normalizePhone,
   hashPhone,
   buildSignedLink,
+  buildSignedIntakeLink,
   verifySignedLink,
+  verifySignedIntakeLink,
   STOP_KEYWORDS,
   START_KEYWORDS,
   HELP_KEYWORDS,
@@ -542,6 +544,78 @@ describe("verifySignedLink", () => {
     expect(result.valid).toBe(false);
     if (!result.valid) {
       expect(result.reason).toBe("missing_params");
+    }
+  });
+});
+
+describe("buildSignedIntakeLink", () => {
+  it("targets the public intake route with the forwarded listing URL", async () => {
+    const link = await buildSignedIntakeLink(
+      TEST_BASE_URL,
+      "https://www.zillow.com/homedetails/Test/123_zpid/",
+      TEST_SECRET,
+      1_700_000_000_000,
+    );
+    expect(link).toContain("/intake?");
+    expect(link).toContain(
+      "url=https%3A%2F%2Fwww.zillow.com%2Fhomedetails%2FTest%2F123_zpid%2F",
+    );
+    expect(link).toContain("source=sms");
+  });
+
+  it("supports custom sources in the signed payload", async () => {
+    const link = await buildSignedIntakeLink(
+      TEST_BASE_URL,
+      "https://www.redfin.com/FL/Miami/home/99999",
+      TEST_SECRET,
+      1_700_000_000_000,
+      "share_import",
+    );
+    expect(link).toContain("source=share_import");
+  });
+});
+
+describe("verifySignedIntakeLink", () => {
+  it("verifies a freshly built intake link", async () => {
+    const listingUrl = "https://www.zillow.com/homedetails/Test/123_zpid/";
+    const link = await buildSignedIntakeLink(
+      TEST_BASE_URL,
+      listingUrl,
+      TEST_SECRET,
+    );
+    const result = await verifySignedIntakeLink(link, TEST_SECRET);
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.listingUrl).toBe(listingUrl);
+      expect(result.source).toBe("sms");
+    }
+  });
+
+  it("rejects a tampered forwarded listing URL", async () => {
+    const listingUrl = "https://www.zillow.com/homedetails/Test/123_zpid/";
+    const ts = Date.now() - 1000;
+    const link = await buildSignedIntakeLink(
+      TEST_BASE_URL,
+      listingUrl,
+      TEST_SECRET,
+      ts,
+    );
+    const tampered = link.replace("123_zpid", "999_zpid");
+    const result = await verifySignedIntakeLink(tampered, TEST_SECRET);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.reason).toBe("bad_signature");
+    }
+  });
+
+  it("rejects non-intake paths", async () => {
+    const result = await verifySignedIntakeLink(
+      "https://app.example.com/other?url=https%3A%2F%2Fzillow.com&t=1&sig=abc",
+      TEST_SECRET,
+    );
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.reason).toBe("missing_intake_path");
     }
   });
 });

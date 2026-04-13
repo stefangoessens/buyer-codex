@@ -253,6 +253,32 @@ export async function buildSignedLink(
 }
 
 /**
+ * Build a signed SMS intake link that forwards a normalized listing URL into
+ * the public `/intake` flow.
+ *
+ * Format:
+ * `<baseUrl>/intake?url=<encoded-listing-url>&source=<source>&t=<timestamp>&sig=<hmacHex>`
+ *
+ * The signature covers `intake:<listingUrl>:<source>:<timestamp>` so neither
+ * the forwarded listing URL nor the declared channel can be tampered with.
+ */
+export async function buildSignedIntakeLink(
+  baseUrl: string,
+  listingUrl: string,
+  secret: string,
+  timestamp?: number,
+  source: string = "sms",
+): Promise<string> {
+  const ts = timestamp ?? Date.now();
+  const cleanBase = baseUrl.replace(/\/+$/, "");
+  const encodedUrl = encodeURIComponent(listingUrl);
+  const encodedSource = encodeURIComponent(source);
+  const payload = `intake:${listingUrl}:${source}:${ts}`;
+  const sig = await hmacSha256Hex(secret, payload);
+  return `${cleanBase}/intake?url=${encodedUrl}&source=${encodedSource}&t=${ts}&sig=${sig}`;
+}
+
+/**
  * Verify a signed link built by `buildSignedLink`.
  *
  * Returns either `{ valid: true, dealRoomId }` or `{ valid: false, reason }`.
@@ -289,31 +315,68 @@ export async function verifySignedLink(
 
   const tRaw = parsed.searchParams.get("t");
   const sig = parsed.searchParams.get("sig");
-  if (!tRaw || !sig) {
-    return { valid: false, reason: "missing_params" };
+  const timestampState = validateSignedTimestamp(tRaw, sig, maxAgeMs);
+  if (!timestampState.ok) {
+    return { valid: false, reason: timestampState.reason };
   }
-
-  const ts = Number.parseInt(tRaw, 10);
-  if (!Number.isFinite(ts) || ts <= 0) {
-    return { valid: false, reason: "missing_params" };
-  }
-
-  const now = Date.now();
-  if (ts > now + 60_000) {
-    // Allow a tiny bit of clock skew, but anything meaningfully in the
-    // future is either tampering or a broken signer — treat it as invalid.
-    return { valid: false, reason: "future" };
-  }
-  if (now - ts > maxAgeMs) {
-    return { valid: false, reason: "expired" };
-  }
+  const ts = timestampState.timestamp;
 
   const expected = await hmacSha256Hex(secret, `${dealRoomId}:${ts}`);
-  if (!constantTimeEqualHex(expected, sig)) {
+  if (!constantTimeEqualHex(expected, sig!)) {
     return { valid: false, reason: "bad_signature" };
   }
 
   return { valid: true, dealRoomId };
+}
+
+/**
+ * Verify a signed intake link built by `buildSignedIntakeLink`.
+ *
+ * Returns either `{ valid: true, listingUrl, source }` or
+ * `{ valid: false, reason }`.
+ */
+export async function verifySignedIntakeLink(
+  url: string,
+  secret: string,
+  maxAgeMs: number = DEFAULT_MAX_AGE_MS,
+): Promise<
+  | { valid: true; listingUrl: string; source: string }
+  | { valid: false; reason: string }
+> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { valid: false, reason: "malformed_url" };
+  }
+
+  if (parsed.pathname !== "/intake") {
+    return { valid: false, reason: "missing_intake_path" };
+  }
+
+  const listingUrl = parsed.searchParams.get("url");
+  const source = parsed.searchParams.get("source");
+  const tRaw = parsed.searchParams.get("t");
+  const sig = parsed.searchParams.get("sig");
+  if (!listingUrl || !source) {
+    return { valid: false, reason: "missing_params" };
+  }
+
+  const timestampState = validateSignedTimestamp(tRaw, sig, maxAgeMs);
+  if (!timestampState.ok) {
+    return { valid: false, reason: timestampState.reason };
+  }
+  const ts = timestampState.timestamp;
+
+  const expected = await hmacSha256Hex(
+    secret,
+    `intake:${listingUrl}:${source}:${ts}`,
+  );
+  if (!constantTimeEqualHex(expected, sig!)) {
+    return { valid: false, reason: "bad_signature" };
+  }
+
+  return { valid: true, listingUrl, source };
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -360,4 +423,31 @@ function constantTimeEqualHex(a: string, b: string): boolean {
     mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
   return mismatch === 0;
+}
+
+function validateSignedTimestamp(
+  tRaw: string | null,
+  sig: string | null,
+  maxAgeMs: number,
+):
+  | { ok: true; timestamp: number }
+  | { ok: false; reason: "missing_params" | "future" | "expired" } {
+  if (!tRaw || !sig) {
+    return { ok: false, reason: "missing_params" };
+  }
+
+  const ts = Number.parseInt(tRaw, 10);
+  if (!Number.isFinite(ts) || ts <= 0) {
+    return { ok: false, reason: "missing_params" };
+  }
+
+  const now = Date.now();
+  if (ts > now + 60_000) {
+    return { ok: false, reason: "future" };
+  }
+  if (now - ts > maxAgeMs) {
+    return { ok: false, reason: "expired" };
+  }
+
+  return { ok: true, timestamp: ts };
 }
