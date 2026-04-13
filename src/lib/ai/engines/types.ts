@@ -194,6 +194,7 @@ export interface LeverageInput {
   neighborhoodMarketTrajectory?: "rising" | "flat" | "falling";
   neighborhoodMedianSaleToListRatio?: number;
   neighborhoodMedianPriceCutFrequency?: number;
+  neighborhoodMedianReductionPct?: number;
   sqft: number;
   wasRelisted?: boolean;
   wasWithdrawn?: boolean;

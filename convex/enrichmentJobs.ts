@@ -267,7 +267,10 @@ async function buildFreshSourceMap(
       formatted: property.address.formatted,
       zip: property.address.zip,
     },
+    buildingName: property.buildingName,
+    neighborhood: property.neighborhood,
     subdivision: property.subdivision,
+    schoolDistrict: property.schoolDistrict,
   });
   if (neighborhoodRequests.length > 0) {
     let oldestRefresh: string | undefined;
@@ -276,8 +279,11 @@ async function buildFreshSourceMap(
     for (const request of neighborhoodRequests) {
       const row = await ctx.db
         .query("neighborhoodMarketContext")
-        .withIndex("by_geoKey_and_windowDays", (q: any) =>
-          q.eq("geoKey", request.geoKey).eq("windowDays", request.windowDays),
+        .withIndex("by_geoKind_and_geoKey_and_windowDays", (q: any) =>
+          q
+            .eq("geoKind", request.geoKind)
+            .eq("geoKey", request.geoKey)
+            .eq("windowDays", request.windowDays),
         )
         .unique();
       if (!row) {
@@ -412,6 +418,18 @@ async function replaceRecentComparableSalesRows(args: {
             ? sale.condition
             : undefined,
         dom: typeof sale.dom === "number" ? sale.dom : undefined,
+        reductionCount:
+          typeof sale.reductionCount === "number"
+            ? sale.reductionCount
+            : undefined,
+        totalReductionAmount:
+          typeof sale.totalReductionAmount === "number"
+            ? sale.totalReductionAmount
+            : undefined,
+        totalReductionPct:
+          typeof sale.totalReductionPct === "number"
+            ? sale.totalReductionPct
+            : undefined,
         provenance: {
           source: args.citation,
           fetchedAt: args.fetchedAt,
@@ -1037,14 +1055,24 @@ export const upsertNeighborhoodContext = internalMutation({
   args: {
     geoKey: v.string(),
     geoKind: v.union(
-      v.literal("zip"),
+      v.literal("building"),
       v.literal("subdivision"),
+      v.literal("neighborhood"),
+      v.literal("school_zone"),
+      v.literal("zip"),
+      v.literal("broader_area"),
       v.literal("city"),
     ),
     windowDays: v.number(),
+    avgPricePerSqft: v.optional(v.number()),
     medianDom: v.optional(v.number()),
     medianPricePerSqft: v.optional(v.number()),
     medianListPrice: v.optional(v.number()),
+    avgSaleToListRatio: v.optional(v.number()),
+    medianSaleToListRatio: v.optional(v.number()),
+    priceReductionFrequency: v.optional(v.number()),
+    avgReductionPct: v.optional(v.number()),
+    medianReductionPct: v.optional(v.number()),
     inventoryCount: v.optional(v.number()),
     pendingCount: v.optional(v.number()),
     salesVelocity: v.optional(v.number()),
@@ -1055,6 +1083,16 @@ export const upsertNeighborhoodContext = internalMutation({
         v.literal("falling"),
       ),
     ),
+    sampleSize: v.object({
+      total: v.number(),
+      sold: v.number(),
+      active: v.number(),
+      pending: v.number(),
+      pricePerSqft: v.number(),
+      dom: v.number(),
+      saleToList: v.number(),
+      reduction: v.number(),
+    }),
     provenanceSource: v.string(),
   },
   returns: v.id("neighborhoodMarketContext"),
@@ -1062,8 +1100,11 @@ export const upsertNeighborhoodContext = internalMutation({
     const now = new Date().toISOString();
     const existing = await ctx.db
       .query("neighborhoodMarketContext")
-      .withIndex("by_geoKey_and_windowDays", (q) =>
-        q.eq("geoKey", args.geoKey).eq("windowDays", args.windowDays),
+      .withIndex("by_geoKind_and_geoKey_and_windowDays", (q) =>
+        q
+          .eq("geoKind", args.geoKind)
+          .eq("geoKey", args.geoKey)
+          .eq("windowDays", args.windowDays),
       )
       .unique();
 
@@ -1071,13 +1112,20 @@ export const upsertNeighborhoodContext = internalMutation({
       geoKey: args.geoKey,
       geoKind: args.geoKind,
       windowDays: args.windowDays,
+      avgPricePerSqft: args.avgPricePerSqft,
       medianDom: args.medianDom,
       medianPricePerSqft: args.medianPricePerSqft,
       medianListPrice: args.medianListPrice,
+      avgSaleToListRatio: args.avgSaleToListRatio,
+      medianSaleToListRatio: args.medianSaleToListRatio,
+      priceReductionFrequency: args.priceReductionFrequency,
+      avgReductionPct: args.avgReductionPct,
+      medianReductionPct: args.medianReductionPct,
       inventoryCount: args.inventoryCount,
       pendingCount: args.pendingCount,
       salesVelocity: args.salesVelocity,
       trajectory: args.trajectory,
+      sampleSize: args.sampleSize,
       provenance: { source: args.provenanceSource, fetchedAt: now },
       lastRefreshedAt: now,
     };
@@ -1276,13 +1324,20 @@ export const persistJobResult = internalMutation({
               geoKey: computed.geoKey,
               geoKind: computed.geoKind,
               windowDays: computed.windowDays,
+              avgPricePerSqft: computed.avgPricePerSqft,
               medianDom: computed.medianDom,
               medianPricePerSqft: computed.medianPricePerSqft,
               medianListPrice: computed.medianListPrice,
+              avgSaleToListRatio: computed.avgSaleToListRatio,
+              medianSaleToListRatio: computed.medianSaleToListRatio,
+              priceReductionFrequency: computed.priceReductionFrequency,
+              avgReductionPct: computed.avgReductionPct,
+              medianReductionPct: computed.medianReductionPct,
               inventoryCount: computed.inventoryCount,
               pendingCount: computed.pendingCount,
               salesVelocity: computed.salesVelocity,
               trajectory: computed.trajectory,
+              sampleSize: computed.sampleSize,
               provenanceSource: args.citation,
             },
           );
@@ -1544,13 +1599,28 @@ export const getListingAgentsForProperty = query({
 });
 
 export const getNeighborhoodContext = query({
-  args: { geoKey: v.string(), windowDays: v.number() },
+  args: {
+    geoKey: v.string(),
+    geoKind: v.union(
+      v.literal("building"),
+      v.literal("subdivision"),
+      v.literal("neighborhood"),
+      v.literal("school_zone"),
+      v.literal("zip"),
+      v.literal("broader_area"),
+      v.literal("city"),
+    ),
+    windowDays: v.number(),
+  },
   returns: v.any(),
   handler: async (ctx, args) => {
     return await ctx.db
       .query("neighborhoodMarketContext")
-      .withIndex("by_geoKey_and_windowDays", (q) =>
-        q.eq("geoKey", args.geoKey).eq("windowDays", args.windowDays),
+      .withIndex("by_geoKind_and_geoKey_and_windowDays", (q) =>
+        q
+          .eq("geoKind", args.geoKind)
+          .eq("geoKey", args.geoKey)
+          .eq("windowDays", args.windowDays),
       )
       .unique();
   },

@@ -59,11 +59,15 @@ export function detectDomPressure(
 
 export function detectPriceReductions(
   reductions?: Array<{ amount: number; date: string }>,
+  neighborhoodMedianPriceCutFrequency?: number,
   neighborhoodMedianSaleToListRatio?: number,
 ): LeverageSignal | null {
   if (!reductions || reductions.length === 0) return null;
 
-  const referenceCount = referenceReductionCount(neighborhoodMedianSaleToListRatio);
+  const referenceCount = referenceReductionCount(
+    neighborhoodMedianPriceCutFrequency,
+    neighborhoodMedianSaleToListRatio,
+  );
   const count = reductions.length;
   const delta = round1(count - referenceCount);
 
@@ -82,6 +86,7 @@ export function detectPriceReductions(
 export function detectPriceReductionAmount(
   listPrice: number,
   reductions?: Array<{ amount: number; date: string }>,
+  neighborhoodMedianReductionPct?: number,
   neighborhoodMedianSaleToListRatio?: number,
 ): LeverageSignal | null {
   if (!reductions || reductions.length === 0 || !Number.isFinite(listPrice) || listPrice <= 0) {
@@ -90,7 +95,10 @@ export function detectPriceReductionAmount(
 
   const totalReduction = reductions.reduce((sum, reduction) => sum + reduction.amount, 0);
   const markdownPct = round2((totalReduction / listPrice) * 100);
-  const referencePct = referenceMarkdownPct(neighborhoodMedianSaleToListRatio);
+  const referencePct = referenceMarkdownPct(
+    neighborhoodMedianReductionPct,
+    neighborhoodMedianSaleToListRatio,
+  );
   const delta = round2(markdownPct - referencePct);
 
   return {
@@ -386,11 +394,13 @@ export function analyzeLeverage(input: LeverageInput): LeverageOutput {
     detectDomPressure(input.daysOnMarket, input.neighborhoodMedianDom),
     detectPriceReductions(
       input.priceReductions,
+      input.neighborhoodMedianPriceCutFrequency,
       input.neighborhoodMedianSaleToListRatio,
     ),
     detectPriceReductionAmount(
       input.listPrice,
       input.priceReductions,
+      input.neighborhoodMedianReductionPct,
       input.neighborhoodMedianSaleToListRatio,
     ),
     detectMotivatedLanguage(input.description),
@@ -450,8 +460,16 @@ function compactSignals(
 }
 
 function referenceMarkdownPct(
+  neighborhoodMedianReductionPct?: number,
   neighborhoodMedianSaleToListRatio?: number,
 ): number {
+  if (
+    typeof neighborhoodMedianReductionPct === "number" &&
+    Number.isFinite(neighborhoodMedianReductionPct) &&
+    neighborhoodMedianReductionPct >= 0
+  ) {
+    return round2(neighborhoodMedianReductionPct);
+  }
   if (
     typeof neighborhoodMedianSaleToListRatio !== "number" ||
     !Number.isFinite(neighborhoodMedianSaleToListRatio) ||
@@ -463,9 +481,17 @@ function referenceMarkdownPct(
 }
 
 function referenceReductionCount(
+  neighborhoodMedianPriceCutFrequency?: number,
   neighborhoodMedianSaleToListRatio?: number,
 ): number {
-  const markdownPct = referenceMarkdownPct(neighborhoodMedianSaleToListRatio);
+  if (
+    typeof neighborhoodMedianPriceCutFrequency === "number" &&
+    Number.isFinite(neighborhoodMedianPriceCutFrequency) &&
+    neighborhoodMedianPriceCutFrequency >= 0
+  ) {
+    return round1(clamp(neighborhoodMedianPriceCutFrequency * 3, 0, 3));
+  }
+  const markdownPct = referenceMarkdownPct(undefined, neighborhoodMedianSaleToListRatio);
   return round1(clamp(markdownPct / 2, 0, 3));
 }
 

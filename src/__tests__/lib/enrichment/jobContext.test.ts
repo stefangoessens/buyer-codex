@@ -21,7 +21,10 @@ const property = {
   listingAgentName: "Jane Smith",
   listingBrokerage: "Compass",
   listingAgentPhone: "(305) 555-0110",
+  buildingName: "Ocean House Tower",
   subdivision: "Ocean House",
+  neighborhood: "South of Fifth",
+  schoolDistrict: "Miami-Dade County Public Schools",
 };
 
 describe("enrichment/jobContext", () => {
@@ -52,10 +55,25 @@ describe("enrichment/jobContext", () => {
     ]);
   });
 
-  it("expands neighborhood requests across zip, subdivision, and city windows", () => {
+  it("expands market requests across the full fallback ladder", () => {
     const requests = buildNeighborhoodRequests(property);
 
-    expect(requests).toHaveLength(9);
+    expect(requests).toHaveLength(18);
+    expect(requests).toContainEqual({
+      geoKey: "Ocean House Tower",
+      geoKind: "building",
+      windowDays: 30,
+    });
+    expect(requests).toContainEqual({
+      geoKey: "South of Fifth",
+      geoKind: "neighborhood",
+      windowDays: 60,
+    });
+    expect(requests).toContainEqual({
+      geoKey: "Miami-Dade County Public Schools",
+      geoKind: "school_zone",
+      windowDays: 90,
+    });
     expect(requests).toContainEqual({
       geoKey: "33139",
       geoKind: "zip",
@@ -68,7 +86,7 @@ describe("enrichment/jobContext", () => {
     });
     expect(requests).toContainEqual({
       geoKey: "Miami Beach",
-      geoKind: "city",
+      geoKind: "broader_area",
       windowDays: 60,
     });
   });

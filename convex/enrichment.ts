@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { buildNeighborhoodRequests } from "../src/lib/enrichment/jobContext";
+import { buildPropertyMarketContext } from "../src/lib/enrichment/marketContext";
 import {
   buildCompCandidatesFromRecentSales,
   buildLeverageInputFromEnrichment,
@@ -84,15 +85,21 @@ async function loadNeighborhoodContextsForProperty(ctx: any, property: any) {
       formatted: property.address.formatted,
       zip: property.address.zip,
     },
+    buildingName: property.buildingName,
+    neighborhood: property.neighborhood,
     subdivision: property.subdivision,
+    schoolDistrict: property.schoolDistrict,
   });
 
   const rows: Array<any> = [];
   for (const request of requests) {
     const row = await ctx.db
       .query("neighborhoodMarketContext")
-      .withIndex("by_geoKey_and_windowDays", (q: any) =>
-        q.eq("geoKey", request.geoKey).eq("windowDays", request.windowDays),
+      .withIndex("by_geoKind_and_geoKey_and_windowDays", (q: any) =>
+        q
+          .eq("geoKind", request.geoKind)
+          .eq("geoKey", request.geoKey)
+          .eq("windowDays", request.windowDays),
       )
       .unique();
     if (row) rows.push(row);
@@ -139,23 +146,47 @@ async function buildEnrichmentPayload(ctx: any, propertyId: Id<"properties">) {
     .withIndex("by_propertyId_and_soldDate", (q: any) => q.eq("propertyId", propertyId))
     .order("desc")
     .collect();
+  const marketContext = buildPropertyMarketContext({
+    baselines: neighborhoodContexts,
+    subject: {
+      propertyId,
+      buildingName: property.buildingName,
+      subdivision: property.subdivision,
+      neighborhood: property.neighborhood,
+      schoolDistrict: property.schoolDistrict,
+      zip: property.zip ?? property.address?.zip,
+      broaderArea: property.address?.city,
+    },
+    generatedAt:
+      neighborhoodContexts
+        .map((context: any) => context.lastRefreshedAt)
+        .sort()
+        .at(-1) ??
+      property.updatedAt ??
+      property.createdAt ??
+      "",
+  });
 
   return {
     summary: summarizeJobs(jobs),
     snapshots,
     listingAgents,
+    marketContext,
     neighborhoodContexts,
     portalEstimates,
     recentSales,
     engineInputs: {
+      marketContext,
       pricing: buildPricingInputFromEnrichment({
         property,
         estimates: portalEstimates,
+        marketContext,
         contexts: neighborhoodContexts,
         recentSales,
       }),
       leverage: buildLeverageInputFromEnrichment({
         property,
+        marketContext,
         contexts: neighborhoodContexts,
         listingAgent: listingAgents.find((agent) => agent.linkRole === "listing") ?? null,
         recentSales,
@@ -206,6 +237,7 @@ export const getForProperty = query({
 
     return {
       summary: payload.summary,
+      marketContext: payload.marketContext,
       neighborhoodContexts: payload.neighborhoodContexts,
       portalEstimates: payload.portalEstimates,
       recentSales: payload.recentSales,
