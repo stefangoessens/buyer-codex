@@ -18,6 +18,43 @@ afterEach(() => {
 });
 
 describe("track() — funnel category", () => {
+  it("accepts paste_submitted with url, source, and platform", () => {
+    expect(() =>
+      track("paste_submitted", {
+        url: "https://www.zillow.com/homedetails/123_zpid/",
+        source: "hero",
+        platform: "zillow",
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts parse_succeeded with typed parser fields", () => {
+    expect(() =>
+      track("parse_succeeded", {
+        source: "hero",
+        platform: "redfin",
+        listingId: "123456",
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts teaser_rendered with optional latency", () => {
+    expect(() =>
+      track("teaser_rendered", {
+        source: "hero:intake_teaser",
+        platform: "realtor",
+        sourceListingId: "sl_1",
+        latencyMs: 4200,
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts registration_prompted with source", () => {
+    expect(() =>
+      track("registration_prompted", { source: "hero:intake_teaser" }),
+    ).not.toThrow();
+  });
+
   it("accepts link_pasted with url and source", () => {
     expect(() =>
       track("link_pasted", { url: "https://zillow.com/123", source: "hero" }),
@@ -73,6 +110,16 @@ describe("track() — dashboard category", () => {
 });
 
 describe("track() — deal_room category", () => {
+  it("accepts deal_room_unlocked with ids", () => {
+    expect(() =>
+      track("deal_room_unlocked", {
+        dealRoomId: "dr_1",
+        propertyId: "prop_1",
+        accessLevel: "registered",
+      }),
+    ).not.toThrow();
+  });
+
   it("accepts deal_room_entered with access level", () => {
     expect(() =>
       track("deal_room_entered", {
@@ -187,6 +234,26 @@ describe("track() — offer category", () => {
 });
 
 describe("track() — closing category", () => {
+  it("accepts agreement_prompted", () => {
+    expect(() =>
+      track("agreement_prompted", {
+        dealRoomId: "dr_1",
+        source: "offer_cockpit_gate",
+        requiredAction: "sign_agreement",
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts agreement_signed", () => {
+    expect(() =>
+      track("agreement_signed", {
+        agreementId: "ag_1",
+        dealRoomId: "dr_1",
+        agreementType: "full_representation",
+      }),
+    ).not.toThrow();
+  });
+
   it("accepts contract_signed", () => {
     expect(() =>
       track("contract_signed", {
@@ -360,7 +427,11 @@ describe("track() — posthog guard", () => {
     // In the vitest jsdom/node env, posthog.__loaded is falsy so the guard
     // in track() prevents capture from ever running.
     expect(() =>
-      track("link_pasted", { url: "https://zillow.com/123", source: "hero" }),
+      track("paste_submitted", {
+        url: "https://www.zillow.com/homedetails/123_zpid/",
+        source: "hero",
+        platform: "zillow",
+      }),
     ).not.toThrow();
   });
 
@@ -370,7 +441,11 @@ describe("track() — posthog guard", () => {
     try {
       // @ts-expect-error — test override of readonly process.env.NODE_ENV
       process.env.NODE_ENV = "development";
-      track("link_pasted", { url: "https://zillow.com/1", source: "hero" });
+      track("paste_submitted", {
+        url: "https://www.zillow.com/homedetails/1_zpid/",
+        source: "hero",
+        platform: "zillow",
+      });
       // If the guard passed at all, we don't need to assert the call count —
       // the point is that it doesn't throw.
       expect(logSpy).toHaveBeenCalled();
@@ -384,16 +459,17 @@ describe("track() — posthog guard", () => {
 describe("trackFunnelStep()", () => {
   it("does not throw for a funnel event with valid typed properties", () => {
     expect(() =>
-      trackFunnelStep("link_pasted", "acquisition", 1, {
-        url: "https://zillow.com/1",
+      trackFunnelStep("paste_submitted", "acquisition", 1, {
+        url: "https://www.zillow.com/homedetails/1_zpid/",
         source: "hero",
+        platform: "zillow",
       }),
     ).not.toThrow();
   });
 
   it("does not throw for a deal_room funnel event", () => {
     expect(() =>
-      trackFunnelStep("deal_room_entered", "conversion", 3, {
+      trackFunnelStep("deal_room_unlocked", "conversion", 6, {
         dealRoomId: "dr_1",
         propertyId: "prop_1",
         accessLevel: "registered",
@@ -433,12 +509,20 @@ describe("trackFunnelStep()", () => {
 describe("listEventsByCategory()", () => {
   it("returns all funnel events", () => {
     const events = listEventsByCategory("funnel");
-    expect(events).toContain("link_pasted");
-    expect(events).toContain("extension_intake_succeeded");
-    expect(events).toContain("teaser_viewed");
-    expect(events).toContain("registration_started");
-    expect(events).toContain("registration_completed");
-    expect(events).toHaveLength(5);
+    expect(events).toEqual(
+      expect.arrayContaining([
+        "paste_submitted",
+        "parse_succeeded",
+        "teaser_rendered",
+        "registration_prompted",
+        "registration_completed",
+        "deal_room_unlocked",
+        "agreement_prompted",
+        "agreement_signed",
+        "extension_intake_succeeded",
+      ]),
+    );
+    expect(events.length).toBeGreaterThanOrEqual(12);
   });
 
   it("returns all deal_room events", () => {

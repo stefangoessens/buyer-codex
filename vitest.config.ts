@@ -10,7 +10,7 @@ export default defineConfig({
       },
       {
         find: "@buyer-codex/shared/",
-        replacement: path.resolve(__dirname, "./packages/shared/src/"),
+        replacement: `${path.resolve(__dirname, "./packages/shared/src")}/`,
       },
       {
         find: "@buyer-codex/shared",

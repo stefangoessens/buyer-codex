@@ -7,6 +7,8 @@
  * and downstream codegen/serialization flows read one catalog.
  */
 
+import { agreementTypes } from "./contracts";
+
 // MARK: - Shared literals
 
 export const LINK_PASTED_SOURCES = [
@@ -22,6 +24,14 @@ export const LINK_PASTED_SOURCES = [
 ] as const;
 
 export type LinkPastedSource = (typeof LINK_PASTED_SOURCES)[number];
+
+export const LISTING_PORTALS = [
+  "zillow",
+  "redfin",
+  "realtor",
+] as const;
+
+export type ListingPortal = (typeof LISTING_PORTALS)[number];
 
 export const DEAL_ROOM_ACCESS_LEVELS = [
   "anonymous",
@@ -41,6 +51,10 @@ export const MESSAGE_CHANNELS = [
 
 export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
 
+const AGREEMENT_TYPES = agreementTypes;
+
+type AgreementType = (typeof AGREEMENT_TYPES)[number];
+
 // MARK: - Typed event map
 
 /**
@@ -49,6 +63,25 @@ export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
  * properties inline.
  */
 export interface LaunchEventMap {
+  paste_submitted: {
+    url: string;
+    source: LinkPastedSource;
+    platform: ListingPortal;
+  };
+  parse_succeeded: {
+    source: LinkPastedSource;
+    platform: ListingPortal;
+    listingId: string;
+  };
+  teaser_rendered: {
+    source?: string;
+    platform?: ListingPortal;
+    sourceListingId?: string;
+    latencyMs?: number;
+  };
+  registration_prompted: {
+    source: string;
+  };
   link_pasted: {
     url: string;
     source: LinkPastedSource;
@@ -63,6 +96,21 @@ export interface LaunchEventMap {
   registration_completed: {
     userId: string;
     source?: string;
+  };
+  deal_room_unlocked: {
+    dealRoomId: string;
+    propertyId: string;
+    accessLevel?: DealRoomAccessLevel;
+  };
+  agreement_prompted: {
+    dealRoomId: string;
+    source?: string;
+    requiredAction?: string;
+  };
+  agreement_signed: {
+    agreementId: string;
+    dealRoomId: string;
+    agreementType?: AgreementType;
   };
   deal_room_entered: {
     dealRoomId: string;
@@ -175,8 +223,8 @@ export interface LaunchEventEnvelope<Name extends string = LaunchEventName> {
   contractVersion: string;
 }
 
-export const CURRENT_LAUNCH_EVENT_CONTRACT_VERSION = "1.1.0" as const;
-export const CURRENT_LAUNCH_EVENT_CONTRACT_DATE = "2026-04-12" as const;
+export const CURRENT_LAUNCH_EVENT_CONTRACT_VERSION = "1.2.0" as const;
+export const CURRENT_LAUNCH_EVENT_CONTRACT_DATE = "2026-04-13" as const;
 
 export const LAUNCH_EVENT_CONTRACT_CHANGELOG = [
   {
@@ -191,12 +239,14 @@ export const LAUNCH_EVENT_CONTRACT_CHANGELOG = [
   {
     version: CURRENT_LAUNCH_EVENT_CONTRACT_VERSION,
     releasedOn: CURRENT_LAUNCH_EVENT_CONTRACT_DATE,
-    summary: "Moved the launch catalog into @buyer-codex/shared and aligned the typed web event map.",
+    summary:
+      "Moved the launch catalog into @buyer-codex/shared and added the public paste-link funnel taxonomy.",
     changes: [
       "Promoted the launch event catalog, validator, and emit helpers into the shared package.",
       "Added contract serialization and versioned changelog metadata for downstream review/codegen consumers.",
       "Expanded link_pasted source values to cover live web, extension, and share-import entrypoints.",
       "Loosened teaser_viewed.propertyId to optional so the runtime contract matches the existing typed analytics surface.",
+      "Added paste_submitted, parse_succeeded, teaser_rendered, registration_prompted, deal_room_unlocked, agreement_prompted, and agreement_signed for the public paste-link funnel.",
     ],
   },
 ] as const satisfies readonly LaunchEventContractRelease[];
@@ -207,6 +257,108 @@ export const LAUNCH_EVENT_CONTRACT = {
   version: CURRENT_LAUNCH_EVENT_CONTRACT_VERSION,
   lastUpdated: CURRENT_LAUNCH_EVENT_CONTRACT_DATE,
   events: {
+    paste_submitted: {
+      name: "paste_submitted",
+      category: "public_site",
+      description:
+        "Buyer submits a supported listing URL from a paste-link CTA.",
+      owner: "growth",
+      introducedIn: "1.2.0",
+      props: {
+        url: {
+          type: "string",
+          required: true,
+          description: "Raw pasted URL.",
+        },
+        source: {
+          type: "enum",
+          required: true,
+          description: "Which inbound surface the pasted listing came from.",
+          enumValues: LINK_PASTED_SOURCES,
+        },
+        platform: {
+          type: "enum",
+          required: true,
+          description: "Portal resolved from the shared URL parser.",
+          enumValues: LISTING_PORTALS,
+        },
+      },
+    },
+    parse_succeeded: {
+      name: "parse_succeeded",
+      category: "public_site",
+      description:
+        "The shared intake parser normalizes the submitted listing URL successfully.",
+      owner: "growth",
+      introducedIn: "1.2.0",
+      props: {
+        source: {
+          type: "enum",
+          required: true,
+          description: "Which inbound surface triggered the parse.",
+          enumValues: LINK_PASTED_SOURCES,
+        },
+        platform: {
+          type: "enum",
+          required: true,
+          description: "Portal resolved by the parser.",
+          enumValues: LISTING_PORTALS,
+        },
+        listingId: {
+          type: "string",
+          required: true,
+          description: "Portal-native listing identifier extracted by the parser.",
+        },
+      },
+    },
+    teaser_rendered: {
+      name: "teaser_rendered",
+      category: "public_site",
+      description:
+        "The intake teaser / onboarding gate renders after a listing URL is accepted.",
+      owner: "growth",
+      introducedIn: "1.2.0",
+      props: {
+        source: {
+          type: "string",
+          required: false,
+          description: "Origin surface or gate label for the teaser render.",
+        },
+        platform: {
+          type: "enum",
+          required: false,
+          description: "Portal that produced the teaser, when known.",
+          enumValues: LISTING_PORTALS,
+        },
+        sourceListingId: {
+          type: "string",
+          required: false,
+          description: "Captured source-listing id backing the teaser.",
+        },
+        latencyMs: {
+          type: "integer",
+          required: false,
+          description:
+            "Elapsed milliseconds from paste submission to teaser render.",
+          min: 0,
+        },
+      },
+    },
+    registration_prompted: {
+      name: "registration_prompted",
+      category: "public_site",
+      description:
+        "The registration prompt is shown as the next step in the teaser gate.",
+      owner: "growth",
+      introducedIn: "1.2.0",
+      props: {
+        source: {
+          type: "string",
+          required: true,
+          description: "Which surface triggered the registration prompt.",
+        },
+      },
+    },
     link_pasted: {
       name: "link_pasted",
       category: "public_site",
@@ -276,6 +428,83 @@ export const LAUNCH_EVENT_CONTRACT = {
           type: "string",
           required: false,
           description: "Origin surface.",
+        },
+      },
+    },
+    deal_room_unlocked: {
+      name: "deal_room_unlocked",
+      category: "deal_room",
+      description:
+        "The buyer reaches their first deal room view after the intake and registration gate.",
+      owner: "growth",
+      introducedIn: "1.2.0",
+      props: {
+        dealRoomId: {
+          type: "string",
+          required: true,
+          description: "Convex deal room id.",
+        },
+        propertyId: {
+          type: "string",
+          required: true,
+          description: "Convex property id.",
+        },
+        accessLevel: {
+          type: "enum",
+          required: false,
+          description: "Resolved access level when the deal room unlocks.",
+          enumValues: DEAL_ROOM_ACCESS_LEVELS,
+        },
+      },
+    },
+    agreement_prompted: {
+      name: "agreement_prompted",
+      category: "offer",
+      description:
+        "The UI prompts the buyer to review or sign the buyer agreement before continuing.",
+      owner: "brokerage",
+      introducedIn: "1.2.0",
+      props: {
+        dealRoomId: {
+          type: "string",
+          required: true,
+          description: "Deal room that requires the agreement step.",
+        },
+        source: {
+          type: "string",
+          required: false,
+          description: "Surface that presented the agreement gate.",
+        },
+        requiredAction: {
+          type: "string",
+          required: false,
+          description: "Eligibility action the buyer must take next.",
+        },
+      },
+    },
+    agreement_signed: {
+      name: "agreement_signed",
+      category: "offer",
+      description:
+        "The buyer agreement reaches a signed state and unlocks the next workflow step.",
+      owner: "brokerage",
+      introducedIn: "1.2.0",
+      props: {
+        agreementId: {
+          type: "string",
+          required: true,
+          description: "Agreement id.",
+        },
+        dealRoomId: {
+          type: "string",
+          required: true,
+          description: "Deal room governed by the agreement.",
+        },
+        agreementType: {
+          type: "enum",
+          required: false,
+          description: "Agreement flavor that was signed.",
+          enumValues: AGREEMENT_TYPES,
         },
       },
     },

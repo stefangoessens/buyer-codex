@@ -13,6 +13,7 @@ import {
   applySupersessionState,
   resolveCurrentGoverningFromRows,
 } from "./agreementSupersession";
+import { trackPosthogEvent } from "./lib/analytics";
 
 const agreementDocumentArgs = {
   documentStorageId: v.optional(v.id("_storage")),
@@ -434,6 +435,16 @@ export const sendForSigning = mutation({
       dealRoomId: agreement.dealRoomId,
       actorUserId: user._id,
     });
+
+    await trackPosthogEvent(
+      "agreement_signed",
+      {
+        agreementId: String(updatedAgreement._id),
+        dealRoomId: String(updatedAgreement.dealRoomId),
+        agreementType: updatedAgreement.type,
+      },
+      String(updatedAgreement.buyerId),
+    );
 
     return null;
   },

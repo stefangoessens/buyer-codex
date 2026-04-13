@@ -7,7 +7,6 @@ import { TrustBar } from "@/components/marketing/TrustBar";
 import { FeatureCard } from "@/components/marketing/FeatureCard";
 import { TestimonialCard } from "@/components/marketing/TestimonialCard";
 import { PasteLinkInput } from "@/components/marketing/PasteLinkInput";
-import { buildListingIntakeHref } from "@/lib/intake/pasteLink";
 
 const trustStats = [
   { value: "500+", label: "Buyers served" },
@@ -71,9 +70,9 @@ export function HomePageClient() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  function handleSubmit(url: string) {
+  function handleSubmit(submission: { href: string }) {
     startTransition(() => {
-      router.push(buildListingIntakeHref(url));
+      router.push(submission.href);
     });
   }
 

@@ -382,6 +382,29 @@ describe("validateLaunchEvent — undeclared prop rejection (codex P2)", () => {
 // MARK: - Real contract
 
 describe("validateLaunchEvent — real LAUNCH_EVENT_CONTRACT", () => {
+  it("accepts a well-formed paste_submitted payload", () => {
+    const result = validateLaunchEvent("paste_submitted", {
+      url: "https://www.zillow.com/homedetails/123_zpid/",
+      source: "hero",
+      platform: "zillow",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects paste_submitted with an invalid portal enum", () => {
+    const result = validateLaunchEvent("paste_submitted", {
+      url: "https://example.com/listing/123",
+      source: "hero",
+      platform: "example",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.errors.some((e) => e.kind === "invalidEnumValue")
+      ).toBe(true);
+    }
+  });
+
   it("accepts a well-formed link_pasted payload", () => {
     const result = validateLaunchEvent("link_pasted", {
       url: "https://zillow.com/home/123",
@@ -433,6 +456,23 @@ describe("validateLaunchEvent — real LAUNCH_EVENT_CONTRACT", () => {
       accessLevel: "registered",
     });
     expect(result.ok).toBe(true);
+  });
+
+  it("accepts teaser_rendered with latencyMs", () => {
+    const result = validateLaunchEvent("teaser_rendered", {
+      source: "hero:intake_teaser",
+      platform: "redfin",
+      sourceListingId: "sl_1",
+      latencyMs: 4200,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects teaser_rendered with a negative latency", () => {
+    const result = validateLaunchEvent("teaser_rendered", {
+      latencyMs: -1,
+    });
+    expect(result.ok).toBe(false);
   });
 
   it("rejects offer_submitted with a non-integer offerPrice", () => {

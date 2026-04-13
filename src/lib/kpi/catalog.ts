@@ -28,16 +28,16 @@ const PRODUCT_KPIS: readonly KpiDefinition[] = [
       "Share of paste-a-link submissions that reach a teaser page render.",
     formulaEnglish:
       "Of buyers who pasted a listing URL, the share whose browser rendered the teaser page.",
-    formulaSymbolic: "count(teaser_viewed) / count(link_pasted)",
+    formulaSymbolic: "count(teaser_rendered) / count(paste_submitted)",
     source: {
       kind: "launchEvent",
-      eventNames: ["link_pasted", "teaser_viewed"],
-      combiner: "count(teaser_viewed) / count(link_pasted)",
+      eventNames: ["paste_submitted", "teaser_rendered"],
+      combiner: "count(teaser_rendered) / count(paste_submitted)",
     },
     cadence: "hourly",
     presentation: "percentage",
     owner: "growth",
-    introducedIn: "1.0.0",
+    introducedIn: "1.1.0",
   },
   {
     id: "product.teaser_to_register",
@@ -48,37 +48,57 @@ const PRODUCT_KPIS: readonly KpiDefinition[] = [
     formulaEnglish:
       "Of buyers who viewed the teaser page, the share who completed the registration form.",
     formulaSymbolic:
-      "count(registration_completed) / count(teaser_viewed)",
+      "count(registration_completed) / count(teaser_rendered)",
     source: {
       kind: "launchEvent",
-      eventNames: ["teaser_viewed", "registration_completed"],
-      combiner: "count(registration_completed) / count(teaser_viewed)",
+      eventNames: ["teaser_rendered", "registration_completed"],
+      combiner: "count(registration_completed) / count(teaser_rendered)",
     },
     cadence: "hourly",
     presentation: "percentage",
     owner: "growth",
-    introducedIn: "1.0.0",
+    introducedIn: "1.1.0",
   },
   {
     id: "product.register_to_deal_room",
     category: "product",
     label: "Register → Deal room conversion",
     description:
-      "Share of newly-registered buyers who entered at least one deal room.",
+      "Share of newly-registered buyers who unlocked at least one deal room.",
     formulaEnglish:
-      "Of buyers who completed registration, the share who entered at least one deal room within 24 hours.",
+      "Of buyers who completed registration, the share who reached a first deal-room view within 24 hours.",
     formulaSymbolic:
-      "count_unique_buyers(deal_room_entered) / count(registration_completed)",
+      "count_unique_buyers(deal_room_unlocked) / count(registration_completed)",
     source: {
       kind: "launchEvent",
-      eventNames: ["registration_completed", "deal_room_entered"],
+      eventNames: ["registration_completed", "deal_room_unlocked"],
       combiner:
-        "count_unique_buyers(deal_room_entered) / count(registration_completed)",
+        "count_unique_buyers(deal_room_unlocked) / count(registration_completed)",
     },
     cadence: "daily",
     presentation: "percentage",
     owner: "growth",
-    introducedIn: "1.0.0",
+    introducedIn: "1.1.0",
+  },
+  {
+    id: "product.paste_to_registered_deal_room_under_60s",
+    category: "product",
+    label: "Paste → Registered deal room < 60s",
+    description:
+      "Share of paste-link visitors who register and reach the first deal-room view within 60 seconds.",
+    formulaEnglish:
+      "Of buyers who submit a supported listing URL, the share who complete registration and reach their first deal-room view in under 60 seconds.",
+    formulaSymbolic:
+      "count_users(deal_room_unlocked within 60s after paste_submitted and after registration_completed) / count(paste_submitted)",
+    source: {
+      kind: "external",
+      system: "posthog",
+      reference: "buyer-codex / paste-link public homepage funnel",
+    },
+    cadence: "hourly",
+    presentation: "percentage",
+    owner: "growth",
+    introducedIn: "1.1.0",
   },
   {
     id: "product.deal_room_to_tour",
