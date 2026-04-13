@@ -34,7 +34,9 @@ jobs:
         with:
           filters: |
             web:
-              - 'src/**'
+              - 'src/app/**'
+              - 'src/components/**'
+              - 'src/lib/**'
               - 'next.config.ts'
               - 'instrumentation-client.ts'
               - 'postcss.config.mjs'
@@ -45,8 +47,14 @@ jobs:
             convex:
               - 'convex/**'
             shared:
-              - 'packages/shared/**'
-              - '!packages/shared/src/config.ts'
+              - 'packages/shared/package.json'
+              - 'packages/shared/src/auth.ts'
+              - 'packages/shared/src/communication-templates.ts'
+              - 'packages/shared/src/contracts.ts'
+              - 'packages/shared/src/external-access.ts'
+              - 'packages/shared/src/index.ts'
+              - 'packages/shared/src/launch-events.ts'
+              - 'packages/shared/src/utils.ts'
             shared_platform:
               - 'packages/shared/src/config.ts'
             ios:
@@ -86,7 +94,7 @@ jobs:
         run: pnpm lint
 
       - name: Typecheck
-        run: pnpm typecheck:web
+        run: pnpm exec tsc -p tsconfig.web.json --noEmit
 
       - name: Unit tests
         run: pnpm test
