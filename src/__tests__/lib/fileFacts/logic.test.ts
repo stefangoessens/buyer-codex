@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
+  applyFactUpdate,
   canTransitionReview,
   filterFactsByRole,
   formatValue,
   isIsoDate,
   isValidFactSlug,
   latestApprovedPerSlug,
+  markFactSuperseded,
   projectBrokerFact,
   projectBuyerFact,
   validateFact,
@@ -15,6 +17,7 @@ import type {
   FileFact,
   FileFactReviewStatus,
   FileFactValue,
+  FileFactWriteInput,
 } from "@/lib/fileFacts/types";
 
 // MARK: - Fixtures
@@ -217,6 +220,61 @@ describe("validateFact", () => {
   });
 });
 
+// MARK: - applyFactUpdate
+
+describe("applyFactUpdate", () => {
+  it("resets review state and metadata after a valid update", () => {
+    const updatedAt = "2026-04-13T00:00:00Z";
+    const updates: FileFactWriteInput = {
+      factSlug: "hoa.monthly_fee",
+      value: { kind: "numeric", value: 425, unit: "USD" },
+      storageId: "kg_123",
+      propertyId: "p_1",
+      dealRoomId: "dr_1",
+      analysisRunId: "job_abc",
+      confidence: 0.81,
+      internalOnly: false,
+    };
+
+    const result = applyFactUpdate(makeFact(), updates, updatedAt);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.fact.value).toEqual(updates.value);
+      expect(result.fact.analysisRunId).toBe("job_abc");
+      expect(result.fact.reviewStatus).toBe("needsReview");
+      expect(result.fact.reviewedBy).toBeUndefined();
+      expect(result.fact.reviewedAt).toBeUndefined();
+      expect(result.fact.updatedAt).toBe(updatedAt);
+      expect(result.fact.createdAt).toBe("2026-04-12T00:00:00Z");
+    }
+  });
+
+  it("rejects invalid updated payloads", () => {
+    const result = applyFactUpdate(
+      makeFact(),
+      {
+        factSlug: "HOA Fee",
+        value: { kind: "numeric", value: 350 },
+        storageId: "kg_123",
+        propertyId: "p_1",
+        dealRoomId: "dr_1",
+        analysisRunId: "job_abc",
+        confidence: 0.5,
+        internalOnly: false,
+      },
+      "2026-04-13T00:00:00Z"
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.kind === "invalidFactSlug")).toBe(
+        true
+      );
+    }
+  });
+});
+
 // MARK: - canTransitionReview
 
 describe("canTransitionReview", () => {
@@ -353,6 +411,23 @@ describe("projectBrokerFact", () => {
     expect(view.displayValue).toBe("350 USD");
     expect(view.reviewStatus).toBe("approved");
     expect(view.internalOnly).toBe(false);
+  });
+});
+
+// MARK: - markFactSuperseded
+
+describe("markFactSuperseded", () => {
+  it("marks the fact superseded and stamps reviewer metadata", () => {
+    const superseded = markFactSuperseded(
+      makeFact({ reviewStatus: "needsReview" }),
+      "2026-04-13T00:00:00Z",
+      "broker@example.com"
+    );
+
+    expect(superseded.reviewStatus).toBe("superseded");
+    expect(superseded.reviewedBy).toBe("broker@example.com");
+    expect(superseded.reviewedAt).toBe("2026-04-13T00:00:00Z");
+    expect(superseded.updatedAt).toBe("2026-04-13T00:00:00Z");
   });
 });
 

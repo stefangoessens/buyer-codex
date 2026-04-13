@@ -2324,7 +2324,7 @@ export default defineSchema({
     storageId: v.id("_storage"),
     propertyId: v.optional(v.id("properties")),
     dealRoomId: v.optional(v.id("dealRooms")),
-    analysisRunId: v.optional(v.string()),
+    analysisRunId: v.optional(v.id("fileAnalysisJobs")),
 
     valueKind: v.union(
       v.literal("numeric"),
@@ -2355,6 +2355,7 @@ export default defineSchema({
     updatedAt: v.string(),
   })
     .index("by_storageId", ["storageId"])
+    .index("by_analysisRunId", ["analysisRunId"])
     .index("by_propertyId_and_factSlug", ["propertyId", "factSlug"])
     .index("by_dealRoomId", ["dealRoomId"])
     .index("by_factSlug", ["factSlug"])

@@ -1,6 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser, requireAuth, requireRole } from "./lib/session";
+import type { Id } from "./_generated/dataModel";
 
 /**
  * Convex queries + mutations for typed file facts (KIN-841).
@@ -69,90 +70,200 @@ function canTransitionReview(
   return REVIEW_TRANSITIONS[from].includes(to);
 }
 
+const factWriteArgs = {
+  factSlug: v.string(),
+  storageId: v.id("_storage"),
+  propertyId: v.optional(v.id("properties")),
+  dealRoomId: v.optional(v.id("dealRooms")),
+  analysisRunId: v.optional(v.id("fileAnalysisJobs")),
+  valueKind: valueKindValidator,
+  valueNumeric: v.optional(v.number()),
+  valueNumericUnit: v.optional(v.string()),
+  valueText: v.optional(v.string()),
+  valueDate: v.optional(v.string()),
+  valueBoolean: v.optional(v.boolean()),
+  valueEnum: v.optional(v.string()),
+  valueEnumAllowed: v.optional(v.array(v.string())),
+  confidence: v.optional(v.number()),
+  internalOnly: v.boolean(),
+} as const;
+
+type FactWriteArgs = {
+  factSlug: string;
+  storageId: Id<"_storage">;
+  propertyId?: Id<"properties">;
+  dealRoomId?: Id<"dealRooms">;
+  analysisRunId?: Id<"fileAnalysisJobs">;
+  valueKind: "numeric" | "text" | "date" | "boolean" | "enum";
+  valueNumeric?: number;
+  valueNumericUnit?: string;
+  valueText?: string;
+  valueDate?: string;
+  valueBoolean?: boolean;
+  valueEnum?: string;
+  valueEnumAllowed?: string[];
+  confidence?: number;
+  internalOnly: boolean;
+};
+
+async function resolveFactContext(
+  ctx: MutationCtx,
+  args: FactWriteArgs
+): Promise<{
+  propertyId?: Id<"properties">;
+  dealRoomId?: Id<"dealRooms">;
+}> {
+  if (!args.analysisRunId) {
+    return {
+      propertyId: args.propertyId,
+      dealRoomId: args.dealRoomId,
+    };
+  }
+
+  const analysisJob = await ctx.db.get(args.analysisRunId);
+  if (!analysisJob) {
+    throw new Error("analysis job not found");
+  }
+  if (analysisJob.fileStorageId !== args.storageId) {
+    throw new Error("analysis job/file linkage mismatch");
+  }
+  if (args.propertyId && analysisJob.propertyId !== args.propertyId) {
+    throw new Error("analysis job/property linkage mismatch");
+  }
+  if (args.dealRoomId && analysisJob.dealRoomId !== args.dealRoomId) {
+    throw new Error("analysis job/deal room linkage mismatch");
+  }
+
+  return {
+    propertyId: args.propertyId ?? analysisJob.propertyId,
+    dealRoomId: args.dealRoomId ?? analysisJob.dealRoomId,
+  };
+}
+
+function assertValidFactWrite(args: FactWriteArgs): void {
+  if (!FACT_SLUG_REGEX.test(args.factSlug)) {
+    throw new Error(`invalid factSlug: ${args.factSlug}`);
+  }
+
+  switch (args.valueKind) {
+    case "numeric":
+      if (
+        typeof args.valueNumeric !== "number" ||
+        Number.isNaN(args.valueNumeric)
+      ) {
+        throw new Error("valueNumeric required and must be a number");
+      }
+      break;
+    case "text":
+      if (typeof args.valueText !== "string") {
+        throw new Error("valueText required for text facts");
+      }
+      break;
+    case "date":
+      if (!args.valueDate || !isIsoDate(args.valueDate)) {
+        throw new Error("valueDate must be ISO-8601");
+      }
+      break;
+    case "boolean":
+      if (typeof args.valueBoolean !== "boolean") {
+        throw new Error("valueBoolean required for boolean facts");
+      }
+      break;
+    case "enum":
+      if (!args.valueEnum || !args.valueEnumAllowed) {
+        throw new Error("valueEnum and valueEnumAllowed required");
+      }
+      if (args.valueEnumAllowed.length === 0) {
+        throw new Error("valueEnumAllowed must be non-empty");
+      }
+      if (!args.valueEnumAllowed.includes(args.valueEnum)) {
+        throw new Error(
+          `valueEnum "${args.valueEnum}" not in [${args.valueEnumAllowed.join(", ")}]`
+        );
+      }
+      break;
+  }
+
+  if (
+    args.confidence !== undefined &&
+    (typeof args.confidence !== "number" ||
+      Number.isNaN(args.confidence) ||
+      args.confidence < 0 ||
+      args.confidence > 1)
+  ) {
+    throw new Error("confidence must be 0..1");
+  }
+}
+
+function sameStringArray(
+  left?: readonly string[],
+  right?: readonly string[]
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return left === right;
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function isNoOpUpdate(
+  record: {
+    factSlug: string;
+    storageId: Id<"_storage">;
+    propertyId?: Id<"properties">;
+    dealRoomId?: Id<"dealRooms">;
+    analysisRunId?: Id<"fileAnalysisJobs">;
+    valueKind: FactWriteArgs["valueKind"];
+    valueNumeric?: number;
+    valueNumericUnit?: string;
+    valueText?: string;
+    valueDate?: string;
+    valueBoolean?: boolean;
+    valueEnum?: string;
+    valueEnumAllowed?: string[];
+    confidence?: number;
+    internalOnly: boolean;
+  },
+  args: FactWriteArgs,
+  resolvedContext: {
+    propertyId?: Id<"properties">;
+    dealRoomId?: Id<"dealRooms">;
+  }
+): boolean {
+  return (
+    record.factSlug === args.factSlug &&
+    record.storageId === args.storageId &&
+    record.propertyId === resolvedContext.propertyId &&
+    record.dealRoomId === resolvedContext.dealRoomId &&
+    record.analysisRunId === args.analysisRunId &&
+    record.valueKind === args.valueKind &&
+    record.valueNumeric === args.valueNumeric &&
+    record.valueNumericUnit === args.valueNumericUnit &&
+    record.valueText === args.valueText &&
+    record.valueDate === args.valueDate &&
+    record.valueBoolean === args.valueBoolean &&
+    record.valueEnum === args.valueEnum &&
+    sameStringArray(record.valueEnumAllowed, args.valueEnumAllowed) &&
+    record.confidence === args.confidence &&
+    record.internalOnly === args.internalOnly
+  );
+}
+
 // MARK: - Create
 
 export const createFact = mutation({
-  args: {
-    factSlug: v.string(),
-    storageId: v.id("_storage"),
-    propertyId: v.optional(v.id("properties")),
-    dealRoomId: v.optional(v.id("dealRooms")),
-    analysisRunId: v.optional(v.string()),
-    valueKind: valueKindValidator,
-    valueNumeric: v.optional(v.number()),
-    valueNumericUnit: v.optional(v.string()),
-    valueText: v.optional(v.string()),
-    valueDate: v.optional(v.string()),
-    valueBoolean: v.optional(v.boolean()),
-    valueEnum: v.optional(v.string()),
-    valueEnumAllowed: v.optional(v.array(v.string())),
-    confidence: v.optional(v.number()),
-    internalOnly: v.boolean(),
-  },
+  args: factWriteArgs,
   returns: v.id("fileFacts"),
   handler: async (ctx, args) => {
     await requireRole(ctx, "broker");
-
-    if (!FACT_SLUG_REGEX.test(args.factSlug)) {
-      throw new Error(`invalid factSlug: ${args.factSlug}`);
-    }
-
-    // Per-kind validation — must match valueKind exactly.
-    switch (args.valueKind) {
-      case "numeric":
-        if (
-          typeof args.valueNumeric !== "number" ||
-          Number.isNaN(args.valueNumeric)
-        ) {
-          throw new Error("valueNumeric required and must be a number");
-        }
-        break;
-      case "text":
-        if (typeof args.valueText !== "string") {
-          throw new Error("valueText required for text facts");
-        }
-        break;
-      case "date":
-        if (!args.valueDate || !isIsoDate(args.valueDate)) {
-          throw new Error("valueDate must be ISO-8601");
-        }
-        break;
-      case "boolean":
-        if (typeof args.valueBoolean !== "boolean") {
-          throw new Error("valueBoolean required for boolean facts");
-        }
-        break;
-      case "enum":
-        if (!args.valueEnum || !args.valueEnumAllowed) {
-          throw new Error("valueEnum and valueEnumAllowed required");
-        }
-        if (args.valueEnumAllowed.length === 0) {
-          throw new Error("valueEnumAllowed must be non-empty");
-        }
-        if (!args.valueEnumAllowed.includes(args.valueEnum)) {
-          throw new Error(
-            `valueEnum "${args.valueEnum}" not in [${args.valueEnumAllowed.join(", ")}]`
-          );
-        }
-        break;
-    }
-
-    if (
-      args.confidence !== undefined &&
-      (typeof args.confidence !== "number" ||
-        Number.isNaN(args.confidence) ||
-        args.confidence < 0 ||
-        args.confidence > 1)
-    ) {
-      throw new Error("confidence must be 0..1");
-    }
+    assertValidFactWrite(args);
+    const resolvedContext = await resolveFactContext(ctx, args);
 
     const now = new Date().toISOString();
     return await ctx.db.insert("fileFacts", {
       factSlug: args.factSlug,
       storageId: args.storageId,
-      propertyId: args.propertyId,
-      dealRoomId: args.dealRoomId,
+      propertyId: resolvedContext.propertyId,
+      dealRoomId: resolvedContext.dealRoomId,
       analysisRunId: args.analysisRunId,
       valueKind: args.valueKind,
       valueNumeric: args.valueNumeric,
@@ -168,6 +279,82 @@ export const createFact = mutation({
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+// MARK: - Update
+
+export const updateFact = mutation({
+  args: {
+    id: v.id("fileFacts"),
+    ...factWriteArgs,
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireRole(ctx, "broker");
+    const record = await ctx.db.get(args.id);
+    if (!record) {
+      throw new Error("fileFact not found");
+    }
+    if (record.reviewStatus === "superseded") {
+      throw new Error("superseded facts are immutable");
+    }
+
+    assertValidFactWrite(args);
+    const resolvedContext = await resolveFactContext(ctx, args);
+    if (isNoOpUpdate(record, args, resolvedContext)) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    await ctx.db.patch(args.id, {
+      factSlug: args.factSlug,
+      storageId: args.storageId,
+      propertyId: resolvedContext.propertyId,
+      dealRoomId: resolvedContext.dealRoomId,
+      analysisRunId: args.analysisRunId,
+      valueKind: args.valueKind,
+      valueNumeric: args.valueNumeric,
+      valueNumericUnit: args.valueNumericUnit,
+      valueText: args.valueText,
+      valueDate: args.valueDate,
+      valueBoolean: args.valueBoolean,
+      valueEnum: args.valueEnum,
+      valueEnumAllowed: args.valueEnumAllowed,
+      confidence: args.confidence,
+      internalOnly: args.internalOnly,
+      reviewStatus: "needsReview",
+      reviewedBy: undefined,
+      reviewedAt: undefined,
+      updatedAt: now,
+    });
+    return null;
+  },
+});
+
+// MARK: - Supersede
+
+export const markSuperseded = mutation({
+  args: { id: v.id("fileFacts") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await requireRole(ctx, "broker");
+    const record = await ctx.db.get(args.id);
+    if (!record) {
+      throw new Error("fileFact not found");
+    }
+    if (record.reviewStatus === "superseded") {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    await ctx.db.patch(args.id, {
+      reviewStatus: "superseded",
+      reviewedBy: user.email,
+      reviewedAt: now,
+      updatedAt: now,
+    });
+    return null;
   },
 });
 
@@ -210,7 +397,7 @@ const factReturnValidator = v.object({
   storageId: v.id("_storage"),
   propertyId: v.optional(v.id("properties")),
   dealRoomId: v.optional(v.id("dealRooms")),
-  analysisRunId: v.optional(v.string()),
+  analysisRunId: v.optional(v.id("fileAnalysisJobs")),
   valueKind: valueKindValidator,
   valueNumeric: v.optional(v.number()),
   valueNumericUnit: v.optional(v.string()),
