@@ -20,6 +20,8 @@ import {
   type CounterOfferStatus,
   type RawCounterOffer,
 } from "./lib/counterofferHistory";
+import { buildCalibrationRecord } from "../src/lib/ai/engines/pricingCalibration";
+import type { PricingOutput } from "../src/lib/ai/engines/types";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Validators for return shape
@@ -116,6 +118,67 @@ function toRaw(doc: Doc<"counterOffers">): RawCounterOffer {
     brokerNotes: doc.brokerNotes,
     expiresAt: doc.expiresAt,
   };
+}
+
+async function recordPricingCalibrationForAcceptedOffer(
+  ctx: { db: any },
+  args: {
+    propertyId: Id<"properties">;
+    offerId: Id<"offers">;
+    actualAcceptedPrice: number;
+    acceptedAt: string;
+    submittedAt?: string | null;
+  },
+) {
+  const db = ctx.db as any;
+
+  const latestPricingOutput = await db
+    .query("aiEngineOutputs")
+    .withIndex("by_propertyId_and_engineType", (q: any) =>
+      q.eq("propertyId", args.propertyId).eq("engineType", "pricing"),
+    )
+    .order("desc")
+    .first();
+
+  if (!latestPricingOutput) return;
+
+  const existingRecord = await db
+    .query("pricingCalibrationRecords")
+    .withIndex("by_engineOutputId", (q: any) =>
+      q.eq("engineOutputId", latestPricingOutput._id),
+    )
+    .first();
+  if (existingRecord) return;
+
+  let pricing: PricingOutput;
+  try {
+    pricing = JSON.parse(latestPricingOutput.output) as PricingOutput;
+  } catch {
+    return;
+  }
+
+  const counters = await db
+    .query("counterOffers")
+    .withIndex("by_offerId", (q: any) => q.eq("offerId", args.offerId))
+    .collect();
+
+  const record = buildCalibrationRecord({
+    propertyId: String(args.propertyId),
+    engineOutputId: String(latestPricingOutput._id),
+    promptVersion: latestPricingOutput.promptVersion ?? "unknown",
+    modelId: latestPricingOutput.modelId,
+    pricing,
+    actualAcceptedPrice: args.actualAcceptedPrice,
+    acceptedAt: args.acceptedAt,
+    submittedAt: args.submittedAt,
+    countersMade: counters.length,
+  });
+
+  await db.insert("pricingCalibrationRecords", {
+    ...record,
+    propertyId: args.propertyId,
+    engineOutputId: latestPricingOutput._id,
+  });
 }
 
 async function loadOfferWithAuthz(
@@ -366,6 +429,13 @@ export const respondToCounter = mutation({
         offer.status !== "expired"
       ) {
         await ctx.db.patch(row.offerId, { status: "accepted" });
+        await recordPricingCalibrationForAcceptedOffer(ctx, {
+          propertyId: offer.propertyId,
+          offerId: row.offerId,
+          actualAcceptedPrice: row.price,
+          acceptedAt: now,
+          submittedAt: offer.submittedAt,
+        });
       }
     }
 

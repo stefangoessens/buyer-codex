@@ -4,6 +4,7 @@ import {
   buildPricingRequest,
   computeConsensus,
   executePricingAnalysis,
+  parsePricingResponse,
   spreadConfidenceAdjustment,
 } from "@/lib/ai/engines/pricing";
 
@@ -87,11 +88,85 @@ describe("spreadConfidenceAdjustment", () => {
 
 describe("buildPricePoint", () => {
   it("computes deltas correctly", () => {
-    const point = buildPricePoint(480000, 500000, 490000, 0.85);
+    const point = buildPricePoint(480000, 500000, 490000, 0.85, {
+      neighborhoodMedianPrice: 495000,
+      compAveragePrice: 485000,
+    });
     expect(point.value).toBe(480000);
     expect(point.deltaVsListPrice).toBe(-4);
     expect(point.deltaVsConsensus).toBeCloseTo(-2, 0);
+    expect(point.deltaVsNeighborhoodMedian).toBeCloseTo(-3, 0);
+    expect(point.deltaVsCompAverage).toBeCloseTo(-1, 0);
     expect(point.confidence).toBe(0.85);
+  });
+});
+
+describe("parsePricingResponse", () => {
+  const input = {
+    propertyId: "p1",
+    listPrice: 500000,
+    address: "123 Main",
+    beds: 3,
+    baths: 2,
+    sqft: 1800,
+    yearBuilt: 2020,
+    propertyType: "Condo",
+    neighborhoodMedianPsf: 275,
+    compAvgPsf: 265,
+  };
+
+  it("adds comparative references and keeps spread as a ratio", () => {
+    const output = parsePricingResponse(
+      JSON.stringify({
+        fairValue: 480000,
+        likelyAccepted: 490000,
+        strongOpener: 470000,
+        walkAway: 460000,
+      }),
+      input,
+      490000,
+      0.045,
+      ["zillow", "redfin", "realtor"],
+    );
+
+    expect(output).not.toBeNull();
+    expect(output?.estimateSpread).toBe(0.045);
+    expect(output?.marketReferences).toEqual({
+      listPrice: 500000,
+      consensusEstimate: 490000,
+      neighborhoodMedianPrice: 495000,
+      compAveragePrice: 477000,
+    });
+    expect(output?.fairValue.deltaVsNeighborhoodMedian).toBeCloseTo(-3, 0);
+    expect(output?.fairValue.deltaVsCompAverage).toBeCloseTo(1, 0);
+    expect(output?.reviewFallback).toEqual({
+      reviewRequired: false,
+      reasons: [],
+      summary: null,
+    });
+  });
+
+  it("marks sparse or conflicting inputs for broker review", () => {
+    const output = parsePricingResponse(
+      JSON.stringify({
+        fairValue: 480000,
+        likelyAccepted: 490000,
+        strongOpener: 470000,
+        walkAway: 460000,
+      }),
+      input,
+      490000,
+      0.14,
+      ["zillow"],
+    );
+
+    expect(output).not.toBeNull();
+    expect(output?.overallConfidence).toBeLessThan(0.8);
+    expect(output?.reviewFallback?.reviewRequired).toBe(true);
+    expect(output?.reviewFallback?.reasons).toEqual([
+      "sparse_estimates",
+      "estimate_disagreement",
+    ]);
   });
 });
 

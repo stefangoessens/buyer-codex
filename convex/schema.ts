@@ -634,6 +634,32 @@ export default defineSchema({
     .index("by_propertyId_and_engineType", ["propertyId", "engineType"])
     .index("by_reviewState", ["reviewState"]),
 
+  pricingCalibrationRecords: defineTable({
+    propertyId: v.id("properties"),
+    engineOutputId: v.id("aiEngineOutputs"),
+    promptVersion: v.string(),
+    modelId: v.string(),
+    predictedFairValue: v.number(),
+    predictedLikelyAccepted: v.number(),
+    predictedStrongOpener: v.number(),
+    predictedWalkAway: v.number(),
+    actualAcceptedPrice: v.number(),
+    errorFairValue: v.number(),
+    errorLikelyAccepted: v.number(),
+    errorStrongOpener: v.number(),
+    errorWalkAway: v.number(),
+    meanAbsoluteError: v.number(),
+    highError: v.boolean(),
+    daysToAccept: v.union(v.number(), v.null()),
+    countersMade: v.number(),
+    acceptedAt: v.string(),
+    recordedAt: v.string(),
+  })
+    .index("by_propertyId", ["propertyId"])
+    .index("by_engineOutputId", ["engineOutputId"])
+    .index("by_recordedAt", ["recordedAt"])
+    .index("by_highError", ["highError"]),
+
   // ═══════════════════════════════════════════════════════════════════════════
   // AI PROMPT REGISTRY
   // ═══════════════════════════════════════════════════════════════════════════
