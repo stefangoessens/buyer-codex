@@ -1,5 +1,10 @@
-import type { GatewayConfig, GatewayRequest, GatewayResult } from "./types";
-import { callAnthropic, callOpenAI } from "./providers";
+import type {
+  GatewayConfig,
+  GatewayMessage,
+  GatewayRequest,
+  GatewayResponse,
+  GatewayResult,
+} from "./types";
 
 const DEFAULT_CONFIG: GatewayConfig = {
   primaryProvider: "anthropic",
@@ -15,6 +20,18 @@ const ENGINE_CONFIGS: Partial<Record<string, Partial<GatewayConfig>>> = {
   copilot: { primaryModel: "claude-sonnet-4-20250514", timeoutMs: 15000 },
   doc_parser: { primaryModel: "claude-sonnet-4-20250514", timeoutMs: 60000 },
 };
+
+type ProviderInvoker = (
+  messages: GatewayMessage[],
+  model: string,
+  maxTokens: number,
+  temperature: number,
+) => Promise<GatewayResponse>;
+
+export interface GatewayDependencies {
+  anthropic: ProviderInvoker;
+  openai: ProviderInvoker;
+}
 
 function isRetryableError(error: unknown): boolean {
   if (error instanceof Error) {
@@ -34,16 +51,20 @@ function isRetryableError(error: unknown): boolean {
 }
 
 async function callWithTimeout(
-  provider: "anthropic" | "openai",
+  provider: keyof GatewayDependencies,
   model: string,
   messages: GatewayRequest["messages"],
   maxTokens: number,
   temperature: number,
-  timeoutMs: number
+  timeoutMs: number,
+  dependencies: GatewayDependencies,
 ) {
-  const call = provider === "anthropic"
-    ? callAnthropic(messages, model, maxTokens, temperature)
-    : callOpenAI(messages, model, maxTokens, temperature);
+  const call = dependencies[provider](
+    messages,
+    model,
+    maxTokens,
+    temperature,
+  );
 
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error(`timeout after ${timeoutMs}ms`)), timeoutMs)
@@ -52,14 +73,43 @@ async function callWithTimeout(
   return Promise.race([call, timeout]);
 }
 
+async function loadGatewayDependencies(): Promise<GatewayDependencies> {
+  const providers = await import("./providers");
+  return {
+    anthropic: providers.callAnthropic,
+    openai: providers.callOpenAI,
+  };
+}
+
+async function resolveGatewayDependencies(
+  dependencies?: Partial<GatewayDependencies>,
+): Promise<GatewayDependencies> {
+  if (dependencies?.anthropic && dependencies?.openai) {
+    return {
+      anthropic: dependencies.anthropic,
+      openai: dependencies.openai,
+    };
+  }
+
+  const defaults = await loadGatewayDependencies();
+  return {
+    anthropic: dependencies?.anthropic ?? defaults.anthropic,
+    openai: dependencies?.openai ?? defaults.openai,
+  };
+}
+
 /**
  * Send a request through the AI gateway.
  * Routes to primary provider, fails over to fallback on retryable errors.
  * Returns typed result with usage/cost tracking.
  */
-export async function gateway(request: GatewayRequest): Promise<GatewayResult> {
+export async function gateway(
+  request: GatewayRequest,
+  dependencies?: Partial<GatewayDependencies>,
+): Promise<GatewayResult> {
   const engineOverrides = ENGINE_CONFIGS[request.engineType] ?? {};
   const config = { ...DEFAULT_CONFIG, ...engineOverrides, ...request.config };
+  const resolvedDependencies = await resolveGatewayDependencies(dependencies);
 
   const maxTokens = request.maxTokens ?? 4096;
   const temperature = request.temperature ?? 0;
@@ -76,7 +126,8 @@ export async function gateway(request: GatewayRequest): Promise<GatewayResult> {
         request.messages,
         maxTokens,
         temperature,
-        timeoutMs
+        timeoutMs,
+        resolvedDependencies,
       );
       return { success: true, data: response };
     } catch (err) {
@@ -105,7 +156,8 @@ export async function gateway(request: GatewayRequest): Promise<GatewayResult> {
       request.messages,
       maxTokens,
       temperature,
-      timeoutMs
+      timeoutMs,
+      resolvedDependencies,
     );
     response.usage.fallbackUsed = true;
     return { success: true, data: response };

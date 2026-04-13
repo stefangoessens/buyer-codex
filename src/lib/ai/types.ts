@@ -15,6 +15,7 @@ export interface GatewayMessage {
 export interface GatewayRequest {
   messages: GatewayMessage[];
   engineType: string;
+  dealRoomId?: string;
   maxTokens?: number;
   temperature?: number;
   config?: Partial<GatewayConfig>;
