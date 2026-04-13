@@ -79,6 +79,8 @@ function invokeRegisteredQuery<TResult>(
   return Promise.resolve(handler(ctx, args));
 }
 
+type RunMutationCall = Parameters<TestContext["runMutation"]>;
+
 const BROKER_USER = {
   _id: "user_broker",
   _creationTime: 1,
@@ -87,10 +89,8 @@ const BROKER_USER = {
   role: "broker" as const,
 };
 
-function getEligibilityCalls(runMutationSpy: ReturnType<typeof vi.spyOn>) {
-  return runMutationSpy.mock.calls.filter(
-    ([, args]) => !("eventType" in (args as Record<string, unknown>)),
-  );
+function getEligibilityCalls(calls: RunMutationCall[]) {
+  return calls.filter(([, args]) => !("eventType" in args));
 }
 
 function cloneRow<T extends Record<string, unknown> | null>(row: T): T {
@@ -293,7 +293,9 @@ describe("agreement lifecycle eligibility sync", () => {
     );
 
     expect(agreementId).toBeDefined();
-    const eligibilityCalls = getEligibilityCalls(runMutationSpy);
+    const eligibilityCalls = getEligibilityCalls(
+      runMutationSpy.mock.calls as RunMutationCall[],
+    );
     expect(eligibilityCalls).toHaveLength(1);
     expect(eligibilityCalls[0]?.[1]).toMatchObject({
       buyerId: "buyer_1",
@@ -336,7 +338,9 @@ describe("agreement lifecycle eligibility sync", () => {
       },
     );
 
-    const eligibilityCalls = getEligibilityCalls(runMutationSpy);
+    const eligibilityCalls = getEligibilityCalls(
+      runMutationSpy.mock.calls as RunMutationCall[],
+    );
     expect(eligibilityCalls).toHaveLength(1);
     expect(eligibilityCalls[0]?.[1]).toMatchObject({
       buyerId: "buyer_1",
@@ -378,7 +382,9 @@ describe("agreement lifecycle eligibility sync", () => {
       },
     );
 
-    const eligibilityCalls = getEligibilityCalls(runMutationSpy);
+    const eligibilityCalls = getEligibilityCalls(
+      runMutationSpy.mock.calls as RunMutationCall[],
+    );
     expect(eligibilityCalls).toHaveLength(1);
     expect(tables.agreements[0]).toMatchObject({
       _id: "agreement_sent",
@@ -457,7 +463,9 @@ describe("agreement lifecycle eligibility sync", () => {
       },
     );
 
-    const eligibilityCalls = getEligibilityCalls(runMutationSpy);
+    const eligibilityCalls = getEligibilityCalls(
+      runMutationSpy.mock.calls as RunMutationCall[],
+    );
     expect(eligibilityCalls).toHaveLength(1);
     expect(tables.agreements[0]).toMatchObject({
       _id: "agreement_signed",
@@ -532,7 +540,9 @@ describe("agreement lifecycle eligibility sync", () => {
     );
 
     expect(newAgreementId).toBeDefined();
-    const eligibilityCalls = getEligibilityCalls(runMutationSpy);
+    const eligibilityCalls = getEligibilityCalls(
+      runMutationSpy.mock.calls as RunMutationCall[],
+    );
     expect(eligibilityCalls).toHaveLength(1);
     expect(eligibilityCalls[0]?.[1]).toMatchObject({
       buyerId: "buyer_1",

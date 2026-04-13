@@ -1,38 +1,79 @@
-import { query, mutation, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
+import { internalMutation, mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
 import { requireRole } from "./lib/session";
+import {
+  reconcileBuyerFeeLedger,
+  rollupBuyerFeeLedgerEntries,
+} from "../packages/shared/src/contracts";
 
-// ─── Constants ──────────────────────────────────────────────────────────────
-const DISCREPANCY_THRESHOLD = 50; // $50 — flag discrepancies above this amount
+const DISCREPANCY_THRESHOLD = 50;
 
-// Entry types that contribute to the expected total (everything except actual_closing and adjustment)
-const EXPECTED_ENTRY_TYPES = [
-  "fee_set",
-  "seller_credit",
-  "buyer_credit",
-  "closing_credit_projection",
-] as const;
+type LedgerEntryDoc = Doc<"feeLedgerEntries">;
 
-// Credit entry types that offset the buyer's obligation (subtracted from fee)
-const CREDIT_ENTRY_TYPES: readonly string[] = ["seller_credit", "buyer_credit", "closing_credit_projection"];
-
-/** Compute expected net total with correct sign semantics (fee minus credits). */
-function computeExpectedTotal(entries: Array<{ entryType: string; amount: number }>): number {
-  return entries
-    .filter((e) => (EXPECTED_ENTRY_TYPES as readonly string[]).includes(e.entryType))
-    .reduce((sum, e) => {
-      // Credits offset the fee — subtract them
-      if (CREDIT_ENTRY_TYPES.includes(e.entryType)) {
-        return sum - e.amount;
-      }
-      return sum + e.amount;
-    }, 0);
+function buildReconciliation(entries: LedgerEntryDoc[]) {
+  const expected = rollupBuyerFeeLedgerEntries(entries, "projected");
+  const hasActual = entries.some((entry) => entry.bucket === "actual");
+  const actual = hasActual ? rollupBuyerFeeLedgerEntries(entries, "actual") : null;
+  return reconcileBuyerFeeLedger(expected, actual, DISCREPANCY_THRESHOLD);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// QUERIES
-// ═══════════════════════════════════════════════════════════════════════════════
+async function persistReport(
+  ctx: MutationCtx,
+  args: {
+    dealRoomId: Id<"dealRooms">;
+    reportType: "post_close" | "monthly";
+    reportMonth?: string;
+    actorUserId?: Id<"users">;
+    internalRun?: boolean;
+  },
+): Promise<Id<"reconciliationReports">> {
+  const ledgerEntries = await ctx.db
+    .query("feeLedgerEntries")
+    .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", args.dealRoomId))
+    .collect();
+
+  const reconciliation = buildReconciliation(ledgerEntries);
+  const now = new Date().toISOString();
+
+  const reportId = await ctx.db.insert("reconciliationReports", {
+    dealRoomId: args.dealRoomId,
+    reportType: args.reportType,
+    expectedRollup: reconciliation.expected,
+    actualRollup: reconciliation.actual ?? undefined,
+    deltaRollup: reconciliation.delta ?? undefined,
+    discrepancyAmount: reconciliation.discrepancyAmount ?? undefined,
+    discrepancyDimensions:
+      reconciliation.discrepancyDimensions.length > 0
+        ? reconciliation.discrepancyDimensions
+        : undefined,
+    discrepancyFlag: reconciliation.discrepancyFlag,
+    discrepancyDetails: reconciliation.discrepancyDetails,
+    reviewStatus: "pending",
+    reportMonth: args.reportMonth,
+    generatedAt: now,
+  });
+
+  await ctx.db.insert("auditLog", {
+    userId: args.actorUserId,
+    action: "reconciliation_report_generated",
+    entityType: "reconciliationReports",
+    entityId: reportId,
+    details: JSON.stringify({
+      reportType: args.reportType,
+      dealRoomId: args.dealRoomId,
+      reportMonth: args.reportMonth ?? null,
+      discrepancyFlag: reconciliation.discrepancyFlag,
+      discrepancyDimensions: reconciliation.discrepancyDimensions,
+      internal: args.internalRun ?? false,
+    }),
+    timestamp: now,
+  });
+
+  return reportId;
+}
 
 /** Get all reconciliation reports for a deal room. Broker/admin only. */
 export const getReportsByDealRoom = query({
@@ -74,13 +115,9 @@ export const getPendingDiscrepancies = query({
       .withIndex("by_reviewStatus", (q) => q.eq("reviewStatus", "pending"))
       .collect();
 
-    return pending.filter((r) => r.discrepancyFlag === true);
+    return pending.filter((report) => report.discrepancyFlag === true);
   },
 });
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MUTATIONS (public, broker/admin only)
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /** Generate a post-close reconciliation report for a deal room. */
 export const generatePostCloseReport = mutation({
@@ -88,160 +125,81 @@ export const generatePostCloseReport = mutation({
   returns: v.id("reconciliationReports"),
   handler: async (ctx, args) => {
     const user = await requireRole(ctx, "broker");
-
     const dealRoom = await ctx.db.get(args.dealRoomId);
     if (!dealRoom) throw new Error("Deal room not found");
 
-    const ledgerEntries = await ctx.db
-      .query("feeLedgerEntries")
-      .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", args.dealRoomId))
-      .collect();
-
-    // Expected total: fee minus credits (same sign semantics as ledger summary)
-    const expectedTotal = computeExpectedTotal(ledgerEntries);
-
-    // Actual total: from actual_closing entry (take most recent if multiple)
-    const actualEntries = ledgerEntries
-      .filter((e) => e.entryType === "actual_closing")
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-    const actualTotal = actualEntries.length > 0 ? actualEntries[0].amount : undefined;
-
-    // Compute discrepancy
-    let discrepancyAmount: number | undefined;
-    let discrepancyFlag = false;
-    let discrepancyDetails: string | undefined;
-
-    if (actualTotal !== undefined) {
-      discrepancyAmount = Math.abs(expectedTotal - actualTotal);
-      discrepancyFlag = discrepancyAmount > DISCREPANCY_THRESHOLD;
-      if (discrepancyFlag) {
-        discrepancyDetails = `Expected $${expectedTotal.toFixed(2)}, actual $${actualTotal.toFixed(2)}. Discrepancy: $${discrepancyAmount.toFixed(2)} exceeds $${DISCREPANCY_THRESHOLD} threshold.`;
-      }
-    }
-
-    const now = new Date().toISOString();
-
-    const reportId = await ctx.db.insert("reconciliationReports", {
+    return await persistReport(ctx, {
       dealRoomId: args.dealRoomId,
       reportType: "post_close",
-      expectedTotal,
-      actualTotal,
-      discrepancyAmount,
-      discrepancyFlag,
-      discrepancyDetails,
-      reviewStatus: "pending",
-      generatedAt: now,
+      actorUserId: user._id,
     });
-
-    await ctx.db.insert("auditLog", {
-      userId: user._id,
-      action: "reconciliation_report_generated",
-      entityType: "reconciliationReports",
-      entityId: reportId,
-      details: JSON.stringify({
-        reportType: "post_close",
-        dealRoomId: args.dealRoomId,
-        expectedTotal,
-        actualTotal,
-        discrepancyFlag,
-      }),
-      timestamp: now,
-    });
-
-    return reportId;
   },
 });
 
-/** Record actual closing statement amount and auto-generate post-close report. */
+/** Record actual closing-statement amounts and generate a post-close report. */
 export const recordActualClosing = mutation({
   args: {
     dealRoomId: v.id("dealRooms"),
-    actualAmount: v.number(),
+    actualSellerPaidAmount: v.number(),
+    actualBuyerPaidAmount: v.number(),
+    actualClosingCredit: v.number(),
+    actualExpectedBuyerFee: v.optional(v.number()),
     sourceDocument: v.optional(v.string()),
+    offerId: v.optional(v.id("offers")),
+    contractId: v.optional(v.id("contracts")),
   },
   returns: v.id("reconciliationReports"),
   handler: async (ctx, args) => {
     const user = await requireRole(ctx, "broker");
-
     const dealRoom = await ctx.db.get(args.dealRoomId);
     if (!dealRoom) throw new Error("Deal room not found");
 
-    const now = new Date().toISOString();
+    const actualExpectedBuyerFee =
+      args.actualExpectedBuyerFee ??
+      args.actualSellerPaidAmount +
+        args.actualBuyerPaidAmount -
+        args.actualClosingCredit;
 
-    // Create the actual_closing ledger entry
-    const entryId = await ctx.db.insert("feeLedgerEntries", {
-      dealRoomId: args.dealRoomId,
-      entryType: "actual_closing",
-      amount: args.actualAmount,
-      description: "Actual closing statement amount",
-      source: "closing_statement",
-      provenance: {
-        actorId: user._id,
+    const actualEntries = [
+      {
+        dimension: "expectedBuyerFee" as const,
+        amount: actualExpectedBuyerFee,
+      },
+      {
+        dimension: "sellerPaidAmount" as const,
+        amount: args.actualSellerPaidAmount,
+      },
+      {
+        dimension: "buyerPaidAmount" as const,
+        amount: args.actualBuyerPaidAmount,
+      },
+      {
+        dimension: "projectedClosingCredit" as const,
+        amount: args.actualClosingCredit,
+      },
+    ];
+
+    for (const entry of actualEntries) {
+      await ctx.runMutation(internal.ledger.createEntryInternal, {
+        dealRoomId: args.dealRoomId,
+        bucket: "actual",
+        dimension: entry.dimension,
+        amount: entry.amount,
+        description: "Actual closing statement amount",
+        source: "closing_statement",
+        offerId: args.offerId,
+        contractId: args.contractId,
+        actorUserId: user._id,
         triggeredBy: "reconciliation.recordActualClosing",
         sourceDocument: args.sourceDocument,
-        timestamp: now,
-      },
-      createdAt: now,
-    });
+      });
+    }
 
-    await ctx.db.insert("auditLog", {
-      userId: user._id,
-      action: "actual_closing_recorded",
-      entityType: "feeLedgerEntries",
-      entityId: entryId,
-      details: JSON.stringify({
-        actualAmount: args.actualAmount,
-        sourceDocument: args.sourceDocument,
-      }),
-      timestamp: now,
-    });
-
-    // Now generate the post-close reconciliation report inline
-    const ledgerEntries = await ctx.db
-      .query("feeLedgerEntries")
-      .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", args.dealRoomId))
-      .collect();
-
-    // Expected total: fee minus credits (same sign semantics as ledger summary)
-    const expectedTotal = computeExpectedTotal(ledgerEntries);
-
-    // Use the just-recorded actual amount
-    const actualTotal = args.actualAmount;
-    const discrepancyAmount = Math.abs(expectedTotal - actualTotal);
-    const discrepancyFlag = discrepancyAmount > DISCREPANCY_THRESHOLD;
-    const discrepancyDetails = discrepancyFlag
-      ? `Expected $${expectedTotal.toFixed(2)}, actual $${actualTotal.toFixed(2)}. Discrepancy: $${discrepancyAmount.toFixed(2)} exceeds $${DISCREPANCY_THRESHOLD} threshold.`
-      : undefined;
-
-    const reportId = await ctx.db.insert("reconciliationReports", {
+    return await persistReport(ctx, {
       dealRoomId: args.dealRoomId,
       reportType: "post_close",
-      expectedTotal,
-      actualTotal,
-      discrepancyAmount,
-      discrepancyFlag,
-      discrepancyDetails,
-      reviewStatus: "pending",
-      generatedAt: now,
+      actorUserId: user._id,
     });
-
-    await ctx.db.insert("auditLog", {
-      userId: user._id,
-      action: "reconciliation_report_generated",
-      entityType: "reconciliationReports",
-      entityId: reportId,
-      details: JSON.stringify({
-        reportType: "post_close",
-        dealRoomId: args.dealRoomId,
-        expectedTotal,
-        actualTotal,
-        discrepancyFlag,
-      }),
-      timestamp: now,
-    });
-
-    return reportId;
   },
 });
 
@@ -252,80 +210,30 @@ export const generateMonthlyReport = mutation({
   handler: async (ctx, args) => {
     const user = await requireRole(ctx, "broker");
 
-    // Validate reportMonth format (YYYY-MM)
     if (!/^\d{4}-\d{2}$/.test(args.reportMonth)) {
       throw new Error("reportMonth must be in YYYY-MM format");
     }
 
-    // Find all closed deal rooms — collect and filter by updatedAt month
     const closedDealRooms = await ctx.db
       .query("dealRooms")
       .withIndex("by_buyerId_and_status")
       .collect();
 
     const matchingRooms = closedDealRooms.filter(
-      (dr) => dr.status === "closed" && dr.updatedAt.startsWith(args.reportMonth)
+      (dealRoom) =>
+        dealRoom.status === "closed" &&
+        dealRoom.updatedAt.startsWith(args.reportMonth),
     );
 
-    const now = new Date().toISOString();
     const reportIds: Id<"reconciliationReports">[] = [];
-
     for (const dealRoom of matchingRooms) {
-      const ledgerEntries = await ctx.db
-        .query("feeLedgerEntries")
-        .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", dealRoom._id))
-        .collect();
-
-      const expectedTotal = computeExpectedTotal(ledgerEntries);
-
-      const actualEntries = ledgerEntries
-        .filter((e) => e.entryType === "actual_closing")
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-      const actualTotal = actualEntries.length > 0 ? actualEntries[0].amount : undefined;
-
-      let discrepancyAmount: number | undefined;
-      let discrepancyFlag = false;
-      let discrepancyDetails: string | undefined;
-
-      if (actualTotal !== undefined) {
-        discrepancyAmount = Math.abs(expectedTotal - actualTotal);
-        discrepancyFlag = discrepancyAmount > DISCREPANCY_THRESHOLD;
-        if (discrepancyFlag) {
-          discrepancyDetails = `Expected $${expectedTotal.toFixed(2)}, actual $${actualTotal.toFixed(2)}. Discrepancy: $${discrepancyAmount.toFixed(2)} exceeds $${DISCREPANCY_THRESHOLD} threshold.`;
-        }
-      }
-
-      const reportId = await ctx.db.insert("reconciliationReports", {
+      const reportId = await persistReport(ctx, {
         dealRoomId: dealRoom._id,
         reportType: "monthly",
-        expectedTotal,
-        actualTotal,
-        discrepancyAmount,
-        discrepancyFlag,
-        discrepancyDetails,
-        reviewStatus: "pending",
         reportMonth: args.reportMonth,
-        generatedAt: now,
+        actorUserId: user._id,
       });
-
       reportIds.push(reportId);
-
-      await ctx.db.insert("auditLog", {
-        userId: user._id,
-        action: "reconciliation_report_generated",
-        entityType: "reconciliationReports",
-        entityId: reportId,
-        details: JSON.stringify({
-          reportType: "monthly",
-          reportMonth: args.reportMonth,
-          dealRoomId: dealRoom._id,
-          expectedTotal,
-          actualTotal,
-          discrepancyFlag,
-        }),
-        timestamp: now,
-      });
     }
 
     return reportIds;
@@ -342,12 +250,10 @@ export const reviewDiscrepancy = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const user = await requireRole(ctx, "broker");
-
     const report = await ctx.db.get(args.reportId);
     if (!report) throw new Error("Reconciliation report not found");
 
     const now = new Date().toISOString();
-
     await ctx.db.patch(args.reportId, {
       reviewStatus: args.reviewStatus,
       reviewedBy: user._id,
@@ -371,74 +277,22 @@ export const reviewDiscrepancy = mutation({
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// INTERNAL MUTATIONS (no auth — for use by other Convex functions)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/** Generate a post-close reconciliation report without auth. For internal use (e.g., deal room status transitions). */
+/** Generate a post-close reconciliation report without auth. For internal use by lifecycle hooks. */
 export const generatePostCloseReportInternal = internalMutation({
-  args: { dealRoomId: v.id("dealRooms") },
+  args: {
+    dealRoomId: v.id("dealRooms"),
+    actorUserId: v.optional(v.id("users")),
+  },
   returns: v.id("reconciliationReports"),
   handler: async (ctx, args) => {
     const dealRoom = await ctx.db.get(args.dealRoomId);
     if (!dealRoom) throw new Error("Deal room not found");
 
-    const ledgerEntries = await ctx.db
-      .query("feeLedgerEntries")
-      .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", args.dealRoomId))
-      .collect();
-
-    const expectedTotal = ledgerEntries
-      .filter((e) => (EXPECTED_ENTRY_TYPES as readonly string[]).includes(e.entryType))
-      .reduce((sum, e) => sum + e.amount, 0);
-
-    const actualEntries = ledgerEntries
-      .filter((e) => e.entryType === "actual_closing")
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-    const actualTotal = actualEntries.length > 0 ? actualEntries[0].amount : undefined;
-
-    let discrepancyAmount: number | undefined;
-    let discrepancyFlag = false;
-    let discrepancyDetails: string | undefined;
-
-    if (actualTotal !== undefined) {
-      discrepancyAmount = Math.abs(expectedTotal - actualTotal);
-      discrepancyFlag = discrepancyAmount > DISCREPANCY_THRESHOLD;
-      if (discrepancyFlag) {
-        discrepancyDetails = `Expected $${expectedTotal.toFixed(2)}, actual $${actualTotal.toFixed(2)}. Discrepancy: $${discrepancyAmount.toFixed(2)} exceeds $${DISCREPANCY_THRESHOLD} threshold.`;
-      }
-    }
-
-    const now = new Date().toISOString();
-
-    const reportId = await ctx.db.insert("reconciliationReports", {
+    return await persistReport(ctx, {
       dealRoomId: args.dealRoomId,
       reportType: "post_close",
-      expectedTotal,
-      actualTotal,
-      discrepancyAmount,
-      discrepancyFlag,
-      discrepancyDetails,
-      reviewStatus: "pending",
-      generatedAt: now,
+      actorUserId: args.actorUserId,
+      internalRun: true,
     });
-
-    await ctx.db.insert("auditLog", {
-      action: "reconciliation_report_generated",
-      entityType: "reconciliationReports",
-      entityId: reportId,
-      details: JSON.stringify({
-        reportType: "post_close",
-        dealRoomId: args.dealRoomId,
-        expectedTotal,
-        actualTotal,
-        discrepancyFlag,
-        internal: true,
-      }),
-      timestamp: now,
-    });
-
-    return reportId;
   },
 });

@@ -19,6 +19,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { requireAuth } from "./lib/session";
+import { rollupBuyerFeeLedgerEntries } from "../packages/shared/src/contracts";
 import {
   financingType,
   lenderValidationOutcome,
@@ -137,6 +138,17 @@ async function persistValidation(
     throw new Error("Failed to read back inserted lender credit validation");
   }
   return inserted;
+}
+
+async function loadProjectedLedgerRollup(
+  ctx: MutationCtx,
+  dealRoomId: Id<"dealRooms">,
+) {
+  const entries = await ctx.db
+    .query("feeLedgerEntries")
+    .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", dealRoomId))
+    .collect();
+  return rollupBuyerFeeLedgerEntries(entries, "projected");
 }
 
 // ═══ QUERIES ═══
@@ -295,7 +307,7 @@ export const computeAndPersist = mutation({
     ltvRatio: v.optional(v.number()),
     projectedSellerCredit: v.number(),
     projectedBuyerCredit: v.number(),
-    projectedClosingCredit: v.number(),
+    projectedClosingCredit: v.optional(v.number()),
     sourceDocument: v.optional(v.string()),
   },
   returns: lenderCreditValidationRow,
@@ -310,13 +322,17 @@ export const computeAndPersist = mutation({
       throw new Error("Deal room not found");
     }
 
+    const projectedLedger = await loadProjectedLedgerRollup(ctx, args.dealRoomId);
+    const projectedClosingCredit =
+      args.projectedClosingCredit ?? projectedLedger.projectedClosingCredit;
+
     const input: LenderValidationInput = {
       financingType: args.financingType,
       purchasePrice: args.purchasePrice,
       ltvRatio: args.ltvRatio,
       projectedSellerCredit: args.projectedSellerCredit,
       projectedBuyerCredit: args.projectedBuyerCredit,
-      projectedClosingCredit: args.projectedClosingCredit,
+      projectedClosingCredit,
     };
     const result = validateLenderCredit(input);
 
@@ -417,7 +433,7 @@ export const computeAndPersistInternal = internalMutation({
     ltvRatio: v.optional(v.number()),
     projectedSellerCredit: v.number(),
     projectedBuyerCredit: v.number(),
-    projectedClosingCredit: v.number(),
+    projectedClosingCredit: v.optional(v.number()),
     actorUserId: v.optional(v.id("users")),
     sourceDocument: v.optional(v.string()),
   },
@@ -428,13 +444,17 @@ export const computeAndPersistInternal = internalMutation({
       throw new Error("Deal room not found");
     }
 
+    const projectedLedger = await loadProjectedLedgerRollup(ctx, args.dealRoomId);
+    const projectedClosingCredit =
+      args.projectedClosingCredit ?? projectedLedger.projectedClosingCredit;
+
     const input: LenderValidationInput = {
       financingType: args.financingType,
       purchasePrice: args.purchasePrice,
       ltvRatio: args.ltvRatio,
       projectedSellerCredit: args.projectedSellerCredit,
       projectedBuyerCredit: args.projectedBuyerCredit,
-      projectedClosingCredit: args.projectedClosingCredit,
+      projectedClosingCredit,
     };
     const result = validateLenderCredit(input);
 
