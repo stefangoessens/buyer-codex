@@ -81,12 +81,236 @@ export interface CoordinationFilters {
   agentId?: string;
   /** Limit to requests with no assigned agent. */
   unassignedOnly?: boolean;
+  /** Limit to requests that already have an assigned agent. */
+  assignedOnly?: boolean;
   /** Limit to requests older than this many hours. */
   minAgeHours?: number;
   /** Limit to requests newer than this many hours. */
   maxAgeHours?: number;
   /** Only return requests with at least one prerequisite failure. */
   hasPrerequisiteFailure?: boolean;
+}
+
+export const SHOWING_COORDINATION_STATUS_FILTERS = [
+  "all",
+  "submitted",
+  "blocked",
+  "assigned",
+  "confirmed",
+] as const;
+export type ShowingCoordinationStatusFilter =
+  (typeof SHOWING_COORDINATION_STATUS_FILTERS)[number];
+
+export const SHOWING_COORDINATION_ASSIGNMENT_FILTERS = [
+  "all",
+  "unassigned",
+  "assigned",
+] as const;
+export type ShowingCoordinationAssignmentFilter =
+  (typeof SHOWING_COORDINATION_ASSIGNMENT_FILTERS)[number];
+
+export const SHOWING_COORDINATION_AGE_FILTERS = [
+  "all",
+  "last_24h",
+  "older_than_24h",
+  "older_than_48h",
+  "stale",
+] as const;
+export type ShowingCoordinationAgeFilter =
+  (typeof SHOWING_COORDINATION_AGE_FILTERS)[number];
+
+export const SHOWING_COORDINATION_STATUS_LABELS: Readonly<
+  Record<ShowingCoordinationStatusFilter, string>
+> = {
+  all: "All statuses",
+  submitted: "Submitted",
+  blocked: "Blocked",
+  assigned: "Assigned",
+  confirmed: "Confirmed",
+};
+
+export const SHOWING_COORDINATION_ASSIGNMENT_LABELS: Readonly<
+  Record<ShowingCoordinationAssignmentFilter, string>
+> = {
+  all: "All requests",
+  unassigned: "Unassigned",
+  assigned: "Assigned only",
+};
+
+export const SHOWING_COORDINATION_AGE_LABELS: Readonly<
+  Record<ShowingCoordinationAgeFilter, string>
+> = {
+  all: "Any age",
+  last_24h: "Last 24h",
+  older_than_24h: "24h+",
+  older_than_48h: "48h+",
+  stale: "Stale only",
+};
+
+export const PREREQUISITE_FAILURE_LABELS: Readonly<
+  Record<PrerequisiteFailure, string>
+> = {
+  missing_agreement: "Missing agreement",
+  incomplete_buyer_data: "Incomplete buyer data",
+  no_agent_coverage: "No agent coverage",
+  stale_submission: "Stale submission",
+  stale_blocked: "Stale blocked request",
+  stale_assigned: "Stale assigned request",
+};
+
+export interface ShowingCoordinationFilterState {
+  status: ShowingCoordinationStatusFilter;
+  assignment: ShowingCoordinationAssignmentFilter;
+  age: ShowingCoordinationAgeFilter;
+  hasPrerequisiteFailure: boolean;
+  agentId: string;
+  geographyQuery: string;
+}
+
+export const DEFAULT_SHOWING_COORDINATION_FILTER_STATE: ShowingCoordinationFilterState =
+  {
+    status: "all",
+    assignment: "all",
+    age: "all",
+    hasPrerequisiteFailure: false,
+    agentId: "",
+    geographyQuery: "",
+  };
+
+function isShowingCoordinationStatusFilter(
+  value: string,
+): value is ShowingCoordinationStatusFilter {
+  return (
+    SHOWING_COORDINATION_STATUS_FILTERS as readonly string[]
+  ).includes(value);
+}
+
+function isShowingCoordinationAssignmentFilter(
+  value: string,
+): value is ShowingCoordinationAssignmentFilter {
+  return (
+    SHOWING_COORDINATION_ASSIGNMENT_FILTERS as readonly string[]
+  ).includes(value);
+}
+
+function isShowingCoordinationAgeFilter(
+  value: string,
+): value is ShowingCoordinationAgeFilter {
+  return (SHOWING_COORDINATION_AGE_FILTERS as readonly string[]).includes(value);
+}
+
+export function parseShowingCoordinationFilterFromSearchParams(
+  params: URLSearchParams | Record<string, string | string[] | undefined>,
+): ShowingCoordinationFilterState {
+  const get = (key: string): string | undefined => {
+    if (params instanceof URLSearchParams) {
+      const raw = params.get(key);
+      return raw ?? undefined;
+    }
+    const raw = params[key];
+    if (Array.isArray(raw)) return raw[0];
+    return raw;
+  };
+
+  const statusRaw = get("status");
+  const assignmentRaw = get("assignment");
+  const ageRaw = get("age");
+  const failureRaw = get("prereqs");
+  const agentId = get("agent") ?? "";
+  const geographyQuery = (get("geo") ?? "").trim();
+
+  return {
+    status:
+      statusRaw && isShowingCoordinationStatusFilter(statusRaw)
+        ? statusRaw
+        : DEFAULT_SHOWING_COORDINATION_FILTER_STATE.status,
+    assignment:
+      assignmentRaw && isShowingCoordinationAssignmentFilter(assignmentRaw)
+        ? assignmentRaw
+        : DEFAULT_SHOWING_COORDINATION_FILTER_STATE.assignment,
+    age:
+      ageRaw && isShowingCoordinationAgeFilter(ageRaw)
+        ? ageRaw
+        : DEFAULT_SHOWING_COORDINATION_FILTER_STATE.age,
+    hasPrerequisiteFailure: failureRaw === "1",
+    agentId,
+    geographyQuery,
+  };
+}
+
+export function showingCoordinationFilterToSearchParams(
+  filter: ShowingCoordinationFilterState,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (filter.status !== DEFAULT_SHOWING_COORDINATION_FILTER_STATE.status) {
+    out.status = filter.status;
+  }
+  if (
+    filter.assignment !== DEFAULT_SHOWING_COORDINATION_FILTER_STATE.assignment
+  ) {
+    out.assignment = filter.assignment;
+  }
+  if (filter.age !== DEFAULT_SHOWING_COORDINATION_FILTER_STATE.age) {
+    out.age = filter.age;
+  }
+  if (filter.hasPrerequisiteFailure) {
+    out.prereqs = "1";
+  }
+  if (filter.agentId.trim().length > 0) {
+    out.agent = filter.agentId.trim();
+  }
+  if (filter.geographyQuery.trim().length > 0) {
+    out.geo = filter.geographyQuery.trim();
+  }
+  return out;
+}
+
+export interface ShowingCoordinationQueryArgs extends CoordinationFilters {
+  geographyQuery?: string;
+  staleOnly?: boolean;
+}
+
+export function buildShowingCoordinationQueryArgs(
+  filter: ShowingCoordinationFilterState,
+): ShowingCoordinationQueryArgs {
+  const query: ShowingCoordinationQueryArgs = {};
+
+  if (filter.status !== "all") {
+    query.statuses = [filter.status];
+  }
+  if (filter.assignment === "unassigned") {
+    query.unassignedOnly = true;
+  }
+  if (filter.assignment === "assigned") {
+    query.assignedOnly = true;
+  }
+  if (filter.agentId.trim().length > 0) {
+    query.agentId = filter.agentId.trim();
+  }
+  if (filter.hasPrerequisiteFailure) {
+    query.hasPrerequisiteFailure = true;
+  }
+  if (filter.geographyQuery.trim().length > 0) {
+    query.geographyQuery = filter.geographyQuery.trim();
+  }
+
+  if (filter.age === "last_24h") {
+    query.maxAgeHours = 24;
+  } else if (filter.age === "older_than_24h") {
+    query.minAgeHours = 24;
+  } else if (filter.age === "older_than_48h") {
+    query.minAgeHours = 48;
+  } else if (filter.age === "stale") {
+    query.staleOnly = true;
+  }
+
+  return query;
+}
+
+export function formatPrerequisiteFailureLabel(
+  failure: PrerequisiteFailure,
+): string {
+  return PREREQUISITE_FAILURE_LABELS[failure];
 }
 
 /** The active (non-terminal) statuses by default. */
@@ -243,6 +467,7 @@ export function applyCoordinationFilters(
     if (!statusSet.has(r.status)) return false;
 
     if (filters.unassignedOnly && r.agentId) return false;
+    if (filters.assignedOnly && !r.agentId) return false;
     if (filters.agentId && r.agentId !== filters.agentId) return false;
 
     // Age filters based on createdAt
