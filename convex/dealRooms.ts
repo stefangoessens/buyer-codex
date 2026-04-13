@@ -155,6 +155,11 @@ export const create = mutation({
       updatedAt: new Date().toISOString(),
     });
 
+    await ctx.runMutation(internal.ledger.initializeCompensationStatusInternal, {
+      dealRoomId,
+      actorUserId: user._id,
+    });
+
     await ctx.runMutation(api.leadAttribution.markConverted, {
       userId: user._id,
     });
