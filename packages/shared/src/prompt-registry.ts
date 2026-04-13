@@ -134,20 +134,22 @@ Rules:
       author: DEFAULT_AUTHOR,
       activateByDefault: true,
       changeNotes:
-        "Initial deterministic spec for seller-pressure and negotiation-signal scoring.",
+        "Expanded deterministic spec for seller-pressure scoring, market deltas, and deterministic rationale output.",
       prompt: `Score seller leverage for a Florida listing.
 
 Signals to consider:
 - Days on market versus local median.
-- Price reductions and cumulative markdown.
+- Price reduction count and cumulative markdown versus local markdown norms.
 - Motivated-seller language in the description.
 - Price per sqft versus neighborhood median.
 - Listing trajectory: relisted, withdrawn, or fell-through status.
-- Listing agent historical performance versus market baseline.
+- Listing age versus neighborhood sales velocity.
+- Listing agent historical performance versus market baseline, including price-cut frequency.
+- Seller equity, vacancy, occupancy, and neighborhood market temperature when available.
 
 Output:
 - A leverage score from 0-100.
-- Structured signals with delta, direction, confidence, and citation text.
+- Structured signals with value, market reference, delta, direction, confidence, citation, and explanation text.
 - Overall confidence as the average confidence across emitted signals.`,
     },
     {

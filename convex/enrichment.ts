@@ -158,6 +158,7 @@ async function buildEnrichmentPayload(ctx: any, propertyId: Id<"properties">) {
         property,
         contexts: neighborhoodContexts,
         listingAgent: listingAgents.find((agent) => agent.linkRole === "listing") ?? null,
+        recentSales,
       }),
       compsCandidates: buildCompCandidatesFromRecentSales(recentSales),
     },

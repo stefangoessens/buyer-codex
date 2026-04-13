@@ -150,15 +150,22 @@ describe("enrichment/engineContext", () => {
         brokerage: "Compass",
         avgDaysOnMarket: 46,
         medianListToSellRatio: 0.972,
+        priceCutFrequency: 0.35,
         provenance: {},
         lastRefreshedAt: "2026-04-12T12:00:00Z",
       },
+      recentSales,
     });
 
     expect(input.neighborhoodMedianDom).toBe(28);
     expect(input.neighborhoodMedianPsf).toBe(505);
+    expect(input.neighborhoodSalesVelocity).toBe(0.23);
+    expect(input.neighborhoodInventoryCount).toBe(12);
+    expect(input.neighborhoodMarketTrajectory).toBe("rising");
+    expect(input.neighborhoodMedianSaleToListRatio).toBeCloseTo(0.9862, 4);
     expect(input.listingAgentAvgDom).toBe(46);
     expect(input.listingAgentAvgSaleToList).toBeCloseTo(0.972, 3);
+    expect(input.listingAgentPriceCutFrequency).toBeCloseTo(0.35, 2);
   });
 
   it("maps recent comparable sales into comps-engine candidates", () => {
