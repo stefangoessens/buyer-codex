@@ -167,10 +167,11 @@ Base unit: **4px**. All spacing values are multiples of 4.
 | Constant | Value |
 |---|---|
 | Container max-width | `1280px` |
+| Authenticated app content well | `1152px` |
 | Container padding-x | `24px` (mobile), `32px` (tablet+) |
 | Section padding-y | `64px` (mobile), `80px` (tablet), `96px` (desktop) |
 | Grid gutter | `24px` (mobile), `32px` (desktop) |
-| Sidebar width | `260px` (collapsed: `64px`) |
+| Sidebar width | `256px` (collapsed / drawer trigger: `64px`) |
 | Top nav height | `64px` |
 
 ---
@@ -246,7 +247,7 @@ How design patterns map to buyer-codex surfaces:
 | **Pricing / FAQ** | Hosman structure + PayFit tables | Section-based vertical scroll: hero → pricing table → FAQ accordion → CTA | `PricingTable`, `AccordionFAQ`, `ComparisonRow` |
 | **Savings calculator** | Hosman placement + PayFit inputs | Two-column: controls (sliders, inputs) left, results (cards, chart) right | `SliderInput`, `ResultCard`, `SavingsChart` |
 | **Deal room** | RealAdvisor data + PayFit cards | Dashboard grid: property header → score panel → analysis tabs → timeline | `ScoreBadge`, `PropertyCard`, `AnalysisPanel`, `TimelineStep` |
-| **Buyer dashboard** | PayFit SaaS dashboard | Left sidebar nav + main content area with card grid | `NavSidebar`, `DealCard`, `TaskList`, `KPICard` |
+| **Buyer dashboard** | shadcn preset `b2D0wqNxS` scaffold + PayFit tokens | Fixed rail / mobile chip strip → intro → paste-link CTA → summary band → deal card grid. See `design-references/shadcn-b2D0wqNxS/dashboard-shell-contract.md`. | `NavSidebar`, `PasteLinkCTA`, `DealCard`, `TaskList`, `KPICard` |
 | **Broker console** | PayFit ops + shadcn data tables | Left sidebar nav + table/detail split view | `DataTable`, `QueueCard`, `KPICard`, `StatusBadge` |
 | **Onboarding flow** | PayFit onboarding stepper | Centered card with progress stepper, one question per step | `StepIndicator`, `QuestionCard`, `ProgressBar` |
 | **Auth screens** | PayFit minimal | Centered card on tinted background, logo + form | `AuthCard`, `SocialLoginButton` |
