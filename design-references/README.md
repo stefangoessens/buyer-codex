@@ -16,6 +16,7 @@ Run `pnpm tokens:sync` after token edits to regenerate:
 - `component-catalog.md` — Harvested component patterns with usage notes
 - `component-library.md` — Shared library slot rules, usage examples, and code-backed consumers
 - `shadcn-b2D0wqNxS/dashboard-shell-contract.md` — Explicit buyer dashboard shell contract, reference captures, and annotated zone maps
+- `kin-1046/deal-room-advisory-ia-contract.md` — Explicit deal-room advisory IA, inline-vs-drill-down rules, and cut line for future advisory surfaces
 
 ## Capture Packs
 
