@@ -1,3 +1,4 @@
+export * from "./analytics-events";
 export * from "./auth";
 export * from "./communication-templates";
 export * from "./config";

@@ -45,11 +45,11 @@ export async function trackServerEvent<K extends AnalyticsEventName>(
             options.distinctId ?? `${context.service}:${context.environment}`,
           properties: {
             ...safeProps,
+            analytics_transport: "server",
             app_environment: context.environment,
             app_release: context.release,
             app_service: context.service,
             app_deployment: context.deployment,
-            source: "server",
           },
         }),
       },

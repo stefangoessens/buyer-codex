@@ -5,6 +5,7 @@ small reusable utilities.
 
 ## Conventions
 
+- Put the comprehensive analytics taxonomy in `src/analytics-events.ts`.
 - Put cross-surface TypeScript contracts in `src/contracts.ts`.
 - Put launch analytics schema/validation helpers in `src/launch-events.ts`.
 - Put workspace metadata and environment specs in `src/config.ts`.
