@@ -182,6 +182,7 @@ export const listLatestEngineOutputInternal = internalQuery({
       generatedAt: latest.generatedAt,
       citations: latest.citations,
       reviewState: latest.reviewState,
+      rawOutput: latest.output,
       output: parsed,
       snippet: latest.output.slice(0, 400),
     };
@@ -259,6 +260,8 @@ export const ask = action({
         generatedAt: row.generatedAt,
         confidence: row.confidence,
         snippet: row.snippet,
+        rawOutput: row.rawOutput,
+        reviewState: row.reviewState,
       };
     };
 

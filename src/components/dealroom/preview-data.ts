@@ -165,6 +165,8 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       confidenceTone: "strong",
       citationId: "pricing-2026-04-13-01",
       sourceAnchorId: "source-pricing-2026-04-13-01",
+      guardrailState: "softened",
+      guardrailLabel: "Softened",
     },
     {
       id: "preview-claim-dom",
@@ -179,6 +181,8 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       confidenceTone: "mixed",
       citationId: "dom-2026-04-13-01",
       sourceAnchorId: "source-dom-2026-04-13-01",
+      guardrailState: "softened",
+      guardrailLabel: "Softened",
     },
     {
       id: "preview-claim-leverage",
@@ -193,6 +197,8 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       confidenceTone: "mixed",
       citationId: "leverage-2026-04-13-01",
       sourceAnchorId: "source-leverage-2026-04-13-01",
+      guardrailState: "softened",
+      guardrailLabel: "Softened",
     },
   ],
   keyTakeaways: [
@@ -231,6 +237,10 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
         body: "Days on market are long enough to justify a deliberate opener, especially if execution risk stays low.",
       },
     ],
+    guardrailState: "softened",
+    guardrailLabel: "Softened",
+    guardrailExplanation:
+      "Use this as an illustrative starting point and confirm the final strategy with your broker.",
   },
   missingStates: [
     {
@@ -251,6 +261,9 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       confidenceLabel: "82% confidence",
       generatedAtLabel: "Apr 13",
       claimCount: 1,
+      guardrailState: "softened",
+      guardrailLabel: "Softened",
+      approvalPath: "none",
     },
     {
       citationId: "dom-2026-04-13-01",
@@ -260,6 +273,9 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       confidenceLabel: "74% confidence",
       generatedAtLabel: "Apr 13",
       claimCount: 1,
+      guardrailState: "can_say",
+      guardrailLabel: "Buyer-safe",
+      approvalPath: "none",
     },
     {
       citationId: "leverage-2026-04-13-01",
@@ -269,6 +285,9 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       confidenceLabel: "69% confidence",
       generatedAtLabel: "Apr 13",
       claimCount: 1,
+      guardrailState: "softened",
+      guardrailLabel: "Softened",
+      approvalPath: "none",
     },
     {
       citationId: "offer-2026-04-13-01",
@@ -278,6 +297,9 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       confidenceLabel: "Refresh running",
       generatedAtLabel: null,
       claimCount: 0,
+      guardrailState: "review_required",
+      guardrailLabel: "Review required",
+      approvalPath: "broker_review",
     },
   ],
 };

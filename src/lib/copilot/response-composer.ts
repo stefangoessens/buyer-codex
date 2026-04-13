@@ -8,6 +8,18 @@
 
 import type { CopilotIntent } from "./intents";
 import type { CopilotEngineKey } from "./router";
+import type {
+  AdvisoryApprovalPath,
+  AdvisoryGuardrailAssessment,
+  AdvisoryGuardrailState,
+  AdvisoryOutputClass,
+} from "@/lib/advisory/guardrails";
+
+const currency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
 
 export interface EngineOutputRef {
   engine: CopilotEngineKey;
@@ -16,6 +28,15 @@ export interface EngineOutputRef {
   generatedAt?: string;
   confidence?: number;
   snippet: string;
+  rawOutput?: string;
+  reviewState?: "pending" | "approved" | "rejected";
+}
+
+export interface ResponseGuardrailMetadata {
+  state: AdvisoryGuardrailState;
+  classes: AdvisoryOutputClass[];
+  approvalPath: AdvisoryApprovalPath;
+  reasonCodes: string[];
 }
 
 export interface ComposedResponse {
@@ -25,6 +46,7 @@ export interface ComposedResponse {
   engine: CopilotEngineKey;
   stubbed: boolean;
   requiresLlm: boolean;
+  guardrail?: ResponseGuardrailMetadata;
 }
 
 export interface ComposeInput {
@@ -89,6 +111,7 @@ export function composeStubResponse(input: ComposeInput): ComposedResponse {
     stubbed: true,
     requiresLlm: false,
     citations: [],
+    guardrail: undefined,
     text: `I don't have ${intentLabel} for this property yet. ${next}`,
   };
 }
@@ -104,6 +127,7 @@ export function composeOffTopicRefusal(question: string): ComposedResponse {
     stubbed: true,
     requiresLlm: false,
     citations: [],
+    guardrail: undefined,
     text: `I can only help with questions about this property and the buying process.${hint}try asking about pricing, comps, offer terms, or next steps.`,
   };
 }
@@ -122,6 +146,7 @@ export function composeLlmPrompt(
     stubbed: false,
     requiresLlm: true,
     citations,
+    guardrail: undefined,
     text: `Preparing a grounded answer from the ${engine} engine…`,
   };
   const hasQuestionPreview = questionPreview.length > 0;
@@ -148,9 +173,94 @@ export function composeGroundedAnswer(
     stubbed: false,
     requiresLlm: false,
     citations,
+    guardrail: undefined,
     text: cleaned.length > 0
       ? cleaned
       : "I received an empty response from the engine — please try rephrasing.",
+  };
+}
+
+function parseOutputJson<T>(value: string | undefined): T | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
+function guardrailMetadata(
+  assessment: AdvisoryGuardrailAssessment,
+): ResponseGuardrailMetadata {
+  return {
+    state: assessment.state,
+    classes: assessment.classes,
+    approvalPath: assessment.approvalPath,
+    reasonCodes: [...assessment.reasonCodes],
+  };
+}
+
+function composePricingGuardrailText(
+  input: ComposeInput,
+  assessment: AdvisoryGuardrailAssessment,
+): string {
+  if (assessment.state === "review_required" || assessment.state === "blocked") {
+    return `${assessment.buyerHeadline}. ${assessment.buyerExplanation}`;
+  }
+
+  const parsed = parseOutputJson<{
+    fairValue?: { value?: number };
+    likelyAccepted?: { value?: number };
+  }>(input.engineRef?.rawOutput);
+  const fairValue = parsed?.fairValue?.value;
+  const likelyAccepted = parsed?.likelyAccepted?.value;
+  if (
+    typeof fairValue === "number" &&
+    Number.isFinite(fairValue) &&
+    typeof likelyAccepted === "number" &&
+    Number.isFinite(likelyAccepted)
+  ) {
+    return `${assessment.buyerHeadline}. The current model centers fair value around ${currency.format(fairValue)} and a likely-accepted zone around ${currency.format(likelyAccepted)}. ${assessment.buyerExplanation}`;
+  }
+
+  return `${assessment.buyerHeadline}. ${assessment.buyerExplanation}`;
+}
+
+function composeOfferGuardrailText(
+  assessment: AdvisoryGuardrailAssessment,
+): string {
+  return `${assessment.buyerHeadline}. ${assessment.buyerExplanation}`;
+}
+
+export function composeGuardrailedResponse(
+  input: ComposeInput,
+  assessment: AdvisoryGuardrailAssessment,
+): ComposedResponse {
+  const citations: string[] = [];
+  if (input.engineRef?.engineOutputId) {
+    citations.push(input.engineRef.engineOutputId);
+  }
+
+  let text = `${assessment.buyerHeadline}. ${assessment.buyerExplanation}`;
+  if (assessment.classes.includes("pricing_sensitive")) {
+    text = composePricingGuardrailText(input, assessment);
+  } else if (
+    assessment.classes.includes("negotiation_sensitive") ||
+    assessment.classes.includes("agreement_legal_adjacent") ||
+    assessment.classes.includes("disclosure_sensitive")
+  ) {
+    text = composeOfferGuardrailText(assessment);
+  }
+
+  return {
+    intent: input.intent,
+    engine: input.engine,
+    stubbed:
+      assessment.state === "review_required" || assessment.state === "blocked",
+    requiresLlm: false,
+    citations,
+    guardrail: guardrailMetadata(assessment),
+    text,
   };
 }
 

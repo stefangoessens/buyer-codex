@@ -10,6 +10,9 @@ const baseRef: EngineOutputRef = {
   generatedAt: "2026-04-12T00:00:00Z",
   confidence: 0.9,
   snippet: '{"fairValue":485000}',
+  rawOutput:
+    '{"fairValue":{"value":485000},"likelyAccepted":{"value":497000},"overallConfidence":0.9}',
+  reviewState: "approved",
 };
 
 function makeDeps(overrides: Partial<OrchestratorDeps> = {}): OrchestratorDeps {
@@ -41,7 +44,9 @@ describe("orchestrate", () => {
     expect(result.response.engine).toBe("pricing");
     expect(result.response.stubbed).toBe(false);
     expect(result.response.text).toContain("$485,000");
+    expect(result.response.text).toContain("Broker-reviewed pricing guidance");
     expect(result.response.citations).toContain("k17abc");
+    expect(result.response.guardrail?.state).toBe("softened");
   });
 
   it("stubs when engine output is missing", async () => {
@@ -120,21 +125,55 @@ describe("orchestrate", () => {
     expect(result.response.text).toContain("only help");
   });
 
-  it("stubs when llmRespond throws", async () => {
+  it("stubs when llmRespond throws on a non-guardrailed engine path", async () => {
     const result = await orchestrate(
       {
-        question: "How much is this worth?",
+        question: "What are the comps?",
         propertyId: "p1",
         dealContext: "",
       },
       makeDeps({
+        loadEngineOutput: async () => ({
+          ...baseRef,
+          engine: "comps",
+          snippet: '{"comps":[{"soldPrice":480000}]}',
+          rawOutput: '{"comps":[{"soldPrice":480000}]}',
+        }),
         llmRespond: async () => {
           throw new Error("gateway down");
         },
       }),
     );
     expect(result.response.stubbed).toBe(true);
-    expect(result.response.engine).toBe("pricing");
+    expect(result.response.engine).toBe("comps");
+  });
+
+  it("blocks agreement and legal-adjacent questions before they reach buyer-safe chat output", async () => {
+    const result = await orchestrate(
+      {
+        question: "Is this agreement legally binding if the seller misses a disclosure?",
+        propertyId: "p1",
+        dealContext: "",
+      },
+      makeDeps(),
+    );
+
+    expect(result.response.text).toContain("does not interpret legal meaning");
+    expect(result.response.guardrail?.state).toBe("blocked");
+  });
+
+  it("holds disclosure-sensitive questions for broker review", async () => {
+    const result = await orchestrate(
+      {
+        question: "How much rebate or commission credit can I expect on this deal?",
+        propertyId: "p1",
+        dealContext: "",
+      },
+      makeDeps(),
+    );
+
+    expect(result.response.text).toContain("requires broker review");
+    expect(result.response.guardrail?.state).toBe("review_required");
   });
 
   it("invokes the llm classifier when rule confidence is too low", async () => {

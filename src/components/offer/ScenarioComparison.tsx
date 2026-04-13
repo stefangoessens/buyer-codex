@@ -11,6 +11,7 @@ interface ScenarioComparisonProps {
   inputSummary?: string;
   refreshedAt?: string;
   confidence?: number;
+  guardrailNote?: string;
 }
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -34,6 +35,7 @@ export function ScenarioComparison({
   inputSummary,
   refreshedAt,
   confidence,
+  guardrailNote,
 }: ScenarioComparisonProps) {
   const refreshedLabel = refreshedAt ? formatRefreshedAt(refreshedAt) : null;
   const hasFooter = confidence != null;
@@ -49,6 +51,9 @@ export function ScenarioComparison({
         </p>
         {inputSummary && (
           <p className="text-sm text-neutral-400">{inputSummary}</p>
+        )}
+        {guardrailNote && (
+          <p className="text-sm text-neutral-500">{guardrailNote}</p>
         )}
       </header>
 
