@@ -70,30 +70,30 @@ async function loadLiveAgreementState(
   type: "none" | "tour_pass" | "full_representation";
   status: "none" | "draft" | "sent" | "signed" | "replaced" | "canceled";
 }> {
-  // Use a looser type for ctx.db since this runs from both query + mutation contexts.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db: any = (ctx as any).db;
+  type AgreementLike = {
+    type: "tour_pass" | "full_representation" | "none";
+    status: "draft" | "sent" | "signed" | "replaced" | "canceled" | "none";
+    signedAt?: string;
+  };
+
+  const db = (ctx as { db: { query: (table: "agreements") => any } }).db;
   const agreements = await db
     .query("agreements")
     .withIndex("by_buyerId", (q: { eq: (field: string, value: unknown) => unknown }) =>
       q.eq("buyerId", buyerId),
     )
-    .collect();
+    .collect() as AgreementLike[];
 
   // Prefer full_representation over tour_pass (stronger grant)
   const signedFullRep = agreements
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .filter((a: any) => a.type === "full_representation" && a.status === "signed")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .sort((a: any, b: any) => (b.signedAt ?? "").localeCompare(a.signedAt ?? ""))
+    .filter((a) => a.type === "full_representation" && a.status === "signed")
+    .sort((a, b) => (b.signedAt ?? "").localeCompare(a.signedAt ?? ""))
     .at(0);
   if (signedFullRep) return { type: "full_representation", status: "signed" };
 
   const signedTourPass = agreements
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .filter((a: any) => a.type === "tour_pass" && a.status === "signed")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .sort((a: any, b: any) => (b.signedAt ?? "").localeCompare(a.signedAt ?? ""))
+    .filter((a) => a.type === "tour_pass" && a.status === "signed")
+    .sort((a, b) => (b.signedAt ?? "").localeCompare(a.signedAt ?? ""))
     .at(0);
   if (signedTourPass) return { type: "tour_pass", status: "signed" };
 
@@ -144,6 +144,38 @@ const ACTIVE_STATUSES: Array<TourRequest["status"]> = [
   "confirmed",
 ];
 
+function normalizeSearchText(value: string | undefined): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function formatPropertyAddress(property: Doc<"properties"> | null): string {
+  if (!property) return "Unknown property";
+  if (property.address.formatted) return property.address.formatted;
+  const street = `${property.address.street}${
+    property.address.unit ? ` ${property.address.unit}` : ""
+  }`;
+  return `${street}, ${property.address.city}, ${property.address.state} ${property.address.zip}`;
+}
+
+function matchesGeographyQuery(
+  property: Doc<"properties"> | null,
+  geographyQuery: string | undefined,
+): boolean {
+  const normalized = normalizeSearchText(geographyQuery);
+  if (normalized.length === 0) return true;
+  if (!property) return false;
+
+  return [
+    property.address.city,
+    property.address.county,
+    property.address.zip,
+    property.address.state,
+    property.address.formatted,
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .some((value) => normalizeSearchText(value).includes(normalized));
+}
+
 // ═══ Auth helper ═══
 
 async function requireInternalUser(
@@ -154,6 +186,87 @@ async function requireInternalUser(
     throw new Error("Showing coordination is internal — broker/admin only");
   }
   return user;
+}
+
+interface WorkspaceFilterArgs {
+  statuses?: TourRequest["status"][];
+  agentId?: TourRequest["agentId"];
+  unassignedOnly?: boolean;
+  assignedOnly?: boolean;
+  minAgeHours?: number;
+  maxAgeHours?: number;
+  hasPrerequisiteFailure?: boolean;
+  staleOnly?: boolean;
+  geographyQuery?: string;
+  limit?: number;
+}
+
+async function filterRequestsForWorkspace(
+  ctx: { db: { query: (table: "tourRequests") => any; get: (id: unknown) => Promise<unknown> } },
+  args: WorkspaceFilterArgs,
+): Promise<TourRequest[]> {
+  const all = (await ctx.db.query("tourRequests").collect()) as TourRequest[];
+  const nowIso = new Date().toISOString();
+  const nowMs = Date.parse(nowIso);
+
+  const statusSet =
+    args.statuses && args.statuses.length > 0
+      ? new Set(args.statuses)
+      : new Set(ACTIVE_STATUSES);
+
+  const liveAgreementCache = new Map<
+    string,
+    Awaited<ReturnType<typeof loadLiveAgreementState>>
+  >();
+  const getLiveFor = async (buyerId: TourRequest["buyerId"]) => {
+    const key = buyerId as unknown as string;
+    if (!liveAgreementCache.has(key)) {
+      liveAgreementCache.set(key, await loadLiveAgreementState(ctx as never, buyerId));
+    }
+    return liveAgreementCache.get(key)!;
+  };
+
+  const filtered: TourRequest[] = [];
+  for (const r of all) {
+    if (!statusSet.has(r.status)) continue;
+    if (args.unassignedOnly && r.agentId) continue;
+    if (args.assignedOnly && !r.agentId) continue;
+    if (args.agentId && r.agentId !== args.agentId) continue;
+    if (args.staleOnly && !isStaleInternal(r, nowIso)) continue;
+
+    if (typeof args.minAgeHours === "number") {
+      const createdMs = Date.parse(r.createdAt);
+      if (Number.isNaN(createdMs)) continue;
+      if (nowMs - createdMs < args.minAgeHours * 60 * 60 * 1000) continue;
+    }
+    if (typeof args.maxAgeHours === "number") {
+      const createdMs = Date.parse(r.createdAt);
+      if (Number.isNaN(createdMs)) continue;
+      if (nowMs - createdMs > args.maxAgeHours * 60 * 60 * 1000) continue;
+    }
+
+    if (args.hasPrerequisiteFailure) {
+      const live = await getLiveFor(r.buyerId);
+      const failures = detectPrereqFailuresInternal(r, nowIso, live);
+      if (failures.length === 0) continue;
+    }
+
+    if (args.geographyQuery) {
+      const property = (await ctx.db.get(r.propertyId)) as Doc<"properties"> | null;
+      if (!matchesGeographyQuery(property, args.geographyQuery)) continue;
+    }
+
+    filtered.push(r);
+  }
+
+  filtered.sort((a, b) => {
+    const aStale = isStaleInternal(a, nowIso) ? 1 : 0;
+    const bStale = isStaleInternal(b, nowIso) ? 1 : 0;
+    if (aStale !== bStale) return bStale - aStale;
+    return a.createdAt.localeCompare(b.createdAt);
+  });
+
+  return filtered.slice(0, args.limit ?? 100);
 }
 
 // ═══ Queries ═══
@@ -230,74 +343,213 @@ export const listFiltered = query({
     ),
     agentId: v.optional(v.id("users")),
     unassignedOnly: v.optional(v.boolean()),
+    assignedOnly: v.optional(v.boolean()),
     minAgeHours: v.optional(v.number()),
     maxAgeHours: v.optional(v.number()),
     hasPrerequisiteFailure: v.optional(v.boolean()),
+    staleOnly: v.optional(v.boolean()),
+    geographyQuery: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
   returns: v.array(v.any()),
   handler: async (ctx, args) => {
     await requireInternalUser(ctx);
+    return await filterRequestsForWorkspace(ctx as never, args);
+  },
+});
 
-    const all = await ctx.db.query("tourRequests").collect();
-    const nowIso = new Date().toISOString();
-    const nowMs = Date.parse(nowIso);
-
-    const statusSet =
-      args.statuses && args.statuses.length > 0
-        ? new Set(args.statuses)
-        : new Set(ACTIVE_STATUSES);
-
-    // For hasPrerequisiteFailure filtering, we need live agreement state
-    // per buyer. Build a cache so we only query agreements once per buyer.
-    const liveAgreementCache = new Map<
-      string,
-      Awaited<ReturnType<typeof loadLiveAgreementState>>
-    >();
-    const getLiveFor = async (buyerId: TourRequest["buyerId"]) => {
-      const key = buyerId as unknown as string;
-      if (!liveAgreementCache.has(key)) {
-        liveAgreementCache.set(key, await loadLiveAgreementState(ctx, buyerId));
+/**
+ * Enriched showing-coordination workspace rows. Builds on the same
+ * backend filters as `listFiltered` but joins the request with buyer,
+ * property, assignment, and latest-note context so the admin UI can
+ * render one typed workspace without client-side fan-out queries.
+ */
+export const listWorkspace = query({
+  args: {
+    statuses: v.optional(
+      v.array(
+        v.union(
+          v.literal("draft"),
+          v.literal("submitted"),
+          v.literal("blocked"),
+          v.literal("assigned"),
+          v.literal("confirmed"),
+          v.literal("completed"),
+          v.literal("canceled"),
+          v.literal("failed"),
+        ),
+      ),
+    ),
+    agentId: v.optional(v.id("users")),
+    unassignedOnly: v.optional(v.boolean()),
+    assignedOnly: v.optional(v.boolean()),
+    minAgeHours: v.optional(v.number()),
+    maxAgeHours: v.optional(v.number()),
+    hasPrerequisiteFailure: v.optional(v.boolean()),
+    staleOnly: v.optional(v.boolean()),
+    geographyQuery: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  returns: v.object({
+    rows: v.array(v.any()),
+    generatedAt: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    await requireInternalUser(ctx);
+    const filtered = await filterRequestsForWorkspace(ctx as never, args);
+    const allNotes = await ctx.db.query("showingCoordinatorNotes").collect();
+    const latestNoteByRequest = new Map<string, Doc<"showingCoordinatorNotes">>();
+    for (const note of allNotes) {
+      const key = note.tourRequestId as unknown as string;
+      const existing = latestNoteByRequest.get(key);
+      if (!existing || note.createdAt > existing.createdAt) {
+        latestNoteByRequest.set(key, note);
       }
-      return liveAgreementCache.get(key)!;
-    };
-
-    const filtered: TourRequest[] = [];
-    for (const r of all) {
-      if (!statusSet.has(r.status)) continue;
-      if (args.unassignedOnly && r.agentId) continue;
-      if (args.agentId && r.agentId !== args.agentId) continue;
-
-      if (typeof args.minAgeHours === "number") {
-        const createdMs = Date.parse(r.createdAt);
-        if (Number.isNaN(createdMs)) continue;
-        if (nowMs - createdMs < args.minAgeHours * 60 * 60 * 1000) continue;
-      }
-      if (typeof args.maxAgeHours === "number") {
-        const createdMs = Date.parse(r.createdAt);
-        if (Number.isNaN(createdMs)) continue;
-        if (nowMs - createdMs > args.maxAgeHours * 60 * 60 * 1000) continue;
-      }
-
-      if (args.hasPrerequisiteFailure) {
-        const live = await getLiveFor(r.buyerId);
-        const failures = detectPrereqFailuresInternal(r, nowIso, live);
-        if (failures.length === 0) continue;
-      }
-
-      filtered.push(r);
     }
 
-    // Sort: stale first, then oldest createdAt first
-    const sorted = filtered.sort((a, b) => {
-      const aStale = isStaleInternal(a, nowIso) ? 1 : 0;
-      const bStale = isStaleInternal(b, nowIso) ? 1 : 0;
-      if (aStale !== bStale) return bStale - aStale;
-      return a.createdAt.localeCompare(b.createdAt);
-    });
+    const propertyCache = new Map<string, Doc<"properties"> | null>();
+    const userCache = new Map<string, Doc<"users"> | null>();
+    const assignmentCache = new Map<string, Doc<"tourAssignments"> | null>();
 
-    const limit = args.limit ?? 100;
-    return sorted.slice(0, limit);
+    const loadProperty = async (propertyId: TourRequest["propertyId"]) => {
+      const key = propertyId as unknown as string;
+      if (!propertyCache.has(key)) {
+        propertyCache.set(
+          key,
+          ((await ctx.db.get(propertyId)) as Doc<"properties"> | null) ?? null,
+        );
+      }
+      return propertyCache.get(key) ?? null;
+    };
+
+    const loadUser = async (
+      userId: TourRequest["buyerId"] | TourRequest["agentId"] | Doc<"showingCoordinatorNotes">["authorId"],
+    ) => {
+      if (!userId) return null;
+      const key = userId as unknown as string;
+      if (!userCache.has(key)) {
+        userCache.set(key, ((await ctx.db.get(userId)) as Doc<"users"> | null) ?? null);
+      }
+      return userCache.get(key) ?? null;
+    };
+
+    const loadAssignment = async (assignmentId: TourRequest["currentAssignmentId"]) => {
+      if (!assignmentId) return null;
+      const key = assignmentId as unknown as string;
+      if (!assignmentCache.has(key)) {
+        assignmentCache.set(
+          key,
+          ((await ctx.db.get(assignmentId)) as Doc<"tourAssignments"> | null) ??
+            null,
+        );
+      }
+      return assignmentCache.get(key) ?? null;
+    };
+
+    const nowIso = new Date().toISOString();
+    const nowMs = Date.parse(nowIso);
+    const rows = await Promise.all(
+      filtered.map(async (request) => {
+        const property = await loadProperty(request.propertyId);
+        const buyer = await loadUser(request.buyerId);
+        const assignedAgent = await loadUser(request.agentId);
+        const assignment = await loadAssignment(request.currentAssignmentId);
+        const latestNote = latestNoteByRequest.get(request._id as unknown as string);
+        const latestNoteAuthor = latestNote
+          ? await loadUser(latestNote.authorId)
+          : null;
+        const liveAgreement = await loadLiveAgreementState(ctx, request.buyerId);
+        const failures = detectPrereqFailuresInternal(request, nowIso, liveAgreement);
+        const createdMs = Date.parse(request.createdAt);
+        const ageHours =
+          Number.isNaN(createdMs) || Number.isNaN(nowMs)
+            ? null
+            : Math.max(0, Math.floor((nowMs - createdMs) / (60 * 60 * 1000)));
+
+        return {
+          requestId: request._id,
+          dealRoomId: request.dealRoomId,
+          propertyId: request.propertyId,
+          buyerId: request.buyerId,
+          agentId: request.agentId ?? null,
+          currentAssignmentId: request.currentAssignmentId ?? null,
+          currentAssignmentStatus: assignment?.status ?? null,
+          assignmentRoutingPath:
+            assignment?.routingPath ?? request.assignmentRoutingPath ?? null,
+          propertyAddress: formatPropertyAddress(property),
+          geography: property
+            ? {
+                city: property.address.city,
+                county: property.address.county ?? null,
+                state: property.address.state,
+                zip: property.address.zip,
+              }
+            : null,
+          buyerName: buyer?.name ?? "Unknown buyer",
+          assignedAgentName: assignedAgent?.name ?? null,
+          status: request.status,
+          blockingReason: request.blockingReason ?? null,
+          failureReason: request.failureReason ?? null,
+          preferredWindows: request.preferredWindows,
+          attendeeCount: request.attendeeCount,
+          buyerNotes: request.buyerNotes ?? null,
+          createdAt: request.createdAt,
+          updatedAt: request.updatedAt,
+          submittedAt: request.submittedAt ?? null,
+          assignedAt: request.assignedAt ?? null,
+          confirmedAt: request.confirmedAt ?? null,
+          ageHours,
+          isStale: isStaleInternal(request, nowIso),
+          prerequisiteFailures: failures,
+          latestCoordinatorNote: latestNote
+            ? {
+                body: latestNote.body,
+                category: latestNote.category,
+                createdAt: latestNote.createdAt,
+                authorName: latestNoteAuthor?.name ?? "Unknown user",
+              }
+            : null,
+        };
+      }),
+    );
+
+    return {
+      rows,
+      generatedAt: nowIso,
+    };
+  },
+});
+
+export const listAssignableAgents = query({
+  args: {},
+  returns: v.array(v.any()),
+  handler: async (ctx) => {
+    await requireInternalUser(ctx);
+
+    const coverages = await ctx.db
+      .query("agentCoverage")
+      .withIndex("by_isActive", (q) => q.eq("isActive", true))
+      .collect();
+
+    const seen = new Set<string>();
+    const options = [];
+    for (const coverage of coverages) {
+      const key = coverage.agentId as unknown as string;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const user = (await ctx.db.get(coverage.agentId)) as Doc<"users"> | null;
+      if (!user) continue;
+
+      options.push({
+        agentId: coverage.agentId,
+        name: user.name,
+        brokerage: coverage.brokerage,
+        geographyCount: coverage.coverageAreas.length,
+      });
+    }
+
+    return options.sort((a, b) => a.name.localeCompare(b.name));
   },
 });
 

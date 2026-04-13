@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   QUEUE_STATUSES,
@@ -17,6 +17,17 @@ import {
   filterToSearchParams,
   type QueueFilterState,
 } from "@/lib/admin/queueFilters";
+import {
+  DEFAULT_SHOWING_COORDINATION_FILTER_STATE,
+  SHOWING_COORDINATION_AGE_FILTERS,
+  SHOWING_COORDINATION_AGE_LABELS,
+  SHOWING_COORDINATION_ASSIGNMENT_FILTERS,
+  SHOWING_COORDINATION_ASSIGNMENT_LABELS,
+  SHOWING_COORDINATION_STATUS_FILTERS,
+  SHOWING_COORDINATION_STATUS_LABELS,
+  showingCoordinationFilterToSearchParams,
+  type ShowingCoordinationFilterState,
+} from "@/lib/tours/coordinationFilters";
 
 interface QueueFiltersProps {
   filter: QueueFilterState;
@@ -24,6 +35,18 @@ interface QueueFiltersProps {
   hideQueueKey?: boolean;
   /** Bind each link to this queue key — used when the page already fixes one queue. */
   pinnedQueueKey?: QueueKey;
+}
+
+interface ShowingCoordinationAgentOption {
+  agentId: string;
+  name: string;
+  brokerage?: string;
+}
+
+interface ShowingCoordinationFiltersProps {
+  mode: "showingCoordination";
+  filter: ShowingCoordinationFilterState;
+  agents: ShowingCoordinationAgentOption[];
 }
 
 function pillHref(
@@ -81,7 +104,23 @@ function PillGroup<T extends string>({
  * `<Link>` so filter state is shareable via URL and the page owner
  * does not need client-side state. Resetting drops all params.
  */
-export function QueueFilters({
+export function QueueFilters(
+  props: QueueFiltersProps | ShowingCoordinationFiltersProps,
+) {
+  if ("mode" in props && props.mode === "showingCoordination") {
+    return (
+      <ShowingCoordinationFilters
+        mode="showingCoordination"
+        filter={props.filter}
+        agents={props.agents}
+      />
+    );
+  }
+
+  return <GenericQueueFilters {...(props as QueueFiltersProps)} />;
+}
+
+function GenericQueueFilters({
   filter,
   hideQueueKey = false,
   pinnedQueueKey,
@@ -140,4 +179,136 @@ export function QueueFilters({
   );
 }
 
+function ShowingCoordinationFilters({
+  filter,
+  agents,
+}: ShowingCoordinationFiltersProps) {
+  const pathname = usePathname() ?? "/queues/tour_dispute";
+  const router = useRouter();
+
+  const pillHref = (
+    patch: Partial<ShowingCoordinationFilterState>,
+  ): string => {
+    const next = { ...filter, ...patch };
+    const params = showingCoordinationFilterToSearchParams(next);
+    const qs = new URLSearchParams(params).toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  };
+
+  return (
+    <div className="mb-6 rounded-xl border border-neutral-200 bg-white p-5">
+      <div className="grid gap-5 xl:grid-cols-2">
+        <PillGroup
+          label="Status"
+          options={SHOWING_COORDINATION_STATUS_FILTERS.map((value) => ({
+            value,
+            label: SHOWING_COORDINATION_STATUS_LABELS[value],
+          }))}
+          active={filter.status}
+          buildHref={(value) => pillHref({ status: value })}
+        />
+        <PillGroup
+          label="Assignment"
+          options={SHOWING_COORDINATION_ASSIGNMENT_FILTERS.map((value) => ({
+            value,
+            label: SHOWING_COORDINATION_ASSIGNMENT_LABELS[value],
+          }))}
+          active={filter.assignment}
+          buildHref={(value) => pillHref({ assignment: value })}
+        />
+        <PillGroup
+          label="Age"
+          options={SHOWING_COORDINATION_AGE_FILTERS.map((value) => ({
+            value,
+            label: SHOWING_COORDINATION_AGE_LABELS[value],
+          }))}
+          active={filter.age}
+          buildHref={(value) => pillHref({ age: value })}
+        />
+        <PillGroup
+          label="Prerequisites"
+          options={[
+            { value: "all", label: "All requests" },
+            { value: "needs_attention", label: "Needs attention" },
+          ]}
+          active={filter.hasPrerequisiteFailure ? "needs_attention" : "all"}
+          buildHref={(value) =>
+            pillHref({ hasPrerequisiteFailure: value === "needs_attention" })
+          }
+        />
+      </div>
+      <form
+        className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          const agentId = String(formData.get("agent") ?? "");
+          const geographyQuery = String(formData.get("geo") ?? "");
+          const params = showingCoordinationFilterToSearchParams({
+            ...filter,
+            agentId,
+            geographyQuery,
+          });
+          const qs = new URLSearchParams(params).toString();
+          router.push(qs ? `${pathname}?${qs}` : pathname);
+        }}
+      >
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor="coordination-geo"
+            className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500"
+          >
+            Geography
+          </label>
+          <input
+            id="coordination-geo"
+            name="geo"
+            defaultValue={filter.geographyQuery}
+            placeholder="City, county, state, or ZIP"
+            className="h-10 rounded-md border border-neutral-200 bg-white px-3 text-sm text-neutral-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor="coordination-agent"
+            className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500"
+          >
+            Assigned Agent
+          </label>
+          <select
+            id="coordination-agent"
+            name="agent"
+            defaultValue={filter.agentId}
+            className="h-10 rounded-md border border-neutral-200 bg-white px-3 text-sm text-neutral-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+          >
+            <option value="">All agents</option>
+            {agents.map((agent) => (
+              <option key={agent.agentId} value={agent.agentId}>
+                {agent.name}
+                {agent.brokerage ? ` · ${agent.brokerage}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="submit"
+          className="inline-flex h-10 items-center justify-center rounded-md bg-primary-600 px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+        >
+          Apply
+        </button>
+      </form>
+      <div className="mt-4 flex items-center justify-between gap-2 text-xs text-neutral-500">
+        <span>Filter by status, age, assignment, geography, and prerequisite state.</span>
+        <Link
+          href={pathname}
+          className="font-medium text-primary-600 hover:text-primary-700"
+        >
+          Reset filters
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export { DEFAULT_FILTER_STATE };
+export { DEFAULT_SHOWING_COORDINATION_FILTER_STATE };
