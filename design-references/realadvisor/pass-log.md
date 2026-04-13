@@ -34,3 +34,22 @@
 
 - Coverage did not stabilize because the reference UI never became accessible.
 - This is an active blocker, not an ambiguous capture gap.
+
+## Pass 4
+
+- Date: 2026-04-13 re-check
+- Environment: fresh isolated Chrome DevTools context (`ra-check-2`)
+- Emulation:
+  - viewport `1440x1200`
+  - user agent `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36`
+- Route:
+  - `https://realadvisor.ch/en/find-agent`
+- Result:
+  - Cloudflare briefly entered an automatic "Verifying..." state
+  - the page then fell back to the manual checkbox challenge
+  - clicking the checkbox again left it in a checked/disabled state but still never released the real page
+  - waiting `60s` for `Find the best real estate agent` still timed out
+
+Conclusion:
+
+- The blocker is still active after a fresh isolated-context retry.

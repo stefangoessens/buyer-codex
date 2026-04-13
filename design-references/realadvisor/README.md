@@ -14,6 +14,7 @@ Routes attempted:
 Observed behavior:
 
 - Chrome DevTools lands on "Just a moment..." / "Performing security verification"
+- In a fresh isolated browser context with a normal desktop Chrome user agent, the page may briefly switch to Cloudflare "Verifying..." and then fall back to the checkbox challenge
 - Interacting with the verification checkbox does not release the page into the real product UI
 - Raw `curl -L -A 'Mozilla/5.0'` requests return `HTTP/2 403`
 - Response headers include `cf-mitigated: challenge`
