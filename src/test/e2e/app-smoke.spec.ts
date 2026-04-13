@@ -4,23 +4,25 @@ test.describe("App smoke", () => {
   test("homepage renders the hero CTA", async ({ page }) => {
     await page.goto("/");
 
+    const hero = page.getByTestId("homepage-hero");
+
     await expect(page.getByRole("banner")).toBeVisible();
-    await expect(page.locator("h1")).toContainText("Florida home");
     await expect(
-      page.getByRole("button", { name: "Get free analysis" }).first(),
+      hero.getByRole("heading", { name: /Get the best deal on your Florida home/i }),
     ).toBeVisible();
+    await expect(hero.getByRole("button", { name: "Get free analysis" })).toBeVisible();
   });
 
   test("homepage hero accepts a supported listing URL and routes into intake", async ({
     page,
   }) => {
     await page.goto("/");
+    const hero = page.getByTestId("homepage-hero");
 
-    await page
+    await hero
       .getByPlaceholder("Paste a Zillow, Redfin, or Realtor.com link...")
-      .first()
       .fill("https://www.zillow.com/homedetails/123456_zpid/");
-    await page.getByRole("button", { name: "Get free analysis" }).first().click();
+    await hero.getByRole("button", { name: "Get free analysis" }).click();
 
     await expect(page).toHaveURL(/\/intake\?url=.*source=hero.*submittedAt=/);
     await expect(page.getByText("Listing:")).toBeVisible();
@@ -30,12 +32,12 @@ test.describe("App smoke", () => {
     page,
   }) => {
     await page.goto("/");
+    const hero = page.getByTestId("homepage-hero");
 
-    await page
+    await hero
       .getByPlaceholder("Paste a Zillow, Redfin, or Realtor.com link...")
-      .first()
       .fill("https://example.com/listing/123");
-    await page.getByRole("button", { name: "Get free analysis" }).first().click();
+    await hero.getByRole("button", { name: "Get free analysis" }).click();
 
     await expect(
       page.getByText("Paste a Zillow, Redfin, or Realtor.com listing link."),
@@ -52,9 +54,10 @@ test.describe("App smoke", () => {
 
   test("get-started and admin preview surfaces render", async ({ page }) => {
     await page.goto("/get-started");
-    await expect(page.locator("h1")).toContainText(
-      "Paste a link. Get instant analysis.",
-    );
+
+    await expect(
+      page.getByRole("heading", { name: "Paste a link. Get instant analysis." }),
+    ).toBeVisible();
 
     await page.goto("/preview");
     await expect(page.getByRole("heading", { name: "Broker Console Preview" })).toBeVisible();

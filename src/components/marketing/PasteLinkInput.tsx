@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
 import type { LinkPastedSource } from "@buyer-codex/shared/launch-events";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import {
   trackPasteSubmitted,
 } from "@/lib/intake/pasteLinkFunnel";
 import { track } from "@/lib/analytics";
+import { convex } from "@/lib/convex";
 
 interface PasteLinkInputProps {
   onSubmit?: (submission: PreparedListingIntakeSubmissionSuccess) => void;
@@ -29,10 +29,25 @@ export function PasteLinkInput({
 }: PasteLinkInputProps) {
   const [value, setValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const recordAttemptFailure = useMutation(api.intake.recordAttemptFailure);
 
   const isHero = variant === "hero";
   const canSubmit = value.trim().length > 0;
+
+  async function recordParserFailure(url: string, submittedAt: string) {
+    if (!convex) {
+      return;
+    }
+
+    try {
+      await convex.mutation(api.intake.recordAttemptFailure, {
+        url,
+        source: variant,
+        submittedAt,
+      });
+    } catch {
+      // Metrics must never block the inline recovery path.
+    }
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,13 +56,7 @@ export function PasteLinkInput({
     const submission = prepareListingIntakeSubmission(value, variant);
     if (!submission.ok) {
       setErrorMessage(submission.message);
-      void recordAttemptFailure({
-        url: value,
-        source: variant,
-        submittedAt,
-      }).catch(() => {
-        // Metrics must never block the inline recovery path.
-      });
+      void recordParserFailure(value, submittedAt);
       return;
     }
 
