@@ -9,6 +9,8 @@ import {
 } from "../src/lib/enrichment/jobContext";
 import { canonicalizeAgentId } from "../src/lib/enrichment/listingAgentStats";
 import { computeNeighborhoodContext } from "../src/lib/enrichment/neighborhoodStats";
+import { normalizeBrowserUseFallbackResult } from "../src/lib/enrichment/fallback";
+import { mergeSourceRecords } from "../src/lib/intake/merge";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Source / priority registries (must match src/lib/enrichment/types.ts)
@@ -1350,9 +1352,39 @@ export const persistJobResult = internalMutation({
         resultRef = JSON.stringify(ids);
         break;
       }
-      case "browser_use_fallback":
-        resultRef = undefined;
+      case "browser_use_fallback": {
+        const normalized = normalizeBrowserUseFallbackResult(payload);
+        if (!normalized) {
+          throw new Error("Invalid browser_use_fallback payload");
+        }
+
+        const mergeResult = mergeSourceRecords([
+          {
+            sourcePlatform: "browser_use_fallback",
+            fetchedAt: normalized.capturedAt,
+            data: normalized.canonicalFields,
+          },
+        ]);
+
+        await ctx.runMutation(internal.propertyMerge.mergeIntoProperty, {
+          propertyId: job.propertyId,
+          mergedFields: mergeResult.mergedFields,
+          provenance: mergeResult.provenance,
+          conflictCount: mergeResult.conflicts.length,
+        });
+
+        resultRef = JSON.stringify({
+          sourceUrl: normalized.sourceUrl,
+          portal: normalized.portal,
+          reason: normalized.reason,
+          confidence: normalized.confidence,
+          capturedAt: normalized.capturedAt,
+          evidenceCount: normalized.evidence.length,
+          mergedFieldCount: Object.keys(mergeResult.mergedFields).length,
+          citation: args.citation,
+        });
         break;
+      }
     }
 
     await markJobSucceededRow({

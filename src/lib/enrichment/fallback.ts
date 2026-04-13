@@ -14,6 +14,8 @@
  */
 
 import {
+  FALLBACK_REASONS,
+  type BrowserUseFallbackResult,
   type EnrichmentErrorCode,
   type FallbackReason,
   type PortalName,
@@ -50,6 +52,12 @@ export interface EscalationInput {
   /** Set to true when the portal is on our known-unsupported list. */
   unsupportedPortal?: boolean;
   now?: Date;
+}
+
+export interface NormalizedBrowserUseFallbackResult
+  extends Omit<BrowserUseFallbackResult, "canonicalFields" | "evidence"> {
+  canonicalFields: Record<string, unknown>;
+  evidence: BrowserUseFallbackResult["evidence"];
 }
 
 /**
@@ -140,6 +148,45 @@ export function errorCodeToFallbackReason(
 }
 
 /**
+ * Normalize the Browser Use worker payload into the canonical property-field
+ * subset consumed by the merge pipeline. Accepts either the worker's nested
+ * `{ result }` payload or a flat `BrowserUseFallbackResult` object.
+ */
+export function normalizeBrowserUseFallbackResult(
+  payload: unknown,
+): NormalizedBrowserUseFallbackResult | null {
+  const candidate = unwrapBrowserUseFallbackResult(payload);
+  if (!candidate) return null;
+
+  const {
+    sourceUrl,
+    portal,
+    canonicalFields,
+    confidence,
+    evidence,
+    reason,
+    capturedAt,
+  } = candidate;
+
+  if (typeof sourceUrl !== "string" || sourceUrl.length === 0) return null;
+  if (!isPortalOrUnknown(portal)) return null;
+  if (!isPlainObject(canonicalFields)) return null;
+  if (typeof confidence !== "number" || !Number.isFinite(confidence)) return null;
+  if (!isFallbackReason(reason)) return null;
+  if (typeof capturedAt !== "string" || capturedAt.length === 0) return null;
+
+  return {
+    sourceUrl,
+    portal,
+    canonicalFields: compactCanonicalFields(canonicalFields),
+    confidence,
+    evidence: normalizeEvidence(evidence),
+    reason,
+    capturedAt,
+  };
+}
+
+/**
  * Dedupe key for a Browser Use fallback job. Scoped by
  * (propertyId, sourceUrl, attempt-bucket) so retries of the same failure
  * collapse into the same job within a single hour, but successive attempts
@@ -185,3 +232,60 @@ export const ESCALATION_SKIP_LABELS: Record<string, string> = {
   "no_mapping_for_error_code:unknown":
     "Extractor returned unknown error — operator review required",
 };
+
+function unwrapBrowserUseFallbackResult(
+  payload: unknown,
+): Partial<BrowserUseFallbackResult> | null {
+  if (!isPlainObject(payload)) return null;
+  if (isPlainObject(payload.result)) {
+    return payload.result as Partial<BrowserUseFallbackResult>;
+  }
+  return payload as Partial<BrowserUseFallbackResult>;
+}
+
+function compactCanonicalFields(
+  fields: Record<string, unknown>,
+): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null || value === "") continue;
+    normalized[key] = value;
+  }
+  return normalized;
+}
+
+function normalizeEvidence(
+  evidence: unknown,
+): BrowserUseFallbackResult["evidence"] {
+  if (!Array.isArray(evidence)) return [];
+  return evidence.filter(
+    (
+      entry,
+    ): entry is BrowserUseFallbackResult["evidence"][number] =>
+      isPlainObject(entry) &&
+      (entry.kind === "screenshot" ||
+        entry.kind === "html" ||
+        entry.kind === "json") &&
+      typeof entry.url === "string" &&
+      entry.url.length > 0,
+  );
+}
+
+function isFallbackReason(value: unknown): value is FallbackReason {
+  return typeof value === "string" && FALLBACK_REASONS.includes(value as FallbackReason);
+}
+
+function isPortalOrUnknown(value: unknown): value is PortalName | "unknown" {
+  return (
+    value === "zillow" ||
+    value === "redfin" ||
+    value === "realtor" ||
+    value === "unknown"
+  );
+}
+
+function isPlainObject(
+  value: unknown,
+): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
