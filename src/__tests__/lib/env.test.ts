@@ -1,5 +1,7 @@
 import {
+  extractionServiceEnvSpec,
   requireEnvKeys,
+  resolveDeploymentStage,
   validateEnv,
   webPublicEnvSpec,
   webServerEnvSpec,
@@ -65,5 +67,40 @@ describe("environment contracts", () => {
 
     expect(value.ANTHROPIC_API_KEY).toBe("anthropic_test");
     expect(value.OPENAI_API_KEY).toBe("openai_test");
+  });
+
+  it("rejects unsupported buyer-codex stages", () => {
+    const issues = validateEnv(webServerEnvSpec, {
+      BUYER_CODEX_ENV: "qa",
+    });
+
+    expect(issues).toContainEqual({
+      key: "BUYER_CODEX_ENV",
+      message: "BUYER_CODEX_ENV must be one of: local, preview, staging, production.",
+    });
+  });
+
+  it("documents extraction service env defaults through the shared config package", () => {
+    const issues = validateEnv(extractionServiceEnvSpec, {
+      BUYER_CODEX_ENV: "staging",
+      CORS_ORIGINS: "https://web-staging.example",
+    });
+
+    expect(issues).toEqual([]);
+  });
+
+  it("prefers Railway environment metadata when resolving deployment stages", () => {
+    expect(
+      resolveDeploymentStage({
+        BUYER_CODEX_ENV: "production",
+        RAILWAY_ENVIRONMENT_NAME: "preview-pr-123",
+      }),
+    ).toBe("preview");
+
+    expect(
+      resolveDeploymentStage({
+        BUYER_CODEX_ENV: "staging",
+      }),
+    ).toBe("staging");
   });
 });

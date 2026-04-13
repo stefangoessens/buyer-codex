@@ -14,6 +14,7 @@ except ImportError:  # pragma: no cover - optional runtime integration
 
 REDACTED = "[REDACTED]"
 _PII_PATTERNS = ("authorization", "cookie", "token", "secret", "email", "phone")
+_DEPLOYMENT_STAGES = ("local", "preview", "staging", "production")
 
 logger = logging.getLogger("buyer_codex.extraction")
 if not logging.getLogger().handlers:
@@ -43,6 +44,36 @@ def _redact_dict(payload: dict[str, Any]) -> dict[str, Any]:
     return scrubbed
 
 
+def _normalize_stage(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized = value.strip().lower()
+    if not normalized:
+        return None
+
+    if normalized in _DEPLOYMENT_STAGES:
+        return normalized
+
+    if (
+        normalized.startswith("pr-")
+        or normalized.startswith("preview")
+        or "-preview" in normalized
+    ):
+        return "preview"
+
+    if normalized == "prod":
+        return "production"
+
+    if normalized == "stage":
+        return "staging"
+
+    if normalized in {"development", "dev", "test"}:
+        return "local"
+
+    return None
+
+
 @dataclass(slots=True, frozen=True)
 class ObservabilityContext:
     service: str
@@ -53,19 +84,26 @@ class ObservabilityContext:
 
 
 def resolve_context(default_service: str, version: str) -> ObservabilityContext:
+    railway_environment = _first_value(
+        os.getenv("RAILWAY_ENVIRONMENT_NAME"),
+        os.getenv("RAILWAY_ENVIRONMENT"),
+    )
+    explicit_environment = _first_value(
+        os.getenv("SENTRY_ENVIRONMENT"),
+        os.getenv("BUYER_CODEX_ENV"),
+        os.getenv("NODE_ENV"),
+    )
+
     environment = (
-        _first_value(
-            os.getenv("SENTRY_ENVIRONMENT"),
-            os.getenv("RAILWAY_ENVIRONMENT_NAME"),
-            os.getenv("RAILWAY_ENVIRONMENT"),
-            os.getenv("NODE_ENV"),
-        )
-        or "development"
+        _normalize_stage(railway_environment)
+        or _normalize_stage(explicit_environment)
+        or "local"
     )
     deployment = (
         _first_value(
             os.getenv("RAILWAY_ENVIRONMENT_NAME"),
             os.getenv("RAILWAY_ENVIRONMENT"),
+            os.getenv("BUYER_CODEX_ENV"),
             os.getenv("NODE_ENV"),
         )
         or environment

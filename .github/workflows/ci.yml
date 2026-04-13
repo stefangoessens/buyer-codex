@@ -251,6 +251,7 @@ jobs:
       - quality-gates
     if: |
       github.event_name == 'pull_request' &&
+      vars.PREVIEW_WEB_URL_TEMPLATE != '' &&
       (
         needs.changes.outputs.ci == 'true' ||
         needs.changes.outputs.web == 'true' ||
@@ -286,6 +287,7 @@ jobs:
       - quality-gates
     if: |
       github.event_name == 'pull_request' &&
+      vars.PREVIEW_EXTRACTION_URL_TEMPLATE != '' &&
       (
         needs.changes.outputs.ci == 'true' ||
         needs.changes.outputs.workers == 'true'
@@ -328,6 +330,8 @@ jobs:
           PREVIEW_WEB_RESULT: ${{ needs.preview-web.result }}
           PREVIEW_WORKERS_RESULT: ${{ needs.preview-workers.result }}
           QUALITY_RESULT: ${{ needs.quality-gates.result }}
+          PREVIEW_WEB_TEMPLATE: ${{ vars.PREVIEW_WEB_URL_TEMPLATE }}
+          PREVIEW_EXTRACTION_TEMPLATE: ${{ vars.PREVIEW_EXTRACTION_URL_TEMPLATE }}
         run: |
           echo "quality=$QUALITY_RESULT"
           echo "preview-web=$PREVIEW_WEB_RESULT"
@@ -339,5 +343,15 @@ jobs:
               exit 1
             fi
           done
+
+          {
+            echo "## Preview verification"
+            echo ""
+            echo "- Quality gates: $QUALITY_RESULT"
+            echo "- Web preview template configured: $([ -n \"$PREVIEW_WEB_TEMPLATE\" ] && echo yes || echo no)"
+            echo "- Worker preview template configured: $([ -n \"$PREVIEW_EXTRACTION_TEMPLATE\" ] && echo yes || echo no)"
+            echo "- Web preview result: $PREVIEW_WEB_RESULT"
+            echo "- Worker preview result: $PREVIEW_WORKERS_RESULT"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           echo "Preview workflow is ready for promotion."
