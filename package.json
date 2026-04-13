@@ -1,0 +1,19 @@
+{
+  "name": "buyer-codex-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Linear -> Codex -> GitHub automation runner",
+  "scripts": {
+    "doctor": "node src/cli.mjs doctor",
+    "pick": "node src/cli.mjs pick",
+    "once": "node src/cli.mjs once",
+    "loop": "node src/cli.mjs loop"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "convex": "^1.35.1"
+  }
+}

@@ -1,6 +1,9 @@
 .DS_Store
 .env
+.env.local
 .env.*
+!.env.example
+.runs
 node_modules/
 .next/
 dist/
