@@ -1,9 +1,9 @@
 /**
- * Manual address intake (KIN-775).
+ * Manual address intake (KIN-898).
  *
  * Mutations that accept a user-typed address, normalize it server-side,
- * create a sourceListing row, and return a confidence-aware match result
- * against the existing properties table.
+ * create a sourceListing row, and return an explicit confidence-aware
+ * resolution against the existing properties table.
  *
  * This module is deliberately independent of convex/intake.ts so the URL
  * and address intake surfaces can evolve separately.
@@ -15,12 +15,15 @@ import type { Doc, Id } from "./_generated/dataModel";
 import {
   normalizeAddress,
   matchAddress,
+  resolveAddressMatch,
   type AddressMatchCandidate,
+  type AddressMatchFallbackReason,
+  type AddressMatchResolution,
   type CanonicalAddress,
-  type MatchConfidence,
+  type ScoredAddressMatchCandidate,
 } from "./lib/addressMatch";
 
-const canonicalAddressValidator = v.object({
+const canonicalAddressInputValidator = v.object({
   street: v.string(),
   unit: v.optional(v.string()),
   city: v.string(),
@@ -30,9 +33,19 @@ const canonicalAddressValidator = v.object({
   formatted: v.optional(v.string()),
 });
 
+const canonicalAddressValidator = v.object({
+  street: v.string(),
+  unit: v.optional(v.string()),
+  city: v.string(),
+  state: v.string(),
+  zip: v.string(),
+  county: v.optional(v.string()),
+  formatted: v.string(),
+});
+
 const createAddressIntakeArgs = v.object({
   address: v.union(
-    canonicalAddressValidator,
+    canonicalAddressInputValidator,
     v.object({ raw: v.string() }),
   ),
   userId: v.optional(v.id("users")),
@@ -40,17 +53,11 @@ const createAddressIntakeArgs = v.object({
 
 const matchCandidateReturn = v.object({
   propertyId: v.id("properties"),
-  canonical: v.object({
-    street: v.string(),
-    unit: v.optional(v.string()),
-    city: v.string(),
-    state: v.string(),
-    zip: v.string(),
-    county: v.optional(v.string()),
-    formatted: v.string(),
-  }),
+  canonical: canonicalAddressValidator,
   score: v.number(),
 });
+
+const optionalMatchCandidateReturn = v.union(matchCandidateReturn, v.null());
 
 const createAddressIntakeReturn = v.union(
   v.object({
@@ -60,17 +67,33 @@ const createAddressIntakeReturn = v.union(
       v.literal("exact"),
       v.literal("high"),
     ),
+    score: v.number(),
     intakeId: v.id("sourceListings"),
     canonical: canonicalAddressValidator,
   }),
   v.object({
-    status: v.literal("ambiguous"),
+    status: v.literal("review_required"),
+    reason: v.union(
+      v.literal("ambiguous_match"),
+      v.literal("low_confidence_match"),
+    ),
+    confidence: v.union(
+      v.literal("high"),
+      v.literal("medium"),
+      v.literal("low"),
+    ),
+    score: v.number(),
+    bestMatch: matchCandidateReturn,
     candidates: v.array(matchCandidateReturn),
     intakeId: v.id("sourceListings"),
     canonical: canonicalAddressValidator,
   }),
   v.object({
     status: v.literal("no_match"),
+    reason: v.literal("no_match"),
+    confidence: v.literal("none"),
+    score: v.number(),
+    bestMatch: optionalMatchCandidateReturn,
     intakeId: v.id("sourceListings"),
     canonical: canonicalAddressValidator,
   }),
@@ -84,6 +107,31 @@ const createAddressIntakeReturn = v.union(
     ),
   }),
 );
+
+const matchSnapshotValidator = v.object({
+  confidence: v.union(
+    v.literal("exact"),
+    v.literal("high"),
+    v.literal("medium"),
+    v.literal("low"),
+    v.literal("none"),
+  ),
+  score: v.number(),
+  bestMatchId: v.union(v.id("properties"), v.null()),
+  ambiguous: v.boolean(),
+  resolutionStatus: v.union(
+    v.literal("matched"),
+    v.literal("review_required"),
+    v.literal("no_match"),
+  ),
+  fallbackReason: v.optional(
+    v.union(
+      v.literal("ambiguous_match"),
+      v.literal("low_confidence_match"),
+      v.literal("no_match"),
+    ),
+  ),
+});
 
 /**
  * Build a CanonicalAddress from a stored property document. Properties
@@ -117,6 +165,102 @@ function manualSourceUrl(canonical: CanonicalAddress): string {
   return `manual://address/${encodeURIComponent(canonical.formatted)}`;
 }
 
+function toMatchCandidateReturn(candidate: ScoredAddressMatchCandidate) {
+  return {
+    propertyId: candidate.id as Id<"properties">,
+    canonical: candidate.canonical,
+    score: candidate.score,
+  };
+}
+
+function resolveSourceListingStatus(
+  resolution: AddressMatchResolution,
+): "pending" | "extracted" | "failed" | "merged" {
+  switch (resolution.status) {
+    case "matched":
+      return "merged";
+    case "review_required":
+      return "pending";
+    case "no_match":
+      return "failed";
+  }
+}
+
+function buildSourceListingDoc(args: {
+  canonical: CanonicalAddress;
+  sourceUrl: string;
+  extractedAt: string;
+  resolution: AddressMatchResolution;
+}): Omit<Doc<"sourceListings">, "_id" | "_creationTime"> {
+  const { canonical, sourceUrl, extractedAt, resolution } = args;
+
+  return {
+    propertyId:
+      resolution.status === "matched"
+        ? (resolution.bestMatch.id as Id<"properties">)
+        : undefined,
+    sourcePlatform: "manual",
+    sourceUrl,
+    rawData: JSON.stringify({
+      canonical,
+      match: {
+        confidence: resolution.confidence,
+        score: resolution.score,
+        bestMatchId: resolution.bestMatch?.id ?? null,
+        ambiguous: resolution.ambiguous,
+        resolutionStatus: resolution.status,
+        fallbackReason:
+          "fallbackReason" in resolution ? resolution.fallbackReason : undefined,
+      },
+    }),
+    extractedAt,
+    status: resolveSourceListingStatus(resolution),
+  };
+}
+
+function buildCreateAddressIntakeResponse(args: {
+  intakeId: Id<"sourceListings">;
+  canonical: CanonicalAddress;
+  resolution: AddressMatchResolution;
+}) {
+  const { intakeId, canonical, resolution } = args;
+
+  switch (resolution.status) {
+    case "matched":
+      return {
+        status: "matched" as const,
+        propertyId: resolution.bestMatch.id as Id<"properties">,
+        confidence: resolution.confidence,
+        score: resolution.score,
+        intakeId,
+        canonical,
+      };
+    case "review_required":
+      return {
+        status: "review_required" as const,
+        reason: resolution.fallbackReason,
+        confidence: resolution.confidence,
+        score: resolution.score,
+        bestMatch: toMatchCandidateReturn(resolution.bestMatch),
+        candidates: resolution.candidates.map(toMatchCandidateReturn),
+        intakeId,
+        canonical,
+      };
+    case "no_match":
+      return {
+        status: "no_match" as const,
+        reason: resolution.fallbackReason,
+        confidence: resolution.confidence,
+        score: resolution.score,
+        bestMatch: resolution.bestMatch
+          ? toMatchCandidateReturn(resolution.bestMatch)
+          : null,
+        intakeId,
+        canonical,
+      };
+  }
+}
+
 /**
  * Submit a manual address for intake. Runs server-side normalization,
  * creates a sourceListing row, searches for candidate properties, and
@@ -134,9 +278,9 @@ export const createAddressIntake = mutation({
     if (!normalizationResult.valid) {
       return {
         status: "validation_error" as const,
-        errors: normalizationResult.errors.map((e) => ({
-          code: e.code,
-          message: e.message,
+        errors: normalizationResult.errors.map((error) => ({
+          code: error.code,
+          message: error.message,
         })),
       };
     }
@@ -160,6 +304,7 @@ export const createAddressIntake = mutation({
     }));
 
     const matchResult = matchAddress(canonical, candidates);
+    const resolution = resolveAddressMatch(matchResult);
 
     // If we already have a sourceListing for this manual URL, reuse it —
     // otherwise insert a new one. This keeps re-submission idempotent.
@@ -168,44 +313,19 @@ export const createAddressIntake = mutation({
       .withIndex("by_sourceUrl", (q) => q.eq("sourceUrl", sourceUrl))
       .first();
 
+    const sourceListingDoc = buildSourceListingDoc({
+      canonical,
+      sourceUrl,
+      extractedAt: now,
+      resolution,
+    });
+
     let intakeId: Id<"sourceListings">;
     if (existing) {
       intakeId = existing._id;
-      await ctx.db.patch(existing._id, {
-        extractedAt: now,
-        rawData: JSON.stringify({
-          canonical,
-          match: {
-            confidence: matchResult.confidence,
-            score: matchResult.score,
-            bestMatchId: matchResult.bestMatch?.id ?? null,
-            ambiguous: matchResult.ambiguous,
-          },
-        }),
-        status: resolveStatus(matchResult.confidence, matchResult.ambiguous),
-        propertyId: shouldAutoMerge(matchResult)
-          ? (matchResult.bestMatch!.id as Id<"properties">)
-          : undefined,
-      });
+      await ctx.db.replace(existing._id, sourceListingDoc);
     } else {
-      intakeId = await ctx.db.insert("sourceListings", {
-        sourcePlatform: "manual",
-        sourceUrl,
-        rawData: JSON.stringify({
-          canonical,
-          match: {
-            confidence: matchResult.confidence,
-            score: matchResult.score,
-            bestMatchId: matchResult.bestMatch?.id ?? null,
-            ambiguous: matchResult.ambiguous,
-          },
-        }),
-        extractedAt: now,
-        status: resolveStatus(matchResult.confidence, matchResult.ambiguous),
-        propertyId: shouldAutoMerge(matchResult)
-          ? (matchResult.bestMatch!.id as Id<"properties">)
-          : undefined,
-      });
+      intakeId = await ctx.db.insert("sourceListings", sourceListingDoc);
     }
 
     // Audit trail.
@@ -216,83 +336,29 @@ export const createAddressIntake = mutation({
       entityId: intakeId,
       details: JSON.stringify({
         canonicalFormatted: canonical.formatted,
-        confidence: matchResult.confidence,
-        score: matchResult.score,
-        ambiguous: matchResult.ambiguous,
-        candidateCount: matchResult.candidates.length,
+        confidence: resolution.confidence,
+        score: resolution.score,
+        ambiguous: resolution.ambiguous,
+        resolutionStatus: resolution.status,
+        fallbackReason:
+          "fallbackReason" in resolution ? resolution.fallbackReason : undefined,
+        candidateCount: resolution.candidates.length,
       }),
       timestamp: now,
     });
 
-    // Decide which response shape to return.
-    if (
-      matchResult.bestMatch &&
-      !matchResult.ambiguous &&
-      (matchResult.confidence === "exact" || matchResult.confidence === "high")
-    ) {
-      return {
-        status: "matched" as const,
-        propertyId: matchResult.bestMatch.id as Id<"properties">,
-        confidence: matchResult.confidence as "exact" | "high",
-        intakeId,
-        canonical,
-      };
-    }
-
-    if (matchResult.ambiguous || matchResult.confidence === "medium") {
-      return {
-        status: "ambiguous" as const,
-        candidates: matchResult.candidates.map((c) => ({
-          propertyId: c.id as Id<"properties">,
-          canonical: {
-            ...c.canonical,
-            formatted: c.canonical.formatted,
-          },
-          score: c.score,
-        })),
-        intakeId,
-        canonical,
-      };
-    }
-
-    return {
-      status: "no_match" as const,
+    return buildCreateAddressIntakeResponse({
       intakeId,
       canonical,
-    };
+      resolution,
+    });
   },
 });
-
-/** Whether a match result is eligible for auto-merge to an existing property. */
-function shouldAutoMerge(result: {
-  confidence: MatchConfidence;
-  ambiguous: boolean;
-  bestMatch: { id: string } | null;
-}): boolean {
-  if (!result.bestMatch) return false;
-  if (result.ambiguous) return false; // never auto-merge ambiguous results
-  return result.confidence === "exact" || result.confidence === "high";
-}
-
-/**
- * Map a match confidence into the sourceListing.status literal.
- * Ambiguous results never transition to "merged" even at high confidence
- * — they stay "pending" until the buyer or ops disambiguates.
- */
-function resolveStatus(
-  confidence: MatchConfidence,
-  ambiguous: boolean,
-): "pending" | "extracted" | "failed" | "merged" {
-  if (ambiguous) return "pending";
-  if (confidence === "exact" || confidence === "high") return "merged";
-  if (confidence === "medium" || confidence === "low") return "pending";
-  return "pending";
-}
 
 /**
  * Look up the current state of an address intake request by id. Returns
  * the stored canonical + match snapshot so a follow-up UI can continue
- * the disambiguation flow.
+ * the fallback flow.
  */
 export const getIntakeStatus = query({
   args: {
@@ -307,14 +373,7 @@ export const getIntakeStatus = query({
       propertyId: v.optional(v.id("properties")),
       extractedAt: v.string(),
       canonical: v.optional(canonicalAddressValidator),
-      match: v.optional(
-        v.object({
-          confidence: v.string(),
-          score: v.number(),
-          bestMatchId: v.union(v.id("properties"), v.null()),
-          ambiguous: v.boolean(),
-        }),
-      ),
+      match: v.optional(matchSnapshotValidator),
     }),
   ),
   handler: async (ctx, args) => {
@@ -324,10 +383,12 @@ export const getIntakeStatus = query({
     let canonical: CanonicalAddress | undefined;
     let match:
       | {
-          confidence: string;
+          confidence: "exact" | "high" | "medium" | "low" | "none";
           score: number;
           bestMatchId: Id<"properties"> | null;
           ambiguous: boolean;
+          resolutionStatus: "matched" | "review_required" | "no_match";
+          fallbackReason?: AddressMatchFallbackReason;
         }
       | undefined;
     if (row.rawData) {
@@ -335,10 +396,12 @@ export const getIntakeStatus = query({
         const parsed = JSON.parse(row.rawData) as {
           canonical?: CanonicalAddress;
           match?: {
-            confidence: string;
+            confidence: "exact" | "high" | "medium" | "low" | "none";
             score: number;
             bestMatchId: Id<"properties"> | null;
             ambiguous: boolean;
+            resolutionStatus: "matched" | "review_required" | "no_match";
+            fallbackReason?: AddressMatchFallbackReason;
           };
         };
         canonical = parsed.canonical;

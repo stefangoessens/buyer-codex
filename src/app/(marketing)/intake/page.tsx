@@ -3,8 +3,8 @@
 //
 // This route accepts a `?url=<listing-url>&source=<channel>` query string
 // and hands off to the main intake flow. It's deliberately minimal in
-// v1: the extension (KIN-816), SMS handler (KIN-776), and address entry
-// (KIN-775) all forward here, and a follow-up card will wire in the
+// v1: the extension (KIN-816) and SMS handler (KIN-776) forward here, and a
+// follow-up card will wire in the
 // auth-aware signed-in / signed-out / duplicate branching.
 //
 // For now this page:

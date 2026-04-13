@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeAddress,
   matchAddress,
+  resolveAddressMatch,
   US_STATES,
   STREET_SUFFIX_MAP,
   type CanonicalAddress,
@@ -385,6 +386,34 @@ describe("normalizeAddress — raw string input", () => {
       expect(result.canonical.state).toBe("FL");
     }
   });
+
+  it("parses comma-free raw address with multi-word city", () => {
+    const result = normalizeAddress({
+      raw: "500 Collins Ave Miami Beach FL 33139",
+    });
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.canonical.street).toBe("500 Collins Ave");
+      expect(result.canonical.city).toBe("Miami Beach");
+      expect(result.canonical.state).toBe("FL");
+      expect(result.canonical.zip).toBe("33139");
+    }
+  });
+
+  it("parses comma-free raw address with unit and multi-word city", () => {
+    const result = normalizeAddress({
+      raw: "90 Las Olas Blvd Apt 903 Fort Lauderdale FL 33301",
+    });
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.canonical.street).toBe("90 Las Olas Blvd");
+      expect(result.canonical.unit).toBe("903");
+      expect(result.canonical.city).toBe("Fort Lauderdale");
+      expect(result.canonical.formatted).toBe(
+        "90 Las Olas Blvd, Unit 903, Fort Lauderdale, FL 33301",
+      );
+    }
+  });
 });
 
 describe("matchAddress — confidence scoring", () => {
@@ -556,5 +585,77 @@ describe("matchAddress — unit handling", () => {
     const candidate = mkCanonical({ unit: "5C" });
     const result = matchAddress(subject, [{ id: "p", canonical: candidate }]);
     expect(result.score).toBeLessThan(1);
+  });
+});
+
+describe("resolveAddressMatch", () => {
+  const subject = mkCanonical();
+
+  it("auto-resolves exact matches", () => {
+    const resolution = resolveAddressMatch(
+      matchAddress(subject, [{ id: "prop_1", canonical: mkCanonical() }]),
+    );
+    expect(resolution.status).toBe("matched");
+    if (resolution.status === "matched") {
+      expect(resolution.confidence).toBe("exact");
+      expect(resolution.bestMatch.id).toBe("prop_1");
+    }
+  });
+
+  it("routes ambiguous high-confidence matches to review_required", () => {
+    const resolution = resolveAddressMatch(
+      matchAddress(subject, [
+        { id: "prop_a", canonical: mkCanonical({ unit: "1" }) },
+        { id: "prop_b", canonical: mkCanonical({ unit: "2" }) },
+      ]),
+    );
+    expect(resolution.status).toBe("review_required");
+    if (resolution.status === "review_required") {
+      expect(resolution.fallbackReason).toBe("ambiguous_match");
+      expect(resolution.ambiguous).toBe(true);
+      expect(resolution.candidates).toHaveLength(2);
+    }
+  });
+
+  it("routes low-confidence single candidates to review_required", () => {
+    const resolution = resolveAddressMatch(
+      matchAddress(subject, [
+        {
+          id: "prop_low",
+          canonical: mkCanonical({
+            city: "Orlando",
+            state: "FL",
+            zip: "32801",
+          }),
+        },
+      ]),
+    );
+    expect(resolution.status).toBe("review_required");
+    if (resolution.status === "review_required") {
+      expect(resolution.fallbackReason).toBe("low_confidence_match");
+      expect(resolution.bestMatch.id).toBe("prop_low");
+    }
+  });
+
+  it("returns explicit no_match when nothing clears the floor", () => {
+    const resolution = resolveAddressMatch(
+      matchAddress(subject, [
+        {
+          id: "prop_none",
+          canonical: mkCanonical({
+            street: "999 Other Ave",
+            city: "Orlando",
+            state: "CA",
+            zip: "90001",
+          }),
+        },
+      ]),
+    );
+    expect(resolution.status).toBe("no_match");
+    if (resolution.status === "no_match") {
+      expect(resolution.fallbackReason).toBe("no_match");
+      expect(resolution.bestMatch?.id).toBe("prop_none");
+      expect(resolution.candidates).toHaveLength(0);
+    }
   });
 });

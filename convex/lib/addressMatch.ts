@@ -1,19 +1,20 @@
 /**
- * Convex-side mirror of src/lib/intake/address.ts (KIN-775).
+ * Convex-side mirror of src/lib/intake/address.ts (KIN-898).
  *
  * This file is an in-sync duplicate so Convex server mutations can run the
  * same normalization + match logic without a cross-bundle import. Keep the
  * two copies aligned whenever one changes.
  */
 
+/** Canonical address shape used by the rest of the intake pipeline. */
 export interface CanonicalAddress {
-  street: string;
-  unit?: string;
+  street: string; // "123 Main St"
+  unit?: string; // "4B"
   city: string;
-  state: string;
-  zip: string;
+  state: string; // "FL" (2-letter code)
+  zip: string; // "33131" or "33131-1234"
   county?: string;
-  formatted: string;
+  formatted: string; // "123 Main St, Unit 4B, Miami, FL 33131"
 }
 
 export type AddressValidationErrorCode =
@@ -34,22 +35,71 @@ export type AddressNormalizationResult =
   | { valid: true; canonical: CanonicalAddress }
   | { valid: false; errors: AddressValidationError[] };
 
+/** Match confidence levels returned by the matcher. */
 export type MatchConfidence = "exact" | "high" | "medium" | "low" | "none";
 
 export interface AddressMatchCandidate {
-  id: string;
+  id: string; // external property ID
   canonical: CanonicalAddress;
-  score?: number;
+  score?: number; // optional external score 0-1
+}
+
+export interface ScoredAddressMatchCandidate extends AddressMatchCandidate {
+  score: number;
 }
 
 export interface AddressMatchResult {
   confidence: MatchConfidence;
+  /** 0-1 — numerical score for the best candidate. */
   score: number;
-  bestMatch: AddressMatchCandidate | null;
-  candidates: Array<AddressMatchCandidate & { score: number }>;
+  /** The best matching candidate, or null if none. */
+  bestMatch: ScoredAddressMatchCandidate | null;
+  /** All candidates that scored above the minimum threshold, sorted desc. */
+  candidates: ScoredAddressMatchCandidate[];
+  /**
+   * If true, multiple candidates scored similarly high and the caller
+   * should prompt the user to disambiguate.
+   */
   ambiguous: boolean;
 }
 
+export type AddressMatchFallbackReason =
+  | "ambiguous_match"
+  | "low_confidence_match"
+  | "no_match";
+
+export type AddressMatchResolution =
+  | {
+      status: "matched";
+      confidence: "exact" | "high";
+      score: number;
+      bestMatch: ScoredAddressMatchCandidate;
+      candidates: ScoredAddressMatchCandidate[];
+      ambiguous: false;
+    }
+  | {
+      status: "review_required";
+      fallbackReason: "ambiguous_match" | "low_confidence_match";
+      confidence: "high" | "medium" | "low";
+      score: number;
+      bestMatch: ScoredAddressMatchCandidate;
+      candidates: ScoredAddressMatchCandidate[];
+      ambiguous: boolean;
+    }
+  | {
+      status: "no_match";
+      fallbackReason: "no_match";
+      confidence: "none";
+      score: number;
+      bestMatch: ScoredAddressMatchCandidate | null;
+      candidates: ScoredAddressMatchCandidate[];
+      ambiguous: false;
+    };
+
+/**
+ * US state abbreviations keyed by normalized full name. Normalization
+ * accepts either 2-letter codes or full names in any case.
+ */
 export const US_STATES: Readonly<Record<string, string>> = Object.freeze({
   ALABAMA: "AL",
   ALASKA: "AK",
@@ -105,8 +155,13 @@ export const US_STATES: Readonly<Record<string, string>> = Object.freeze({
   "PUERTO RICO": "PR",
 });
 
+/** Set of valid 2-letter state codes for quick membership checks. */
 const STATE_CODES: ReadonlySet<string> = new Set(Object.values(US_STATES));
 
+/**
+ * Street suffix normalization map. Accepts common variants and returns
+ * the USPS-standard short form.
+ */
 export const STREET_SUFFIX_MAP: Readonly<Record<string, string>> = Object.freeze({
   STREET: "St",
   ST: "St",
@@ -142,11 +197,30 @@ export const STREET_SUFFIX_MAP: Readonly<Record<string, string>> = Object.freeze
 });
 
 const ZIP_REGEX = /^\d{5}(-\d{4})?$/;
+const STREET_SUFFIX_KEYS: ReadonlySet<string> = new Set(
+  Object.keys(STREET_SUFFIX_MAP),
+);
+const POST_DIRECTIONAL_TOKENS: ReadonlySet<string> = new Set([
+  "N",
+  "S",
+  "E",
+  "W",
+  "NE",
+  "NW",
+  "SE",
+  "SW",
+]);
 
+/** Normalize whitespace: collapse runs and trim. */
 function cleanWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Normalize a street string: trim, collapse whitespace, and standardize
+ * the final suffix token ("Street" → "St", etc.). Preserves case on
+ * primary tokens, but the suffix is rewritten to USPS standard form.
+ */
 function normalizeStreet(value: string): string {
   const cleaned = cleanWhitespace(value);
   if (!cleaned) return "";
@@ -159,18 +233,40 @@ function normalizeStreet(value: string): string {
   return tokens.join(" ");
 }
 
+/** Normalize a state token into a 2-letter code (or empty string). */
 function normalizeState(value: string): string {
   const cleaned = cleanWhitespace(value).toUpperCase();
   if (!cleaned) return "";
   if (STATE_CODES.has(cleaned)) return cleaned;
   if (cleaned in US_STATES) return US_STATES[cleaned];
-  return cleaned;
+  return cleaned; // return the upper-cased raw so caller can flag "invalid_state"
 }
 
+/** Normalize a zip string: strip whitespace and any trailing junk. */
 function normalizeZip(value: string): string {
   return value.replace(/\s+/g, "").trim();
 }
 
+function isStreetSuffixToken(value: string): boolean {
+  const cleaned = value.replace(/\./g, "").toUpperCase();
+  return STREET_SUFFIX_KEYS.has(cleaned);
+}
+
+function isUnitMarkerToken(value: string): boolean {
+  return /^(?:Unit|Apt|Apartment|Suite|Ste|#)$/i.test(
+    value.replace(/[.,]/g, ""),
+  );
+}
+
+function isPostDirectionalToken(value: string): boolean {
+  const cleaned = value.replace(/\./g, "").toUpperCase();
+  return POST_DIRECTIONAL_TOKENS.has(cleaned);
+}
+
+/**
+ * Build a "formatted" one-line representation that matches our canonical
+ * display pattern: "<street>[, Unit <unit>], <city>, <state> <zip>".
+ */
 function formatCanonical(
   street: string,
   unit: string | undefined,
@@ -185,6 +281,15 @@ function formatCanonical(
   return parts.join(", ");
 }
 
+/**
+ * Parse a single-line "street, city, state zip" address. Returns the
+ * structured tokens, or null if we can't find the required anchors.
+ *
+ * Strategy: split on commas first. If that yields 3+ parts, the last
+ * chunk holds "<state> <zip>"; the second to last is the city; everything
+ * before that is the street. Otherwise, scan from the end of the string
+ * for a trailing zip + state pair.
+ */
 function parseRawAddress(raw: string): {
   street: string;
   unit?: string;
@@ -195,6 +300,7 @@ function parseRawAddress(raw: string): {
   const cleaned = cleanWhitespace(raw);
   if (!cleaned) return null;
 
+  // Try comma-separated split first — the common "paste from Google" form.
   const commaParts = cleaned
     .split(",")
     .map((p) => p.trim())
@@ -207,6 +313,9 @@ function parseRawAddress(raw: string): {
       const state = tailMatch[1].trim();
       const zip = tailMatch[2];
       const city = commaParts[commaParts.length - 2];
+      // Street may include unit via further comma splits — join any
+      // leading chunks with ", " so "123 Main St, Apt 4B, Miami, FL 33131"
+      // keeps the apartment piece with the street.
       const streetChunks = commaParts.slice(0, commaParts.length - 2);
       const streetJoined = streetChunks.join(", ");
       const { street, unit } = extractUnit(streetJoined);
@@ -214,38 +323,132 @@ function parseRawAddress(raw: string): {
     }
   }
 
-  const tailRegex = /^(.+?)[\s,]+([A-Za-z][A-Za-z.\s]*?)\s+(\d{5}(?:-\d{4})?)$/;
-  const tailMatch = cleaned.match(tailRegex);
-  if (!tailMatch) return null;
+  // Fallback: parse from the right instead of one giant regex. Single
+  // regexes with non-greedy prefixes are unreliable on comma-free input
+  // because the state group can absorb too much of the middle. Right-to-
+  // left extraction is deterministic.
+  //
+  // Step 1: peel the zip off the end.
+  const zipRegex = /(\d{5}(?:-\d{4})?)$/;
+  const zipMatch = cleaned.match(zipRegex);
+  if (!zipMatch) return null;
+  const zip = zipMatch[1];
+  const withoutZip = cleaned.slice(0, cleaned.length - zip.length).trim();
 
-  const beforeState = tailMatch[1].trim();
-  const state = tailMatch[2].trim();
-  const zip = tailMatch[3];
-
-  const beforeParts = beforeState
-    .split(",")
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-  if (beforeParts.length === 0) return null;
-
-  let city: string;
-  let streetJoined: string;
-  if (beforeParts.length >= 2) {
-    city = beforeParts[beforeParts.length - 1];
-    streetJoined = beforeParts.slice(0, -1).join(", ");
+  // Step 2: peel the state off. Accept either a 2-letter code or a
+  // known full-name state from US_STATES. Try 2-letter first, then
+  // fall back to full name (up to 2 words for "New Hampshire" etc.).
+  let state: string;
+  let withoutState: string;
+  const twoLetterMatch = withoutZip.match(/[\s,]+([A-Za-z]{2})$/);
+  if (twoLetterMatch) {
+    state = twoLetterMatch[1];
+    withoutState = withoutZip.slice(0, twoLetterMatch.index).trim();
   } else {
-    const words = beforeParts[0].split(" ");
-    if (words.length < 3) return null;
-    city = words[words.length - 1];
-    streetJoined = words.slice(0, -1).join(" ");
+    // Try 1-2 word full-name state. Walk back through the tail and
+    // check if the trailing 1 or 2 words match a known state name.
+    const tailWords = withoutZip.replace(/,/g, " ").split(/\s+/).filter(Boolean);
+    if (tailWords.length < 2) return null;
+
+    // Prefer 2-word match ("New Hampshire", "North Carolina", ...).
+    const twoWord = `${tailWords[tailWords.length - 2]} ${tailWords[tailWords.length - 1]}`;
+    const oneWord = tailWords[tailWords.length - 1];
+    if (US_STATES[twoWord.toUpperCase()]) {
+      state = twoWord;
+      withoutState = tailWords.slice(0, -2).join(" ");
+    } else if (US_STATES[oneWord.toUpperCase()]) {
+      state = oneWord;
+      withoutState = tailWords.slice(0, -1).join(" ");
+    } else {
+      return null;
+    }
   }
+  withoutState = withoutState.replace(/,$/, "").trim();
+  if (!withoutState) return null;
+
+  // Step 3: split the remaining "<street> <city>" string. Comma-delimited
+  // inputs are straightforward. For comma-free inputs, prefer the last known
+  // street suffix as the boundary so multi-word cities like "Miami Beach" and
+  // "Fort Lauderdale" survive intact.
+  const split = splitStreetAndCity(withoutState);
+  if (!split) return null;
+  const { city, streetJoined } = split;
+  if (!streetJoined) return null;
 
   const { street, unit } = extractUnit(streetJoined);
   return { street, unit, city, state, zip };
 }
 
+function splitStreetAndCity(
+  value: string,
+): { streetJoined: string; city: string } | null {
+  if (value.includes(",")) {
+    const parts = value
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+    if (parts.length < 2) return null;
+    return {
+      city: parts[parts.length - 1],
+      streetJoined: parts.slice(0, -1).join(", "),
+    };
+  }
+
+  const words = value.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return null;
+
+  let suffixIndex = -1;
+  for (let i = 1; i < words.length - 1; i += 1) {
+    if (isStreetSuffixToken(words[i])) {
+      suffixIndex = i;
+    }
+  }
+
+  if (suffixIndex !== -1) {
+    let streetEnd = suffixIndex;
+    let cursor = suffixIndex + 1;
+
+    if (
+      cursor < words.length - 1 &&
+      isPostDirectionalToken(words[cursor])
+    ) {
+      streetEnd = cursor;
+      cursor += 1;
+    }
+
+    if (
+      cursor + 1 < words.length &&
+      isUnitMarkerToken(words[cursor]) &&
+      cursor + 1 < words.length - 1
+    ) {
+      streetEnd = cursor + 1;
+    } else if (
+      cursor < words.length - 1 &&
+      words[cursor].startsWith("#")
+    ) {
+      streetEnd = cursor;
+    }
+
+    const streetJoined = words.slice(0, streetEnd + 1).join(" ");
+    const city = words.slice(streetEnd + 1).join(" ");
+    if (streetJoined && city) {
+      return { streetJoined, city };
+    }
+  }
+
+  return {
+    city: words[words.length - 1],
+    streetJoined: words.slice(0, -1).join(" "),
+  };
+}
+
+/**
+ * Extract an optional "Unit/Apt/Suite" token out of a street string.
+ * Returns the cleaned street without the unit and the unit value.
+ */
 function extractUnit(street: string): { street: string; unit?: string } {
   const cleaned = cleanWhitespace(street);
+  // Common unit markers: "Unit 4B", "Apt 4B", "Suite 300", "# 4B", "#4B"
   const unitRegex = /[,\s](?:Unit|Apt|Apartment|Suite|Ste|#)\s*([A-Za-z0-9-]+)$/i;
   const match = cleaned.match(unitRegex);
   if (!match) return { street: cleaned };
@@ -254,6 +457,10 @@ function extractUnit(street: string): { street: string; unit?: string } {
   return { street: streetOnly, unit };
 }
 
+/**
+ * Normalize a free-form user-entered address into the canonical shape.
+ * Accepts either a structured input or a single string.
+ */
 export function normalizeAddress(
   input:
     | {
@@ -288,6 +495,8 @@ export function normalizeAddress(
     }
     const parsed = parseRawAddress(raw);
     if (!parsed) {
+      // Can't split into parts — report each missing required field so the
+      // caller can show an inline form.
       return {
         valid: false,
         errors: [
@@ -391,6 +600,7 @@ export function normalizeAddress(
   return { valid: true, canonical };
 }
 
+/** Normalize a street for comparison only — lowercase, no punctuation. */
 function compareStreet(value: string): string {
   return normalizeStreet(value)
     .toLowerCase()
@@ -399,10 +609,12 @@ function compareStreet(value: string): string {
     .trim();
 }
 
+/** First 5 digits of a zip for comparison ("33131-1234" → "33131"). */
 function zipBase(value: string): string {
   return value.slice(0, 5);
 }
 
+/** Build a single numerical score 0-1 comparing two canonical addresses. */
 function scoreCandidate(
   subject: CanonicalAddress,
   candidate: CanonicalAddress,
@@ -440,9 +652,11 @@ function scoreCandidate(
     score += 0.05;
   }
 
+  // Clamp to [0, 1] — protects against any future additive changes.
   return Math.min(1, Math.max(0, Number(score.toFixed(4))));
 }
 
+/** Map a raw score to a confidence bucket. */
 function confidenceFor(score: number): MatchConfidence {
   if (score >= 1) return "exact";
   if (score >= 0.85) return "high";
@@ -451,6 +665,11 @@ function confidenceFor(score: number): MatchConfidence {
   return "none";
 }
 
+/**
+ * Compute a match confidence between a canonical address and a set of
+ * candidate addresses (from the properties table). Returns the best
+ * match plus ambiguity metadata so the caller can prompt for disambig.
+ */
 export function matchAddress(
   subject: CanonicalAddress,
   candidates: AddressMatchCandidate[],
@@ -472,9 +691,13 @@ export function matchAddress(
     }))
     .sort((a, b) => b.score - a.score);
 
+  // Drop candidates below the lowest confidence floor (0.4) — they're
+  // neither useful matches nor meaningful ambiguity signals.
   const aboveFloor = scored.filter((c) => c.score >= 0.4);
 
   if (aboveFloor.length === 0) {
+    // Still return the best (even if it's "none") so the caller can show
+    // "closest match" UI if they want to.
     const best = scored[0];
     return {
       confidence: "none",
@@ -492,6 +715,9 @@ export function matchAddress(
   const best = aboveFloor[0];
   const confidence = confidenceFor(best.score);
 
+  // Ambiguous: 2+ candidates within 0.05 of the top score. We only flag
+  // it if the best isn't already "exact" — an exact match resolves
+  // disambiguation on its own.
   const ambiguous =
     confidence !== "exact" &&
     aboveFloor.filter((c) => best.score - c.score <= 0.05).length >= 2;
@@ -499,12 +725,58 @@ export function matchAddress(
   return {
     confidence,
     score: best.score,
-    bestMatch: {
-      id: best.id,
-      canonical: best.canonical,
-      score: best.score,
-    },
+    bestMatch: best,
     candidates: aboveFloor,
     ambiguous,
+  };
+}
+
+/**
+ * Collapse scored candidates into an explicit intake resolution state.
+ * Exact/high non-ambiguous matches can auto-merge; anything else must
+ * fall back into a review-required or no-match path.
+ */
+export function resolveAddressMatch(
+  result: AddressMatchResult,
+): AddressMatchResolution {
+  if (
+    result.bestMatch &&
+    !result.ambiguous &&
+    (result.confidence === "exact" || result.confidence === "high")
+  ) {
+    return {
+      status: "matched",
+      confidence: result.confidence,
+      score: result.score,
+      bestMatch: result.bestMatch,
+      candidates: result.candidates,
+      ambiguous: false,
+    };
+  }
+
+  if (result.bestMatch && result.confidence !== "none") {
+    const reviewConfidence =
+      result.confidence === "exact" ? "high" : result.confidence;
+    return {
+      status: "review_required",
+      fallbackReason: result.ambiguous
+        ? "ambiguous_match"
+        : "low_confidence_match",
+      confidence: reviewConfidence,
+      score: result.score,
+      bestMatch: result.bestMatch,
+      candidates: result.candidates,
+      ambiguous: result.ambiguous,
+    };
+  }
+
+  return {
+    status: "no_match",
+    fallbackReason: "no_match",
+    confidence: "none",
+    score: result.score,
+    bestMatch: result.bestMatch,
+    candidates: result.candidates,
+    ambiguous: false,
   };
 }
