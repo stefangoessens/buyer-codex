@@ -189,12 +189,20 @@ export interface LeverageInput {
   priceReductions?: Array<{ amount: number; date: string }>;
   neighborhoodMedianDom?: number;
   neighborhoodMedianPsf?: number;
+  neighborhoodSalesVelocity?: number;
+  neighborhoodInventoryCount?: number;
+  neighborhoodMarketTrajectory?: "rising" | "flat" | "falling";
+  neighborhoodMedianSaleToListRatio?: number;
+  neighborhoodMedianPriceCutFrequency?: number;
   sqft: number;
   wasRelisted?: boolean;
   wasWithdrawn?: boolean;
   wasPendingFellThrough?: boolean;
   listingAgentAvgDom?: number;
   listingAgentAvgSaleToList?: number;
+  listingAgentPriceCutFrequency?: number;
+  sellerEquityPct?: number;
+  occupancyStatus?: "owner_occupied" | "tenant_occupied" | "vacant";
 }
 
 export interface LeverageSignal {
@@ -205,6 +213,7 @@ export interface LeverageSignal {
   confidence: number;
   citation: string;
   direction: "bullish" | "bearish" | "neutral";
+  explanation?: string;
 }
 
 export interface LeverageOutput {
@@ -212,6 +221,8 @@ export interface LeverageOutput {
   signals: LeverageSignal[];
   overallConfidence: number;
   signalCount: number;
+  summary?: string;
+  rationale?: string[];
 }
 
 // ═══ Cost Engine Types ═══

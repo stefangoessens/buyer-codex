@@ -92,9 +92,13 @@ export function buildLeverageInputFromEnrichment(args: {
   property: EngineContextPropertyInput;
   contexts: NeighborhoodContext[];
   listingAgent: ListingAgentProfile | null;
+  recentSales?: RecentComparableSale[];
 }): LeverageInput {
   const neighborhood = pickNeighborhoodContext(args.contexts, 30)
     ?? pickNeighborhoodContext(args.contexts, 90);
+  const neighborhoodMedianSaleToListRatio = computeMedianSaleToListRatio(
+    args.recentSales ?? [],
+  );
 
   return {
     propertyId: args.property.propertyId,
@@ -104,12 +108,17 @@ export function buildLeverageInputFromEnrichment(args: {
     priceReductions: args.property.priceReductions,
     neighborhoodMedianDom: neighborhood?.medianDom,
     neighborhoodMedianPsf: neighborhood?.medianPricePerSqft,
+    neighborhoodSalesVelocity: neighborhood?.salesVelocity,
+    neighborhoodInventoryCount: neighborhood?.inventoryCount,
+    neighborhoodMarketTrajectory: neighborhood?.trajectory,
+    neighborhoodMedianSaleToListRatio,
     sqft: args.property.sqftLiving ?? 0,
     wasRelisted: args.property.wasRelisted,
     wasWithdrawn: args.property.wasWithdrawn,
     wasPendingFellThrough: args.property.wasPendingFellThrough,
     listingAgentAvgDom: args.listingAgent?.avgDaysOnMarket,
     listingAgentAvgSaleToList: args.listingAgent?.medianListToSellRatio,
+    listingAgentPriceCutFrequency: args.listingAgent?.priceCutFrequency,
   };
 }
 
@@ -170,4 +179,27 @@ function computeAverageComparablePsf(
   if (psfs.length === 0) return undefined;
   const total = psfs.reduce((sum, psf) => sum + psf, 0);
   return Number((total / psfs.length).toFixed(2));
+}
+
+function computeMedianSaleToListRatio(
+  sales: RecentComparableSale[],
+): number | undefined {
+  const ratios = sales
+    .filter(
+      (sale) =>
+        typeof sale.listPrice === "number" &&
+        sale.listPrice > 0 &&
+        typeof sale.soldPrice === "number" &&
+        sale.soldPrice > 0,
+    )
+    .map((sale) => sale.soldPrice / sale.listPrice!);
+
+  if (ratios.length === 0) return undefined;
+  const sorted = [...ratios].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const median =
+    sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  return Number(median.toFixed(4));
 }
