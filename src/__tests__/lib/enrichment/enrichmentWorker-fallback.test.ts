@@ -4,6 +4,7 @@ import {
   stubAdapters,
   type EnrichmentFetchAdapters,
 } from "@/lib/ai/engines/enrichmentWorker";
+import { normalizeBrowserUseFallbackResult } from "@/lib/enrichment/fallback";
 import type { BrowserUseFallbackResult } from "@/lib/enrichment/types";
 
 function adaptersWithFallback(
@@ -58,6 +59,33 @@ describe("enrichmentWorker — browser_use_fallback", () => {
       const payload = outcome.result.payload as { result: BrowserUseFallbackResult };
       expect(payload.result.reason).toBe("parser_schema_drift");
       expect(payload.result.canonicalFields.listPrice).toBe(500_000);
+    }
+  });
+
+  it("returns a payload shape that the canonical normalizer can merge", async () => {
+    const outcome = await runEnrichmentJob(
+      {
+        propertyId: "p1",
+        source: "browser_use_fallback",
+        context: {
+          sourceUrl: "https://zillow.com/homedetails/999",
+          portal: "zillow",
+          reason: "parser_schema_drift",
+        },
+      },
+      adaptersWithFallback(),
+    );
+
+    expect(outcome.kind).toBe("success");
+    if (outcome.kind === "success") {
+      const normalized = normalizeBrowserUseFallbackResult(outcome.result.payload);
+      expect(normalized).not.toBeNull();
+      expect(normalized?.sourceUrl).toBe("https://zillow.com/homedetails/999");
+      expect(normalized?.canonicalFields).toMatchObject({
+        listPrice: 500_000,
+        beds: 3,
+        baths: 2,
+      });
     }
   });
 
