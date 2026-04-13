@@ -2417,16 +2417,16 @@ export default defineSchema({
       v.literal("neighborhood_market"),
       v.literal("portal_estimates"),
       v.literal("recent_sales"),
-      // KIN-784: Browser Use fallback path runs here when deterministic
-      // extraction fails. Context lives in contextJson below.
-      v.literal("browser_use_fallback"),
+      // KIN-1019: Browser Use hosted runs here as an explicit typed
+      // enrichment path. Context lives in contextJson below.
+      v.literal("browser_use_hosted"),
     ),
     status: v.union(
-      v.literal("pending"),
+      v.literal("queued"),
       v.literal("running"),
       v.literal("succeeded"),
       v.literal("failed"),
-      v.literal("skipped"),
+      v.literal("escalated"),
     ),
     attempt: v.number(),
     maxAttempts: v.number(),
@@ -2440,8 +2440,9 @@ export default defineSchema({
     dedupeKey: v.string(),
     resultRef: v.optional(v.string()),
     // Optional per-source JSON context the worker consumes. For
-    // browser_use_fallback it holds sourceUrl/portal/reason/note; other
-    // sources read typed context via their own adapter args.
+    // browser_use_hosted it holds sourceUrl/portal/trigger/note plus
+    // typed trigger evidence; other sources read typed context via
+    // their own adapter args.
     contextJson: v.optional(v.string()),
   })
     .index("by_propertyId_and_source", ["propertyId", "source"])

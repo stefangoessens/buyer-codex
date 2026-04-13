@@ -4,6 +4,13 @@ Status: Accepted
 Scope: web intake, extraction service, python workers, Convex enrichment jobs, operator recovery
 Date: 2026-04-13
 
+Update note (KIN-1019, 2026-04-13): deterministic extraction remains the
+primary sync path, but Browser Use is now a first-class typed enrichment path
+under explicit triggers (`parser_failure`, `low_confidence_parse`,
+`missing_critical_fields`, `conflicting_portal_data`,
+`operator_requested_deep_extract`). Bright Data access failures remain
+access-layer concerns and do not silently trigger Browser Use.
+
 ## Decision Summary
 
 buyer-codex supports a deterministic-primary ingestion model for listing imports.

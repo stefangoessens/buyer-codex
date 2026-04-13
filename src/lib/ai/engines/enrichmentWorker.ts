@@ -1,17 +1,16 @@
 import { EnrichmentFailure, wrapUnknownError } from "@/lib/enrichment/errors";
 import type {
   AgentObservation,
-  BrowserUseFallbackContext,
-  BrowserUseFallbackResult,
+  BrowserUseHostedResult,
+  BrowserUseTriggerType,
   EnrichmentError,
   EnrichmentResult,
   EnrichmentSource,
-  FallbackReason,
   GeoKind,
   NeighborhoodSale,
   PortalName,
 } from "@/lib/enrichment/types";
-import { FALLBACK_REASONS } from "@/lib/enrichment/types";
+import { BROWSER_USE_TRIGGER_TYPES } from "@/lib/enrichment/types";
 
 export interface EnrichmentFetchAdapters {
   femaFlood(args: {
@@ -63,17 +62,21 @@ export interface EnrichmentFetchAdapters {
     windowDays: number;
   }): Promise<{ sales: NeighborhoodSale[]; citation: string }>;
   /**
-   * KIN-784: Browser Use fallback. Runs when deterministic extraction
-   * fails for an explicit reason. The implementation lives in the Python
-   * worker lane; this contract is the handoff.
+   * KIN-1019: Browser Use hosted. Runs only for explicit extraction
+   * triggers and keeps access-layer concerns out of the Browser Use
+   * contract. The implementation lives in the Python worker lane.
    */
-  browserUseFallback(args: {
+  browserUseHosted(args: {
     propertyId: string;
     sourceUrl: string;
-    portal: PortalName | "unknown";
-    reason: FallbackReason;
+    portal: PortalName;
+    trigger: BrowserUseTriggerType;
+    parseConfidence?: number;
+    minimumParseConfidence?: number;
+    missingCriticalFields?: string[];
+    conflictingFields?: string[];
     note?: string;
-  }): Promise<{ result: BrowserUseFallbackResult; citation: string }>;
+  }): Promise<{ result: BrowserUseHostedResult; citation: string }>;
 }
 
 export interface WorkerJob {
@@ -195,16 +198,24 @@ async function dispatch(
       });
       return { data, citation };
     }
-    case "browser_use_fallback": {
+    case "browser_use_hosted": {
       const sourceUrl = requireString(job, ctx, "sourceUrl");
-      const portal = requireFallbackPortal(job, ctx, "portal");
-      const reason = requireFallbackReason(job, ctx, "reason");
+      const portal = requirePortalName(job, ctx, "portal");
+      const trigger = requireBrowserUseTrigger(job, ctx, "trigger");
       const note = optionalString(ctx, "note");
-      const { citation, ...data } = await adapters.browserUseFallback({
+      const parseConfidence = optionalNumber(ctx, "parseConfidence");
+      const minimumParseConfidence = optionalNumber(ctx, "minimumParseConfidence");
+      const missingCriticalFields = optionalStringArray(ctx, "missingCriticalFields");
+      const conflictingFields = optionalStringArray(ctx, "conflictingFields");
+      const { citation, ...data } = await adapters.browserUseHosted({
         propertyId: job.propertyId,
         sourceUrl,
         portal,
-        reason,
+        trigger,
+        parseConfidence,
+        minimumParseConfidence,
+        missingCriticalFields,
+        conflictingFields,
         note,
       });
       return { data, citation };
@@ -230,6 +241,26 @@ function optionalString(
 ): string | undefined {
   const value = ctx[key];
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function optionalNumber(
+  ctx: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = ctx[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function optionalStringArray(
+  ctx: Record<string, unknown>,
+  key: string,
+): string[] | undefined {
+  const value = ctx[key];
+  if (!Array.isArray(value)) return undefined;
+  const normalized = value.filter(
+    (entry): entry is string => typeof entry === "string" && entry.length > 0,
+  );
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 function requireNumber(
@@ -288,36 +319,19 @@ function requireGeoKind(
   throw parseError(job, `Missing context.${key} (expected GeoKind)`);
 }
 
-function requireFallbackPortal(
+function requireBrowserUseTrigger(
   job: WorkerJob,
   ctx: Record<string, unknown>,
   key: string,
-): PortalName | "unknown" {
-  const value = ctx[key];
-  if (
-    value === "zillow" ||
-    value === "redfin" ||
-    value === "realtor" ||
-    value === "unknown"
-  ) {
-    return value;
-  }
-  throw parseError(job, `Missing context.${key} (expected portal or unknown)`);
-}
-
-function requireFallbackReason(
-  job: WorkerJob,
-  ctx: Record<string, unknown>,
-  key: string,
-): FallbackReason {
+): BrowserUseTriggerType {
   const value = ctx[key];
   if (
     typeof value === "string" &&
-    (FALLBACK_REASONS as readonly string[]).includes(value)
+    (BROWSER_USE_TRIGGER_TYPES as readonly string[]).includes(value)
   ) {
-    return value as FallbackReason;
+    return value as BrowserUseTriggerType;
   }
-  throw parseError(job, `Missing context.${key} (expected FallbackReason)`);
+  throw parseError(job, `Missing context.${key} (expected BrowserUseTriggerType)`);
 }
 
 function parseError(job: WorkerJob, message: string): EnrichmentFailure {
@@ -349,5 +363,5 @@ export const stubAdapters: EnrichmentFetchAdapters = {
   neighborhoodMarket: async () => notImplemented("neighborhood_market")(),
   portalEstimates: async () => notImplemented("portal_estimates")(),
   recentSales: async () => notImplemented("recent_sales")(),
-  browserUseFallback: async () => notImplemented("browser_use_fallback")(),
+  browserUseHosted: async () => notImplemented("browser_use_hosted")(),
 };
