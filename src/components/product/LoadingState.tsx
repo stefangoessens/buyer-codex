@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 interface LoadingStateProps {
-  variant: "card" | "list" | "text";
+  variant: "card" | "list" | "text" | "panel" | "metrics";
   count?: number;
 }
 
@@ -45,6 +45,37 @@ function TextSkeleton() {
   );
 }
 
+function PanelSkeleton() {
+  return (
+    <div className="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-sm">
+      <Skeleton className="h-5 w-40" />
+      <Skeleton className="mt-4 aspect-[16/7] w-full rounded-[20px]" />
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Skeleton key={index} className="h-36 rounded-[18px]" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MetricsSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      {Array.from({ length: 4 }, (_, index) => (
+        <div
+          key={index}
+          className="rounded-[18px] border border-neutral-200 bg-white p-4 shadow-sm"
+        >
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="mt-3 h-8 w-24" />
+          <Skeleton className="mt-2 h-3 w-28" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function LoadingState({ variant, count = 1 }: LoadingStateProps) {
   const items = Array.from({ length: count }, (_, i) => i);
 
@@ -58,6 +89,10 @@ export function LoadingState({ variant, count = 1 }: LoadingStateProps) {
             return <ListRowSkeleton key={i} />;
           case "text":
             return <TextSkeleton key={i} />;
+          case "panel":
+            return <PanelSkeleton key={i} />;
+          case "metrics":
+            return <MetricsSkeleton key={i} />;
         }
       })}
     </div>

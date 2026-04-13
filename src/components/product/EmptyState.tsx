@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SurfaceState } from "./SurfaceState";
 
 interface EmptyStateProps {
   icon?: ReactNode;
@@ -9,17 +10,12 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center py-16">
-      {icon && (
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-400">
-          {icon}
-        </div>
-      )}
-      <h3 className="mt-4 text-xl font-semibold text-neutral-900">{title}</h3>
-      <p className="mt-2 max-w-sm text-center text-base text-neutral-500">
-        {description}
-      </p>
-      {action && <div className="mt-6">{action}</div>}
-    </div>
+    <SurfaceState
+      title={title}
+      description={description}
+      action={action}
+      icon={icon}
+      className="py-16"
+    />
   );
 }

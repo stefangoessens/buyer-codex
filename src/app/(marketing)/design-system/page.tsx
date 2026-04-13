@@ -13,6 +13,7 @@ import { BentoCard } from "@/components/marketing/BentoCard";
 import { FeatureCard } from "@/components/marketing/FeatureCard";
 import { PageHeader } from "@/components/marketing/PageHeader";
 import { TestimonialCard } from "@/components/marketing/TestimonialCard";
+import { SharedComponentShowcase } from "@/components/product/SharedComponentShowcase";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -268,6 +269,27 @@ export default function DesignSystemPage() {
                   author="Example Buyer"
                   role="Tampa"
                 />
+              </div>
+            </div>
+
+            <div className="rounded-[var(--radius-panel)] border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-[var(--spacing-card-padding)]">
+              <div className="max-w-3xl">
+                <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
+                  Shared component library
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">
+                  KIN-945 standardizes the shadcn-based primitives and product
+                  components used by marketing, the dashboard, the deal room,
+                  and the internal console. Slot and composition rules live in
+                  <code className="mx-1 rounded bg-[var(--color-surface-subtle)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)]">
+                    design-references/component-library.md
+                  </code>
+                  alongside the reference captures.
+                </p>
+              </div>
+
+              <div className="mt-8">
+                <SharedComponentShowcase />
               </div>
             </div>
           </div>

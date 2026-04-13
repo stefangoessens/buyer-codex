@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CalculatorField } from "@/components/product/CalculatorField";
+import { PricingPanel } from "@/components/product/PricingPanel";
 import {
   calculateSavings,
   defaultCalculatorInput,
@@ -121,8 +123,7 @@ function CalculatorControls({
       </p>
 
       <div className="mt-6 space-y-5">
-        {/* Purchase price */}
-        <FieldRow
+        <CalculatorField
           id="purchase-price"
           label="Purchase price"
           suffix="USD"
@@ -132,8 +133,7 @@ function CalculatorControls({
           inputMode="numeric"
         />
 
-        {/* Total commission */}
-        <FieldRow
+        <CalculatorField
           id="total-commission"
           label="Total commission"
           suffix="%"
@@ -144,8 +144,7 @@ function CalculatorControls({
           help="Historically 5–6% of purchase price. Always negotiable."
         />
 
-        {/* Buyer-agent split */}
-        <FieldRow
+        <CalculatorField
           id="buyer-agent"
           label="Buyer-agent commission"
           suffix="%"
@@ -156,8 +155,7 @@ function CalculatorControls({
           help="The portion of the total commission paid to the buyer's side."
         />
 
-        {/* Buyer credit */}
-        <FieldRow
+        <CalculatorField
           id="buyer-credit"
           label="Buyer credit (our rebate)"
           suffix="%"
@@ -172,54 +170,6 @@ function CalculatorControls({
   );
 }
 
-function FieldRow({
-  id,
-  label,
-  suffix,
-  value,
-  onChange,
-  placeholder,
-  inputMode,
-  help,
-}: {
-  id: string;
-  label: string;
-  suffix: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  inputMode: "numeric" | "decimal";
-  help?: string;
-}) {
-  return (
-    <div>
-      <label
-        htmlFor={id}
-        className="block text-sm font-medium text-neutral-800"
-      >
-        {label}
-      </label>
-      <div className="mt-1.5 flex items-center rounded-xl border border-neutral-300 bg-white focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100">
-        <input
-          id={id}
-          type="text"
-          inputMode={inputMode}
-          placeholder={placeholder}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-xl bg-transparent px-4 py-3 text-base text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
-        />
-        <span className="pr-4 text-sm font-medium text-neutral-500">
-          {suffix}
-        </span>
-      </div>
-      {help && (
-        <p className="mt-1.5 text-xs text-neutral-500">{help}</p>
-      )}
-    </div>
-  );
-}
-
 // MARK: - Result panel
 
 function CalculatorResultPanel({
@@ -229,24 +179,18 @@ function CalculatorResultPanel({
 }) {
   if (calculation.kind === "error") {
     return (
-      <div className="rounded-2xl bg-neutral-50 p-6 shadow-md ring-1 ring-neutral-200 lg:p-8">
-        <h3 className="text-base font-semibold text-neutral-900">
-          Let&rsquo;s fix those inputs
-        </h3>
-        <ul className="mt-3 space-y-2 text-sm text-neutral-700">
-          {calculation.errors.map((err, i) => (
-            <li
-              key={`${err.kind}-${i}`}
-              className="flex items-start gap-2 rounded-lg bg-white p-3 ring-1 ring-neutral-200"
-            >
-              <span className="mt-0.5 text-base" aria-hidden>
-                !
-              </span>
-              <span>{err.message}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <PricingPanel
+        title="Let&apos;s fix those inputs"
+        description="Update the assumptions below to generate a buyer-credit estimate."
+        highlights={calculation.errors.map((err, index) => (
+          <div key={`${err.kind}-${index}`} className="flex items-start gap-2">
+            <span className="mt-0.5 text-base text-error-600" aria-hidden>
+              !
+            </span>
+            <span>{err.message}</span>
+          </div>
+        ))}
+      />
     );
   }
 
@@ -254,56 +198,47 @@ function CalculatorResultPanel({
 
   if (result.isZeroCommission) {
     return (
-      <div className="rounded-2xl bg-neutral-50 p-6 shadow-md ring-1 ring-neutral-200 lg:p-8">
-        <p className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          No buyer-agent commission
-        </p>
-        <h3 className="mt-2 text-xl font-semibold text-neutral-900">
-          This listing has no buyer-side commission
-        </h3>
-        <p className="mt-3 text-sm text-neutral-700">
-          We&rsquo;ll tell you up front before we engage. No buyer credit to
-          calculate because there&rsquo;s no commission to rebate.
-        </p>
-        <HeadlineDisclosures />
-      </div>
+      <PricingPanel
+        eyebrow="No buyer-agent commission"
+        title="This listing has no buyer-side commission"
+        description="We&apos;ll tell you up front before we engage. No buyer credit to calculate because there&apos;s no commission to rebate."
+        footer={<HeadlineDisclosures />}
+      />
     );
   }
 
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-primary-700 to-primary-800 p-6 text-white shadow-lg lg:p-8">
-      <p className="text-xs font-semibold uppercase tracking-wide text-primary-200">
-        Estimated buyer credit
-      </p>
-      <p className="mt-2 text-4xl font-bold lg:text-5xl">
-        {formatUSD(result.buyerCreditAmount)}
-      </p>
-      <p className="mt-2 text-sm text-primary-100">
-        at closing on a {formatUSD(result.input.purchasePrice)} purchase
-      </p>
-
-      <dl className="mt-6 space-y-3 border-t border-primary-600/50 pt-5 text-sm">
+    <PricingPanel
+      eyebrow="Estimated buyer credit"
+      title="Projected closing credit"
+      value={formatUSD(result.buyerCreditAmount)}
+      description={`at closing on a ${formatUSD(result.input.purchasePrice)} purchase`}
+      tone="emphasis"
+      highlights={[
         <ResultRow
+          key="seller-paid"
           label="Seller-paid commission"
           value={formatUSD(result.totalCommissionAmount)}
-        />
+        />,
         <ResultRow
+          key="buyer-share"
           label="Buyer-agent share"
           value={formatUSD(result.buyerAgentCommissionAmount)}
-        />
+        />,
         <ResultRow
+          key="buyer-credit"
           label="Your credit back"
           value={formatUSD(result.buyerCreditAmount)}
           emphasized
-        />
+        />,
         <ResultRow
+          key="effective-rate"
           label="Effective buyer commission"
           value={`${result.effectiveBuyerCommissionPercent}%`}
-        />
-      </dl>
-
-      <HeadlineDisclosures dark />
-    </div>
+        />,
+      ]}
+      footer={<HeadlineDisclosures />}
+    />
   );
 }
 
@@ -318,12 +253,12 @@ function ResultRow({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <dt className="text-primary-100">{label}</dt>
+      <dt className="text-neutral-500">{label}</dt>
       <dd
         className={
           emphasized
-            ? "text-lg font-semibold text-white"
-            : "text-sm font-medium text-primary-50"
+            ? "text-lg font-semibold text-primary-700"
+            : "text-sm font-medium text-neutral-900"
         }
       >
         {value}
@@ -334,23 +269,15 @@ function ResultRow({
 
 // MARK: - Headline disclosures (inline)
 
-function HeadlineDisclosures({ dark = false }: { dark?: boolean }) {
+function HeadlineDisclosures() {
   const headlines = getHeadlineDisclosures();
   return (
-    <div
-      className={`mt-6 border-t pt-4 text-xs ${
-        dark
-          ? "border-primary-600/50 text-primary-100"
-          : "border-neutral-200 text-neutral-600"
-      }`}
-    >
+    <div className="mt-2 border-t border-neutral-200 pt-4 text-xs text-neutral-600">
       <p className="font-semibold">Important</p>
       <ul className="mt-2 space-y-2">
         {headlines.map((d) => (
           <li key={d.id}>
-            <span className={dark ? "text-white" : "text-neutral-900"}>
-              {d.label}:
-            </span>{" "}
+            <span className="text-neutral-900">{d.label}:</span>{" "}
             {d.body}
           </li>
         ))}

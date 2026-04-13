@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { LoadingState } from "@/components/product/LoadingState";
+import { SurfaceState } from "@/components/product/SurfaceState";
 import { StatusBadge } from "@/components/product/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,22 +31,17 @@ export function PropertyCaseOverview({
   }) as PropertyCaseOverviewSurface | null | undefined;
 
   if (overview === undefined) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center text-sm text-neutral-500">
-          Loading the overview case…
-        </CardContent>
-      </Card>
-    );
+    return <LoadingState variant="panel" />;
   }
 
   if (overview === null) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center text-sm text-neutral-500">
-          This deal room overview is not available.
-        </CardContent>
-      </Card>
+      <SurfaceState
+        tone="error"
+        title="This deal room overview is not available."
+        description="The overview stays hidden until buyer-safe evidence and route data are available."
+        className="bg-white"
+      />
     );
   }
 
