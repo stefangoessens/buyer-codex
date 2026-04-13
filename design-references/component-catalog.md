@@ -50,6 +50,7 @@ Design component patterns harvested from reference sites (PayFit, Hosman, RealAd
 - **Source**: Hosman trust strip
 - **Purpose**: Social proof strip showing partner logos, stats, and trust signals
 - **Visual**: Full-width bar on gray-50 background. Horizontally scrollable on mobile, centered grid on desktop. Each item: logo or icon + stat number (bold) + label (gray-500, sm text). Items separated by subtle vertical dividers (gray-200).
+- **Composition rule**: 3-5 items max. Mix at least two of these evidence types: quantified proof, human/company proof, operational proof. One operational signal should always be present on buyer-codex public surfaces.
 - **Variants**:
   - `logos` -- partner/press logos only
   - `stats` -- numeric stats with labels (e.g., "500+ buyers helped")
@@ -103,6 +104,7 @@ Design component patterns harvested from reference sites (PayFit, Hosman, RealAd
 - **Source**: PayFit empty state pattern
 - **Purpose**: Friendly placeholder when no data exists (no deals, no tours, no saved properties)
 - **Visual**: Centered layout with illustrative icon or illustration (gray-300 stroke), heading (gray-800, lg, semibold), description (gray-500, base), and primary CTA button below. Generous vertical spacing (space-8 between elements). Contained within a dashed border (gray-200) rounded box on brand-surface background.
+- **Illustration rule**: Use one bounded illustration or UI-support graphic only. No mascots, celebratory effects, or decorative scene-building.
 - **Variants**:
   - `page` -- full-page empty state
   - `section` -- inline within a page section
@@ -146,7 +148,8 @@ Design component patterns harvested from reference sites (PayFit, Hosman, RealAd
 - **Variants**:
   - `grid-2` -- 2-column layout (4 features)
   - `grid-3` -- 3-column layout (6 features)
-  - `alternating` -- alternating left/right large feature blocks with illustration
+  - `alternating` -- alternating left/right large feature blocks with illustration or framed product UI
+- **Illustration/UI rule**: Use framed UI when the feature claim is concrete and product-led; use illustration only for softer guidance/support claims.
 - **Surfaces**: Homepage features section, about page, feature detail pages
 
 ---
@@ -161,4 +164,31 @@ Design component patterns harvested from reference sites (PayFit, Hosman, RealAd
   - `featured` -- larger card, primary-50 background, used for hero testimonial
   - `compact` -- inline quote without card chrome, for embedding in other sections
   - `carousel` -- multiple cards in a horizontally scrollable row
+- **Trust rule**: Pair with either one proof stat or one process/compliance note when used on public marketing pages. Never autoplay the carousel variant.
 - **Surfaces**: Homepage testimonials section, landing pages, deal room (agent reviews)
+
+---
+
+## 13. DisclosureStack
+
+- **Source**: PayFit support/compliance framing, adapted for buyer-codex calculator and intake requirements
+- **Purpose**: Keep legal and brokerage-critical trust copy adjacent to the claim it qualifies
+- **Visual**: Low-contrast card or accordion with 2-5 disclosure rows. The first row is always visible and visually stronger (border accent or stronger heading). Remaining rows can collapse behind an explicit "full details" trigger. Body copy should feel calm and readable, not warning-banner styled.
+- **Variants**:
+  - `inline` -- strongest disclosure only, rendered directly under a savings/result figure
+  - `stacked` -- visible multi-row list for calculator support sections
+  - `accordion` -- mobile-friendly or dense-flow variant
+- **Surfaces**: Savings calculator, pricing support sections, intake/onboarding trust blocks
+
+---
+
+## 14. TrustPanel
+
+- **Source**: PayFit trust-forward product support panels, adapted for buyer onboarding and deal-room sidebars
+- **Purpose**: Reassure users inside task flows without switching into marketing mode
+- **Visual**: Radius-lg side panel or inline card with short heading, 2-3 trust bullets, one lightweight badge row, and one optional supporting disclosure or response-time note. Calm background, restrained iconography, and no oversized testimonial styling.
+- **Variants**:
+  - `onboarding` -- emphasizes licensed broker review, secure data handling, and expected turnaround
+  - `dealroom` -- emphasizes auditability, document security, and process ownership
+  - `compact` -- inline reassurance block adjacent to a form
+- **Surfaces**: Intake flow, onboarding steps, deal room sidebars
