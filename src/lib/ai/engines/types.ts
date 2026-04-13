@@ -22,7 +22,20 @@ export interface PricePoint {
   value: number;
   deltaVsListPrice: number; // percentage
   deltaVsConsensus: number; // percentage
+  deltaVsNeighborhoodMedian?: number | null; // percentage
+  deltaVsCompAverage?: number | null; // percentage
   confidence: number; // 0-1
+}
+
+export type PricingReviewReason =
+  | "estimate_disagreement"
+  | "sparse_estimates"
+  | "missing_estimates";
+
+export interface PricingReviewFallback {
+  reviewRequired: boolean;
+  reasons: PricingReviewReason[];
+  summary: string | null;
 }
 
 /** Full pricing engine output */
@@ -35,6 +48,13 @@ export interface PricingOutput {
   estimateSpread: number; // std dev / mean — high = low confidence
   estimateSources: string[]; // which estimates were available
   overallConfidence: number;
+  marketReferences?: {
+    listPrice: number;
+    consensusEstimate: number;
+    neighborhoodMedianPrice: number | null;
+    compAveragePrice: number | null;
+  };
+  reviewFallback?: PricingReviewFallback;
 }
 
 // ═══ Comps Engine Types ═══
@@ -286,9 +306,18 @@ export interface CalibrationRecord {
   engineOutputId: string;
   predictedFairValue: number;
   predictedLikelyAccepted: number;
+  predictedStrongOpener: number;
+  predictedWalkAway: number;
   actualAcceptedPrice: number;
   errorFairValue: number; // percentage
   errorLikelyAccepted: number; // percentage
+  errorStrongOpener: number; // percentage
+  errorWalkAway: number; // percentage
+  meanAbsoluteError: number; // percentage
+  highError: boolean;
+  daysToAccept: number | null;
+  countersMade: number;
+  acceptedAt: string;
   promptVersion: string;
   modelId: string;
   recordedAt: string;

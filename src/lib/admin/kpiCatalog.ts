@@ -150,6 +150,15 @@ export const KPI_CATALOG: readonly KpiMetricDef[] = [
     description: "Share of engine outputs flagged for internal review.",
     direction: "lower_better",
   },
+  {
+    key: "ai.calibration_drift",
+    label: "Calibration drift",
+    category: "ai",
+    unit: "percent",
+    description:
+      "Mean absolute pricing error across accepted deals with stored calibration records.",
+    direction: "lower_better",
+  },
 ];
 
 export const KPI_BY_KEY: Readonly<Record<string, KpiMetricDef>> = Object.freeze(

@@ -24,6 +24,7 @@ import { v } from "convex/values";
 import { type QueryCtx } from "./_generated/server";
 import { buildLeadAttributionReadModel } from "./lib/leadAttribution";
 import { requireAuth } from "./lib/session";
+import { averageCalibrationDrift } from "../src/lib/ai/engines/pricingCalibration";
 
 // ─── range + metric validators ──────────────────────────────────────────────
 
@@ -159,6 +160,13 @@ const METRICS: readonly MetricDef[] = [
   {
     key: "ai.engine_review_rate",
     label: "Needs-review rate",
+    category: "ai",
+    unit: "percent",
+    direction: "lower_better",
+  },
+  {
+    key: "ai.calibration_drift",
+    label: "Calibration drift",
     category: "ai",
     unit: "percent",
     direction: "lower_better",
@@ -331,6 +339,13 @@ async function computeMetric(
           (r as unknown as { reviewState: string }).reviewState === "pending",
       ).length;
       return needingReview / inWindow.length;
+    }
+    case "ai.calibration_drift": {
+      const rows = await (ctx.db as any).query("pricingCalibrationRecords").collect();
+      const inWindow = rows.filter((row: any) =>
+        withinRange(row.recordedAt, startMs, endMs)
+      );
+      return averageCalibrationDrift(inWindow);
     }
     default:
       return null;
