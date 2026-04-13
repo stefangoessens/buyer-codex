@@ -322,7 +322,7 @@ describe("buildPropertyDossier", () => {
     };
   }
 
-  it("labels section provenance/categories and strips internal sections for buyers", () => {
+  it("labels source categories on the evidence graph and strips internal trace from buyers", () => {
     const dossier = buildPropertyDossier(createInput());
 
     expect(dossier.sections.propertyFacts.sourceCategories).toEqual([
@@ -342,12 +342,106 @@ describe("buildPropertyDossier", () => {
       category: "browser_extracted_interactive",
       citation: "https://www.zillow.com/homedetails/1",
     });
+    expect(dossier.evidenceGraph.nodes["portal-estimates"]).toMatchObject({
+      sourceCategory: "deterministic_extracted",
+      kind: "portal_signals",
+    });
+    expect(dossier.evidenceGraph.nodes["market-context"]).toMatchObject({
+      sourceCategory: "market_baseline_aggregated",
+      kind: "market_context",
+    });
+    expect(dossier.evidenceGraph.nodes["browser-verification"]).toMatchObject({
+      sourceCategory: "browser_extracted_interactive",
+      kind: "browser_verification",
+    });
+    expect(dossier.evidenceGraph.nodes["pricing-output"]).toMatchObject({
+      sourceCategory: "inferred_model_generated",
+      kind: "model_output",
+    });
+    expect(dossier.evidenceGraph.sections.leverage.confidenceInputs.sourceCategories).toEqual([
+      "deterministic_extracted",
+      "browser_extracted_interactive",
+      "market_baseline_aggregated",
+    ]);
+    expect(dossier.evidenceGraph.sections.pricing.availableDetailLevels).toEqual([
+      "buyer_safe_summary",
+      "internal_deep_trace",
+    ]);
+    expect(dossier.evidenceGraph.sections.pricing.internalTrace?.reasonCodes).toEqual(
+      expect.arrayContaining(["model_output_available"]),
+    );
+    expect(dossier.evidenceGraph.nodes["pricing-output"].internal).toMatchObject({
+      engineType: "pricing",
+    });
 
     const buyerSafe = projectBuyerSafeDossier(dossier);
     expect(buyerSafe.internalSectionKeys).toEqual([]);
     expect(Object.keys(buyerSafe.sections)).toContain("documents");
     expect(Object.keys(buyerSafe.sections)).not.toContain("browserUse");
     expect(Object.keys(buyerSafe.sections)).not.toContain("downstreamInputs");
+    expect(buyerSafe.evidenceGraph.sections.pricing.availableDetailLevels).toEqual([
+      "buyer_safe_summary",
+    ]);
+    expect(buyerSafe.evidenceGraph.sections.pricing.internalTrace).toBeUndefined();
+    expect(buyerSafe.evidenceGraph.sections.pricing.confidenceInputs.reasonCodes).toBeUndefined();
+    expect(buyerSafe.evidenceGraph.nodes["pricing-output"].internal).toBeUndefined();
+  });
+
+  it("tracks missing and conflicting evidence separately for downstream confidence consumers", () => {
+    const input = createInput();
+    input.marketContext = null;
+    input.recentSales = [];
+    input.browserUseRuns[0] = {
+      ...input.browserUseRuns[0],
+      canonicalFields: {
+        listPrice: 645000,
+        priceReductions: [{ amount: 15000, date: "2026-04-01" }],
+      },
+      conflictingFields: ["listPrice", "priceReductions"],
+    };
+    input.latestOutputs = {
+      pricing: {
+        ...input.latestOutputs!.pricing!,
+        output: {
+          ...input.latestOutputs!.pricing!.output!,
+          reviewFallback: {
+            reviewRequired: true,
+            reasons: ["estimate_disagreement"],
+            summary: "Portal estimates disagree",
+          },
+        },
+      },
+    };
+
+    const dossier = buildPropertyDossier(input);
+    const pricing = dossier.evidenceGraph.sections.pricing;
+    const leverage = dossier.evidenceGraph.sections.leverage;
+
+    expect(pricing.status).toBe("conflicting_evidence");
+    expect(pricing.confidenceInputs.missingLabels).toEqual(
+      expect.arrayContaining(["fresh neighborhood baselines", "local sold comps"]),
+    );
+    expect(pricing.confidenceInputs.conflictingLabels).toEqual(
+      expect.arrayContaining([
+        "conflicting portal estimates",
+        "conflicting listing-price inputs",
+      ]),
+    );
+    expect(pricing.confidenceInputs.reasonCodes).toEqual(
+      expect.arrayContaining([
+        "conflicting_portal_estimates",
+        "conflicting_browser_fields",
+        "missing_market_context",
+        "missing_recent_sales",
+        "pricing_requires_review",
+      ]),
+    );
+    expect(leverage.confidenceInputs.missingLabels).toEqual(
+      expect.arrayContaining(["fresh neighborhood baselines", "local sold comps"]),
+    );
+    expect(leverage.confidenceInputs.conflictingLabels).toContain(
+      "conflicting listing-history inputs",
+    );
   });
 
   it("keeps refresh/replay fingerprints deterministic and changes them when source data changes", () => {
@@ -356,6 +450,7 @@ describe("buildPropertyDossier", () => {
 
     expect(second.fingerprint).toBe(first.fingerprint);
     expect(second.replayKey).toBe(first.replayKey);
+    expect(second.evidenceGraph.fingerprint).toBe(first.evidenceGraph.fingerprint);
     expect(second.sections.portalSignals.freshness.fingerprint).toBe(
       first.sections.portalSignals.freshness.fingerprint,
     );
@@ -371,6 +466,9 @@ describe("buildPropertyDossier", () => {
 
     expect(refreshed.fingerprint).not.toBe(first.fingerprint);
     expect(refreshed.replayKey).not.toBe(first.replayKey);
+    expect(refreshed.evidenceGraph.fingerprint).not.toBe(
+      first.evidenceGraph.fingerprint,
+    );
     expect(refreshed.sections.portalSignals.freshness.fingerprint).not.toBe(
       first.sections.portalSignals.freshness.fingerprint,
     );

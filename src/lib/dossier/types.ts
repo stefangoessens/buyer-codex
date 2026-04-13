@@ -26,7 +26,7 @@ import type {
 } from "@/lib/enrichment/types";
 import type { NegotiationBriefInputs } from "@/lib/negotiation/types";
 
-export const PROPERTY_DOSSIER_VERSION = "1.0.0";
+export const PROPERTY_DOSSIER_VERSION = "1.1.0";
 
 export const DOSSIER_SOURCE_CATEGORIES = [
   "deterministic_extracted",
@@ -40,6 +40,91 @@ export type DossierSourceCategory =
   (typeof DOSSIER_SOURCE_CATEGORIES)[number];
 
 export type DossierVisibility = "buyer_safe" | "internal_only";
+
+export const RECOMMENDATION_EVIDENCE_SECTION_KEYS = [
+  "pricing",
+  "comps",
+  "leverage",
+  "risk",
+  "offer_recommendation",
+] as const;
+
+export type RecommendationEvidenceSectionKey =
+  (typeof RECOMMENDATION_EVIDENCE_SECTION_KEYS)[number];
+
+export const EVIDENCE_TRACE_DETAIL_LEVELS = [
+  "buyer_safe_summary",
+  "internal_deep_trace",
+] as const;
+
+export type EvidenceTraceDetailLevel =
+  (typeof EVIDENCE_TRACE_DETAIL_LEVELS)[number];
+
+export const EVIDENCE_TRACE_STATUSES = [
+  "supported",
+  "mixed",
+  "waiting_on_evidence",
+  "conflicting_evidence",
+] as const;
+
+export type EvidenceTraceStatus = (typeof EVIDENCE_TRACE_STATUSES)[number];
+
+export const EVIDENCE_GRAPH_NODE_KINDS = [
+  "listing_facts",
+  "portal_signals",
+  "market_context",
+  "recent_sales",
+  "risk_hooks",
+  "documents",
+  "browser_verification",
+  "enrichment_artifacts",
+  "model_output",
+  "missing_evidence",
+  "conflicting_evidence",
+] as const;
+
+export type EvidenceGraphNodeKind = (typeof EVIDENCE_GRAPH_NODE_KINDS)[number];
+
+export const RECOMMENDATION_CONFIDENCE_BANDS = [
+  "high",
+  "medium",
+  "low",
+  "waiting",
+] as const;
+
+export type RecommendationConfidenceBand =
+  (typeof RECOMMENDATION_CONFIDENCE_BANDS)[number];
+
+export const RECOMMENDATION_CONFIDENCE_REASON_CODES = [
+  "verified_listing_facts",
+  "portal_estimate_consensus",
+  "market_context_available",
+  "recent_sales_available",
+  "risk_facts_available",
+  "document_findings_available",
+  "browser_verification_available",
+  "model_output_available",
+  "missing_portal_estimates",
+  "sparse_portal_estimates",
+  "missing_market_context",
+  "missing_recent_sales",
+  "insufficient_recent_sales",
+  "missing_listing_history",
+  "missing_risk_facts",
+  "missing_documents",
+  "missing_pricing_output",
+  "missing_comps_output",
+  "missing_leverage_output",
+  "missing_offer_output",
+  "conflicting_portal_estimates",
+  "conflicting_browser_fields",
+  "pricing_requires_review",
+  "offer_requires_pricing_and_leverage",
+  "inference_heavy",
+] as const;
+
+export type RecommendationConfidenceReasonCode =
+  (typeof RECOMMENDATION_CONFIDENCE_REASON_CODES)[number];
 
 export interface DossierSourceRef {
   label: string;
@@ -63,6 +148,82 @@ export interface DossierSection<T> {
   freshness: DossierFreshness;
   provenance: DossierSourceRef[];
   data: T;
+}
+
+export interface EvidenceGraphNode {
+  id: string;
+  label: string;
+  summary: string;
+  kind: EvidenceGraphNodeKind;
+  sourceCategory?: DossierSourceCategory;
+  confidence: number | null;
+  internal?: {
+    sourceSectionKey?: PropertyDossierSectionKey;
+    engineType?: DossierLatestEngineOutput["engineType"];
+    citations: string[];
+    capturedAt?: string;
+    provenance: DossierSourceRef[];
+  };
+}
+
+export interface BuyerSafeEvidenceSummary {
+  detailLevel: "buyer_safe_summary";
+  headline: string;
+  supportLabels: string[];
+  caution: string | null;
+  status: EvidenceTraceStatus;
+  dependsOnInference: boolean;
+}
+
+export interface RecommendationConfidenceInputs {
+  score: number | null;
+  band: RecommendationConfidenceBand;
+  sourceCategories: DossierSourceCategory[];
+  supportLabels: string[];
+  missingLabels: string[];
+  conflictingLabels: string[];
+  dependsOnInference: boolean;
+  reasonCodes?: RecommendationConfidenceReasonCode[];
+}
+
+export interface InternalRecommendationEvidenceTrace {
+  detailLevel: "internal_deep_trace";
+  summary: string;
+  sourceCategories: DossierSourceCategory[];
+  reasonCodes: RecommendationConfidenceReasonCode[];
+  supportingNodeIds: string[];
+  missingNodeIds: string[];
+  conflictingNodeIds: string[];
+}
+
+export interface RecommendationEvidenceSection {
+  key: RecommendationEvidenceSectionKey;
+  title: string;
+  availableDetailLevels: EvidenceTraceDetailLevel[];
+  status: EvidenceTraceStatus;
+  supportingNodeIds: string[];
+  missingNodeIds: string[];
+  conflictingNodeIds: string[];
+  buyerSummary: BuyerSafeEvidenceSummary;
+  confidenceInputs: RecommendationConfidenceInputs;
+  internalTrace?: InternalRecommendationEvidenceTrace;
+}
+
+export interface PropertyEvidenceGraphSections {
+  pricing: RecommendationEvidenceSection;
+  comps: RecommendationEvidenceSection;
+  leverage: RecommendationEvidenceSection;
+  risk: RecommendationEvidenceSection;
+  offer_recommendation: RecommendationEvidenceSection;
+}
+
+export interface PropertyEvidenceGraph {
+  graphVersion: string;
+  fingerprint: string;
+  replayKey: string;
+  sectionKeys: RecommendationEvidenceSectionKey[];
+  nodes: Record<string, EvidenceGraphNode>;
+  sections: PropertyEvidenceGraphSections;
 }
 
 export interface DossierSourceListingRecord {
@@ -291,6 +452,7 @@ export interface PropertyDossier {
   buyerSafeSectionKeys: PropertyDossierSectionKey[];
   internalSectionKeys: PropertyDossierSectionKey[];
   sections: PropertyDossierSections;
+  evidenceGraph: PropertyEvidenceGraph;
 }
 
 export interface DossierBuildInput {
