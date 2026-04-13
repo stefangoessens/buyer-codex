@@ -236,7 +236,128 @@ Base unit: **4px**. All spacing values are multiples of 4.
 
 ---
 
-## 9. Surface Mapping
+### Motion Decision Rules
+
+Use these rules when more than one animation approach would be plausible:
+
+| Situation | Choose | Why it matches PayFit | Do not choose |
+|---|---|---|---|
+| Primary CTA hover | Background tint shift + shadow increase + at most 1-2px perceived lift at `150-200ms` | PayFit buttons feel responsive and polished, but never theatrical | Bounce, glow, elastic scale, icon spin |
+| Card hover | Shadow step (`shadow-sm` → `shadow-md`) and optional `scale(1.01)` | Keeps the surface feeling touchable without looking like a draggable tile | 3D tilt, `scale(1.04+)`, hard drop shadows |
+| Section reveal on public pages | Fade-up `8-12px`, `250-400ms`, stagger `40-60ms`, one pass only | PayFit uses reveal as orchestration, not as an ambient effect | Re-triggering on every scroll, long parallax, layered timelines |
+| Step-to-step onboarding transition | Outgoing content fades to `0` while incoming content slides `12-16px` on the x-axis and fades in at `250ms` | Feels guided and product-like, not like a marketing carousel | Full-screen wipes, slide decks, modal-like cross-zooms |
+| Expand/collapse disclosures or FAQ | Height/opacity transition at `200-250ms` with `ease-in-out` | Keeps compliance/help copy readable and calm | Overshoot springs, accordion snap, collapsing multiple panels at once |
+| Async confirmation | Subtle color confirmation, check icon fade-in, or border accent | Trust surfaces should reinforce certainty, not celebrate | Confetti, success bursts, looping checkmark pulses |
+| Loading | Skeleton sweep or steady pulse `1.4-1.8s` | Matches PayFit's "system is working" feel | Spinners as the default for content regions, jittery shimmer, rainbow loaders |
+
+### Public vs. Authenticated Motion
+
+| Surface type | Motion posture | Allowed emphasis | Restricted behaviors |
+|---|---|---|---|
+| **Public marketing** | Guided, slightly more spacious | Section reveals, CTA hover lift, feature-card hover, controlled testimonial/proof entrance | Auto-rotating testimonial carousels, floating decorative shapes, looping hero motion |
+| **Intake / onboarding** | Reassuring, task-forward | Step transitions, validation states, disclosure expansion, progress indicator updates | Multiple simultaneous reveals, attention traps near inputs, animated distractions next to legal copy |
+| **Authenticated product** | Quiet, utility-first | Instant hover feedback, panel open/close, inline optimistic updates, skeletons | Large staggered reveals after first paint, animated counters on every refresh, marketing-style hero entrances |
+
+### Motion Anti-Patterns
+
+- Too flashy: parallax, marquee logos, count-up vanity metrics, pulsing trust badges, floating gradient blobs, autoplay carousels.
+- Too startup-generic: springy cards, micro-bounce on every click, animated mascot scenes, attention-grabbing cursor-follow effects.
+- Too enterprise-flat: zero hover feedback, abrupt accordion snaps, no progress cues in onboarding, dead/static empty states.
+- `ease-spring` is reserved for tiny input affordances only. Never use it for trust claims, testimonials, disclosures, or page-level transitions.
+
+---
+
+## 9. Illustration
+
+### Choose Illustration vs. Product UI vs. Photography
+
+| If the message is about... | Use | Why | Avoid |
+|---|---|---|---|
+| Workflow clarity, dashboard output, automation, or search results | Product UI screenshot/mock frame | Real interface detail builds credibility faster than metaphor | Abstract illustration standing in for a concrete product claim |
+| Guidance, reassurance, empty states, onboarding support, or invisible service work | Minimal illustration | Softens the experience without pretending to be evidence | Dense UI screenshots that overwhelm a lightweight support moment |
+| Real humans, outcomes, reviews, or properties | Photography | Trust comes from specific people and real homes, not from illustration | Generic stock office scenes or AI-looking people |
+| Pricing math, legal framing, disclosures, or data-heavy comparison | Plain UI + typography | These surfaces need clarity over charm | Decorative scenes, oversized icons, or emotional imagery competing with legal copy |
+
+### Illustration Treatment Rules
+
+1. **Style**: flat or softly shaded 2D, geometric, human but not character-led, with clean outlines or crisp fill boundaries.
+2. **Palette**: one dominant brand-primary family, one warm accent, one success/support color, and neutral grounding. Illustrations should feel like an extension of the token system, not a separate palette.
+3. **Complexity**: one clear idea per illustration. PayFit's illustrations are compositional support, not puzzle images.
+4. **Framing**: keep illustrations inside cards, split-content sections, or empty-state containers. Do not let them float as disconnected collage elements.
+5. **Relationship to UI**: product UI wins whenever the claim can be shown directly. Illustration is secondary and explanatory.
+6. **Scale**: on marketing pages, one illustration per major narrative section is enough. In authenticated surfaces, restrict illustration to empty states, onboarding side panels, and light contextual support.
+7. **Texture**: use clean fills, sparse highlights, and subtle shadows only where they reinforce depth. No grain-heavy poster treatment, hand-drawn sketching, or glossy 3D rendering.
+
+### Illustration Anti-Patterns
+
+- Too flashy: 3D isometric scenes, mascots, exaggerated gradients, oversized decorative ribbons, layered floating stickers.
+- Too startup-generic: generic AI orbit graphics, purple blob collages, emoji-led scenes, abstract "innovation" visuals.
+- Too enterprise-flat: icon-only sections where a supportive illustration should soften the page, grayscale compliance panels with no visual relief.
+- Do not imitate PayFit's exact characters, product scenes, or compositions literally. Borrow the level of friendliness and restraint, not the proprietary artwork.
+
+---
+
+## 10. Trust Surfaces
+
+### Trust Surface Formula
+
+Every trust-forward surface should combine at least **two** of these evidence types:
+
+| Evidence type | What counts | Typical location |
+|---|---|---|
+| **Outcome proof** | Savings figures, time-to-close, buyer count, response-time metric, score improvement | Trust bar, calculator support, KPI rail |
+| **Human proof** | Buyer testimonial, named reviewer, broker review, partner/press/customer logo | Mid-page proof section, footer trust strip, onboarding reassurance panel |
+| **Operational proof** | Licensed brokerage note, broker review process, secure document handling, disclosure language, certification badges | Calculator support, onboarding, footer, deal-room side panels |
+
+A trust surface is weak if it relies on only one evidence type. Example: a testimonial carousel with no quantified outcome or operational framing is too soft; a disclosure wall with no human or outcome proof is too cold.
+
+### Trust Pattern Selection
+
+Use this table when choosing between plausible trust implementations:
+
+| Need | Choose | Composition rules | Do not substitute with |
+|---|---|---|---|
+| Immediate reassurance below the hero | `TrustBar` | 3-5 items max; mix one quantified outcome, one human/company signal, one operational signal; keep copy fragment-length | Long testimonials, badge clouds, auto-scrolling logo belts |
+| Support a calculator or savings claim | Result card + `DisclosureStack` + one proof block or testimonial | Put the strongest disclosure directly under the result, then an expandable stack for the rest; adjacent proof should support the claim, not repeat it | Hiding disclosure in tooltip/modals, putting legal copy only in footer |
+| Convince a skeptical public visitor mid-page | Testimonial cluster with proof companion stats | 2-3 testimonials max per row; pair with one stat rail or one licensing/process note | Full-wall review dumps, testimonial carousels that autoplay |
+| Reassure a user inside onboarding | Compact `TrustPanel` | Focus on broker oversight, data handling, timeline clarity, and next-step certainty; keep it sidebar/card scale | Marketing testimonials, large logo strips, animated proof counters |
+| Reinforce legitimacy near the footer/CTA | Certification or policy rail | Use restrained badges plus one sentence on what the certification/process means | Giant stamp graphics, legal text blocks that dominate the CTA |
+
+### Public vs. Authenticated Trust
+
+| Surface type | Primary trust mechanism | Secondary support | Tone |
+|---|---|---|---|
+| **Public marketing** | Social proof and outcome proof | Disclosures, licensing, certifications, buyer stories | Warm, spacious, persuasive |
+| **Intake / onboarding** | Operational proof | One calm testimonial or proof stat only if it directly reduces hesitation | Guided, low-friction, reassuring |
+| **Authenticated product** | System reliability and process clarity | Audit trail language, status badges, broker review cues, secure-upload messaging | Calm, compact, non-promotional |
+
+Rules:
+
+1. Public surfaces may use testimonials, logos, proof stats, and licensing together, but the visual hierarchy must still lead with the task or value proposition.
+2. Authenticated surfaces should almost never reuse marketing-style testimonial cards. After login, trust comes from state clarity, response expectations, and visible process ownership.
+3. On onboarding surfaces, operational proof beats social proof. "Reviewed by a licensed broker" is stronger than "buyers love us" next to a required form.
+4. Trust surfaces should be interleaved with decision points. Do not stack multiple trust-heavy sections back-to-back without advancing the user.
+
+### Implementation Guardrails
+
+These are product rules, not optional styling advice:
+
+1. Public proof blocks and case studies must render through `src/lib/trustProof/policy.ts` and `src/lib/trustProof/types.ts`. Do not hand-roll testimonial/proof arrays inside components.
+2. If proof is illustrative rather than live, the visible label policy from `DEFAULT_LABELING_POLICY` is mandatory. Never make illustrative examples look like verified transaction proof.
+3. Calculator trust support must consume `src/lib/pricing/disclosures.ts`. The strongest disclosure belongs immediately under the headline claim; the rest may collapse, but they may not disappear.
+4. If there is no verified proof yet, prefer a clearly labeled illustrative example or plain process explanation over vague vanity metrics.
+5. Regulatory or brokerage claims should be phrased as process assurance, then backed by a specific note. Example shape: claim, one-sentence explanation, disclosure link/accordion.
+
+### Trust Anti-Patterns
+
+- Too flashy: animated number counters, flashing ratings, rotating certification badges, testimonial carousels on timers.
+- Too startup-generic: anonymous five-star grids, vague "trusted by top buyers" copy, AI-generated avatars, unqualified superlatives.
+- Too enterprise-flat: monochrome disclosure walls, unlabeled dense legal tables, sterile proof sections with no human context.
+- Do not copy PayFit's Trustpilot-heavy composition literally. Reuse the pacing and evidence balance, not the exact review-provider treatment.
+
+---
+
+## 11. Surface Mapping
 
 How design patterns map to buyer-codex surfaces:
 
@@ -253,7 +374,7 @@ How design patterns map to buyer-codex surfaces:
 
 ---
 
-## 10. Component Patterns
+## 12. Component Patterns
 
 Key reusable components derived from the reference sites. Each component lists its source inspiration, visual characteristics, and buyer-codex adaptation.
 
@@ -276,7 +397,8 @@ Key reusable components derived from the reference sites. Each component lists i
 
 ### TrustBar
 - **Source**: Hosman trust strip
-- **Visual**: Full-width, neutral-50 background, horizontally scrolling or evenly spaced partner logos, optional stats ("500+ buyers served", "$2M+ saved")
+- **Visual**: Full-width, neutral-50 background, horizontally scrolling or evenly spaced partner logos, optional stats ("500+ buyers served", "$2M+ saved"), and at least one operational trust cue (licensed brokerage, secure process, reviewed by broker)
+- **Composition rule**: 3-5 items max. One row on desktop, horizontal scroll on mobile. Prefer a mix of quantified proof + human/company signal + process proof.
 - **Surface**: Public homepage, below hero
 
 ### KPICard
@@ -303,6 +425,7 @@ Key reusable components derived from the reference sites. Each component lists i
 ### EmptyState
 - **Source**: PayFit empty states
 - **Visual**: Centered layout, friendly illustration (minimal line art style, brand-primary + accent colors), heading, description, primary CTA button
+- **Illustration rule**: use one bounded illustration or UI-support graphic only. No mascots, celebratory confetti, or decorative scenery.
 - **Surface**: Any list/dashboard with no data
 
 ### LoadingState
@@ -321,9 +444,41 @@ Key reusable components derived from the reference sites. Each component lists i
 - **Variants**: `active` (green), `pending` (amber), `closed` (neutral), `urgent` (red)
 - **Surface**: Dashboards, tables, cards
 
+### DisclosureStack
+- **Source**: PayFit support/compliance framing, adapted for buyer-codex calculator and intake requirements
+- **Purpose**: Keep legal and brokerage-critical trust copy near the claim it qualifies
+- **Visual**: Compact stack of 2-5 disclosure rows inside a low-contrast card or accordion. First row is always visible and uses stronger typography or border emphasis; remaining rows can collapse. Use generous line length control, subdued separators, and no alert-red styling unless the content is truly negative.
+- **Variants**:
+  - `inline` -- first disclosure only, shown directly under a savings/result figure
+  - `stacked` -- visible list for calculator support sections
+  - `accordion` -- compact version for mobile or denser onboarding flows
+- **Surfaces**: Savings calculator, pricing page, onboarding reassurance blocks
+
+### TrustPanel
+- **Source**: PayFit trust-forward product support panels, adapted for buyer onboarding and deal-room sidebars
+- **Purpose**: Reassure users inside task flows without dropping them into marketing mode
+- **Visual**: Radius-lg side panel or inline card with short heading, 2-3 trust bullets, one lightweight badge row, and one optional supporting disclosure or response-time note. Calm background, neutral typography, and restrained iconography.
+- **Variants**:
+  - `onboarding` -- emphasizes licensed broker review, secure data handling, and expected turnaround
+  - `dealroom` -- emphasizes auditability, document security, and process ownership
+  - `compact` -- inline reassurance block adjacent to a form
+- **Surfaces**: Intake flow, onboarding steps, deal room sidebars
+
+### TestimonialCard
+- **Source**: Hosman testimonials section
+- **Purpose**: Social proof via buyer testimonials and success stories
+- **Visual**: White card (radius-lg, shadow-sm) with quote text (lg, gray-800, italic, snug leading). Below: avatar circle (48px, radius-full), name (medium), role/location (sm, gray-500). Optional star rating row above the quote. Quotation mark decorative element (primary-100, oversized) in top-left corner.
+- **Variants**:
+  - `default` -- standard card with quote + attribution
+  - `featured` -- larger card, primary-50 background, used for hero testimonial
+  - `compact` -- inline quote without card chrome, for embedding in other sections
+  - `carousel` -- multiple cards in a horizontally scrollable row
+- **Trust rule**: pair with either a proof stat or a process/compliance note when used on marketing pages. Do not use the carousel variant on autoplay.
+- **Surfaces**: Homepage testimonials section, landing pages, deal room (agent reviews)
+
 ---
 
-## 11. Adopted vs. Rejected Patterns
+## 13. Adopted vs. Rejected Patterns
 
 ### PayFit
 
@@ -384,7 +539,7 @@ Key reusable components derived from the reference sites. Each component lists i
 
 ---
 
-## 12. Coverage Rationale
+## 14. Coverage Rationale
 
 ### What This Document Covers
 
@@ -395,15 +550,17 @@ This design system covers every visual and structural decision needed to build b
 - **Spacing**: 4px-base grid with 15 tokens from 0-96px, plus layout constants (container, gutter, section padding, sidebar, nav height).
 - **Shape**: Border radii from 6px (inputs) to 9999px (pills) — 5 tokens covering all component shapes.
 - **Elevation**: 6 shadow tokens with clear usage guidance (resting → hover → floating → modal).
-- **Motion**: Duration, easing, and animation rules with accessibility compliance (prefers-reduced-motion).
+- **Motion**: Duration, easing, pacing rules, public-vs-product posture, and anti-patterns with enough detail to choose between plausible transitions.
+- **Illustration**: Explicit rules for when to use illustration versus product UI or photography, plus the allowed visual treatment.
+- **Trust surfaces**: Composition rules for proof bars, testimonials, disclosures, onboarding reassurance, and authenticated trust patterns tied to existing typed data modules.
 - **Surface mapping**: 8 distinct surfaces mapped to reference sources, layout patterns, and key components.
-- **Component patterns**: 12 key components with source attribution, visual specification, and surface assignments.
+- **Component patterns**: Trust/disclosure components plus the core marketing and product primitives, each with source attribution, visual specification, and surface assignments.
 - **Adopted/rejected patterns**: Explicit decisions for all three reference sites with rationale.
 
 ### What Is Intentionally Out of Scope
 
 - **Icon library**: Uses Lucide (configured in `components.json`). No custom icon set needed.
-- **Illustration style**: Will be defined when illustration assets are commissioned. Guideline: minimal line art, brand-primary + accent colors, friendly tone (per PayFit).
+- **Commissioned illustration asset pack**: The style rules are defined above, but the final owned scenes/characters are not specified asset-by-asset here.
 - **iOS-specific tokens**: SwiftUI adaptations will derive from these tokens but are documented in `ios/DESIGN_IOS.md` when that milestone begins.
 - **Dark mode**: Not in scope for launch. The neutral scale and surface tokens are structured to support it later.
 - **Print styles**: Not applicable.
