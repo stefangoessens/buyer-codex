@@ -10,6 +10,7 @@ import {
   type DealStatus,
   type RawDealRoom,
   type RawProperty,
+  type RawPropertyScore,
 } from "@/lib/dashboard/deal-index";
 
 const mkDeal = (overrides: Partial<RawDealRoom> = {}): RawDealRoom => ({
@@ -39,6 +40,12 @@ const mkProperty = (overrides: Partial<RawProperty> = {}): RawProperty => ({
   bathsHalf: 0,
   sqftLiving: 1200,
   photoUrls: ["https://cdn.example.com/photo1.jpg"],
+  ...overrides,
+});
+
+const mkScore = (overrides: Partial<RawPropertyScore> = {}): RawPropertyScore => ({
+  score: 7.4,
+  source: "offer_competitiveness",
   ...overrides,
 });
 
@@ -96,7 +103,7 @@ describe("buildDashboardRow — hydrated path", () => {
   it("builds a full row when property is present", () => {
     const deal = mkDeal();
     const property = mkProperty();
-    const row = buildDashboardRow(deal, property);
+    const row = buildDashboardRow(deal, property, mkScore());
 
     expect(row.dealRoomId).toBe("deal_1");
     expect(row.propertyId).toBe("prop_1");
@@ -110,6 +117,8 @@ describe("buildDashboardRow — hydrated path", () => {
     expect(row.baths).toBe(2);
     expect(row.sqft).toBe(1200);
     expect(row.primaryPhotoUrl).toBe("https://cdn.example.com/photo1.jpg");
+    expect(row.score).toBe(7.4);
+    expect(row.scoreSource).toBe("offer_competitiveness");
   });
 
   it("combines full + half baths correctly", () => {
@@ -200,11 +209,12 @@ describe("buildDashboardRow — partial hydration", () => {
 
   it("preserves deal-level fields even when property is missing", () => {
     const deal = mkDeal({ status: "offer_sent", accessLevel: "registered" });
-    const row = buildDashboardRow(deal, undefined);
+    const row = buildDashboardRow(deal, undefined, mkScore({ score: 6.8 }));
 
     expect(row.status).toBe("offer_sent");
     expect(row.accessLevel).toBe("registered");
     expect(row.category).toBe("active");
+    expect(row.score).toBe(6.8);
   });
 
   it("marks rows partial when the property exists but summary fields are missing", () => {
@@ -269,6 +279,21 @@ describe("buildDealIndex — happy path", () => {
     const result = buildDealIndex(deals, props);
     expect(result.active[0].dealRoomId).toBe("d2"); // offer_sent most urgent
     expect(result.active[result.active.length - 1].dealRoomId).toBe("d1"); // intake least
+  });
+
+  it("carries score badges through the built index", () => {
+    const deals: RawDealRoom[] = [mkDeal({ _id: "d1", propertyId: "p1" })];
+    const props = new Map<string, RawProperty>([
+      ["p1", mkProperty({ _id: "p1" })],
+    ]);
+    const scores = new Map<string, RawPropertyScore>([
+      ["p1", mkScore({ score: 8.6, source: "leverage" })],
+    ]);
+
+    const result = buildDealIndex(deals, props, scores);
+
+    expect(result.active[0]?.score).toBe(8.6);
+    expect(result.active[0]?.scoreSource).toBe("leverage");
   });
 
   it("sorts active by updatedAt desc within same urgency tier", () => {

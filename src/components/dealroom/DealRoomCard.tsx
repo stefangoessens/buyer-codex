@@ -1,6 +1,7 @@
+import React from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { StatusBadge } from "@/components/product/StatusBadge";
+import { ScoreBadge } from "@/components/product/ScoreBadge";
 import { type DashboardDealRow } from "@/lib/dashboard/deal-index";
 import { formatDealRoomActivity } from "@/lib/dealroom/dashboard-types";
 
@@ -18,7 +19,7 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 const numberFormatter = new Intl.NumberFormat("en-US");
 
 export function DealRoomCard({ row, now }: DealRoomCardProps) {
-  const badge = projectStatusBadge(row);
+  const statusLabel = projectStatusLabel(row);
 
   return (
     <Link
@@ -41,20 +42,25 @@ export function DealRoomCard({ row, now }: DealRoomCardProps) {
                 : "Photo unavailable"}
             </div>
           )}
-        </div>
-        <CardContent className="flex flex-col gap-2 p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="line-clamp-2 text-sm font-semibold text-neutral-900">
-                {row.addressLine}
-              </p>
-              {row.detailState !== "complete" && (
-                <p className="mt-1 text-xs text-neutral-500">
-                  {describeDetailState(row)}
-                </p>
-              )}
+          {row.score !== null && (
+            <div className="absolute right-3 top-3">
+              <ScoreBadge score={row.score} maxScore={10} size="sm" />
             </div>
-            <StatusBadge status={badge.status} label={badge.label} />
+          )}
+        </div>
+        <CardContent className="flex flex-col gap-3 p-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              {statusLabel}
+            </p>
+            <p className="mt-1 line-clamp-2 text-sm font-semibold text-neutral-900">
+              {row.addressLine}
+            </p>
+            {row.detailState !== "complete" && (
+              <p className="mt-1 text-xs text-neutral-500">
+                {describeDetailState(row)}
+              </p>
+            )}
           </div>
           <p className="text-lg font-bold text-primary-700">
             {row.listPrice === null
@@ -77,31 +83,26 @@ export function DealRoomCard({ row, now }: DealRoomCardProps) {
   );
 }
 
-function projectStatusBadge(
-  row: DashboardDealRow,
-): {
-  status: "active" | "pending" | "closed" | "urgent" | "draft";
-  label: string;
-} {
+function projectStatusLabel(row: DashboardDealRow): string {
   switch (row.status) {
     case "closed":
-      return { status: "closed", label: "Closed" };
+      return "Closed";
     case "withdrawn":
-      return { status: "draft", label: "Withdrawn" };
+      return "Withdrawn";
     case "under_contract":
-      return { status: "pending", label: "Under contract" };
+      return "Under contract";
     case "closing":
-      return { status: "pending", label: "Closing" };
+      return "Closing";
     case "offer_prep":
-      return { status: "urgent", label: "Offer prep" };
+      return "Offer prep";
     case "offer_sent":
-      return { status: "urgent", label: "Offer sent" };
+      return "Offer sent";
     case "tour_scheduled":
-      return { status: "active", label: "Tour scheduled" };
+      return "Tour scheduled";
     case "intake":
-      return { status: "draft", label: "Intake" };
+      return "Intake";
     case "analysis":
-      return { status: "active", label: "Analysis" };
+      return "Analysis";
   }
 }
 

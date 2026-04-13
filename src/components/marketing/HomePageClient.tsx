@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 import { HeroSection } from "@/components/marketing/HeroSection";
 import { TrustBar } from "@/components/marketing/TrustBar";
 import { FeatureCard } from "@/components/marketing/FeatureCard";
 import { TestimonialCard } from "@/components/marketing/TestimonialCard";
 import { PasteLinkInput } from "@/components/marketing/PasteLinkInput";
+import { buildListingIntakeHref } from "@/lib/intake/pasteLink";
 
 const trustStats = [
   { value: "500+", label: "Buyers served" },
@@ -66,20 +68,20 @@ const testimonials = [
 ];
 
 export function HomePageClient() {
-  const [submitted, setSubmitted] = useState(false);
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
-  // PasteLinkInput handles track("link_pasted") internally — no duplicate here
-  const handleSubmit = useCallback(async (_url: string) => {
-    setSubmitted(true);
-    // Convex submitUrl mutation will be called when Convex is available
-    // For now, the paste-link flow transitions to the deal room on the next page
-  }, []);
+  function handleSubmit(url: string) {
+    startTransition(() => {
+      router.push(buildListingIntakeHref(url));
+    });
+  }
 
   return (
     <>
       {/* Hero */}
       <HeroSection>
-        {submitted ? (
+        {isPending ? (
           <div className="rounded-xl bg-white/10 px-6 py-4 text-lg font-medium text-white backdrop-blur">
             Analyzing your property...
           </div>
@@ -174,7 +176,7 @@ export function HomePageClient() {
             Paste a listing link and get your free AI analysis in seconds.
           </p>
           <div className="mt-8">
-            {submitted ? (
+            {isPending ? (
               <div className="rounded-xl bg-white/10 px-6 py-4 text-lg font-medium text-white backdrop-blur">
                 Analyzing your property...
               </div>

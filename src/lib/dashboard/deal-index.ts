@@ -32,6 +32,7 @@ export type DealStatus =
 
 export type DealCategory = "active" | "recent";
 export type DashboardRowDetailState = "loading" | "partial" | "complete";
+export type DashboardScoreSource = "offer_competitiveness" | "leverage";
 export type DashboardMissingField =
   | "listPrice"
   | "beds"
@@ -86,6 +87,11 @@ export interface RawProperty {
   photoUrls?: string[];
 }
 
+export interface RawPropertyScore {
+  score: number; // normalized to the shared 0-10 ScoreBadge scale
+  source: DashboardScoreSource;
+}
+
 /** Shared buyer-safe fields present on every dashboard row. */
 export interface DashboardDealRowBase {
   dealRoomId: string;
@@ -98,6 +104,8 @@ export interface DashboardDealRowBase {
   baths: number | null; // full + 0.5 per half
   sqft: number | null;
   primaryPhotoUrl: string | null;
+  score: number | null;
+  scoreSource: DashboardScoreSource | null;
   accessLevel: "anonymous" | "registered" | "full";
   updatedAt: string;
   /**
@@ -177,6 +185,7 @@ export function urgencyRank(status: DealStatus): number {
 export function buildDashboardRow(
   deal: RawDealRoom,
   property: RawProperty | undefined,
+  propertyScore?: RawPropertyScore,
 ): DashboardDealRow {
   const { detailState, missingFields } = computeDetailState(property);
   const category = categorize(deal.status);
@@ -204,6 +213,8 @@ export function buildDashboardRow(
       property?.photoUrls && property.photoUrls.length > 0
         ? property.photoUrls[0]
         : null,
+    score: propertyScore?.score ?? null,
+    scoreSource: propertyScore?.source ?? null,
     accessLevel: deal.accessLevel,
     updatedAt: deal.updatedAt,
     detailState,
@@ -225,9 +236,14 @@ export function buildDashboardRow(
 export function buildDealIndex(
   deals: RawDealRoom[],
   propertyById: Map<string, RawProperty>,
+  scoreByPropertyId: Map<string, RawPropertyScore> = new Map(),
 ): DashboardDealIndex {
   const rows: DashboardDealRow[] = deals.map((d) =>
-    buildDashboardRow(d, propertyById.get(d.propertyId)),
+    buildDashboardRow(
+      d,
+      propertyById.get(d.propertyId),
+      scoreByPropertyId.get(d.propertyId),
+    ),
   );
 
   const active = rows

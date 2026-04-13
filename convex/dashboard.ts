@@ -22,6 +22,7 @@ import {
   type RawDealRoom,
   type RawProperty,
   type DashboardDealIndex,
+  type RawPropertyScore,
 } from "./lib/dashboardDealIndex";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -51,6 +52,12 @@ const dashboardDealRowValidator = v.object({
   baths: v.union(v.number(), v.null()),
   sqft: v.union(v.number(), v.null()),
   primaryPhotoUrl: v.union(v.string(), v.null()),
+  score: v.union(v.number(), v.null()),
+  scoreSource: v.union(
+    v.literal("offer_competitiveness"),
+    v.literal("leverage"),
+    v.null(),
+  ),
   accessLevel: v.union(
     v.literal("anonymous"),
     v.literal("registered"),
@@ -114,6 +121,74 @@ const dashboardIndexValidator = v.object({
     ),
   }),
 });
+
+function normalizeDashboardScore(rawScore: number): number | null {
+  if (!Number.isFinite(rawScore)) {
+    return null;
+  }
+
+  return Math.max(0, Math.min(10, Number((rawScore / 10).toFixed(1))));
+}
+
+function parseDashboardScore(
+  output: Doc<"aiEngineOutputs">,
+): RawPropertyScore | null {
+  if (output.reviewState !== "approved") {
+    return null;
+  }
+
+  try {
+    if (output.engineType === "offer") {
+      const parsed = JSON.parse(output.output) as {
+        scenarios?: Array<{ competitivenessScore?: number }>;
+        recommendedIndex?: number;
+      };
+      const recommended =
+        typeof parsed.recommendedIndex === "number"
+          ? parsed.scenarios?.[parsed.recommendedIndex]
+          : undefined;
+      const score = normalizeDashboardScore(
+        recommended?.competitivenessScore ?? Number.NaN,
+      );
+
+      return score === null
+        ? null
+        : {
+            score,
+            source: "offer_competitiveness",
+          };
+    }
+
+    if (output.engineType === "leverage") {
+      const parsed = JSON.parse(output.output) as { score?: number };
+      const score = normalizeDashboardScore(parsed.score ?? Number.NaN);
+
+      return score === null
+        ? null
+        : {
+            score,
+            source: "leverage",
+          };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function pickLatestApprovedScore(
+  outputs: Doc<"aiEngineOutputs">[],
+): RawPropertyScore | null {
+  for (const output of outputs) {
+    const score = parseDashboardScore(output);
+    if (score) {
+      return score;
+    }
+  }
+
+  return null;
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Queries
@@ -207,10 +282,37 @@ export const getDealIndex = query({
     // (e.g. still extracting) are fine — the row builder marks them
     // as `detailState: "loading"`.
     const propertyById = new Map<string, RawProperty>();
+    const scoreByPropertyId = new Map<string, RawPropertyScore>();
     const propertyIds = Array.from(new Set(deals.map((d) => d.propertyId)));
-    const properties = await Promise.all(
-      propertyIds.map((id) => ctx.db.get(id)),
-    );
+    const [properties, scoreEntries] = await Promise.all([
+      Promise.all(propertyIds.map((id) => ctx.db.get(id))),
+      Promise.all(
+        propertyIds.map(async (id) => {
+          const [offerOutputs, leverageOutputs] = await Promise.all([
+            ctx.db
+              .query("aiEngineOutputs")
+              .withIndex("by_propertyId_and_engineType", (q) =>
+                q.eq("propertyId", id).eq("engineType", "offer"),
+              )
+              .order("desc")
+              .collect(),
+            ctx.db
+              .query("aiEngineOutputs")
+              .withIndex("by_propertyId_and_engineType", (q) =>
+                q.eq("propertyId", id).eq("engineType", "leverage"),
+              )
+              .order("desc")
+              .collect(),
+          ]);
+
+          return [
+            id,
+            pickLatestApprovedScore([...offerOutputs, ...leverageOutputs]),
+          ] as const;
+        }),
+      ),
+    ]);
+
     for (const p of properties) {
       if (!p) continue;
       propertyById.set(p._id, {
@@ -233,6 +335,12 @@ export const getDealIndex = query({
       });
     }
 
-    return buildDealIndex(rawDeals, propertyById);
+    for (const [propertyId, score] of scoreEntries) {
+      if (score) {
+        scoreByPropertyId.set(propertyId, score);
+      }
+    }
+
+    return buildDealIndex(rawDeals, propertyById, scoreByPropertyId);
   },
 });
