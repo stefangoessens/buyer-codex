@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
 const sessionMocks = vi.hoisted(() => ({
   requireAuth: vi.fn(),
   getSessionContext: vi.fn(),
@@ -11,11 +10,13 @@ vi.mock("../../../convex/lib/session", () => ({
 }));
 
 import * as agreementsModule from "../../../convex/agreements";
+import * as agreementAuditModule from "../../../convex/agreementAudit";
 import * as offerEligibilityModule from "../../../convex/offerEligibility";
 
 type TableName =
   | "dealRooms"
   | "agreements"
+  | "agreementAuditEvents"
   | "offerEligibilityState"
   | "auditLog";
 
@@ -61,6 +62,23 @@ function invokeRegisteredMutation<TResult>(
   return Promise.resolve(handler(ctx, args));
 }
 
+function invokeRegisteredQuery<TResult>(
+  query: unknown,
+  ctx: TestContext,
+  args: Record<string, unknown>,
+): Promise<TResult> {
+  const handler = (
+    query as {
+      _handler: (
+        ctx: TestContext,
+        args: Record<string, unknown>,
+      ) => Promise<TResult> | TResult;
+    }
+  )._handler;
+
+  return Promise.resolve(handler(ctx, args));
+}
+
 const BROKER_USER = {
   _id: "user_broker",
   _creationTime: 1,
@@ -68,6 +86,12 @@ const BROKER_USER = {
   name: "Broker",
   role: "broker" as const,
 };
+
+function getEligibilityCalls(runMutationSpy: ReturnType<typeof vi.spyOn>) {
+  return runMutationSpy.mock.calls.filter(
+    ([, args]) => !("eventType" in (args as Record<string, unknown>)),
+  );
+}
 
 function cloneRow<T extends Record<string, unknown> | null>(row: T): T {
   if (!row) {
@@ -83,6 +107,7 @@ function createTables(
   const tables: Tables = {
     dealRooms: [...(initial.dealRooms ?? [])],
     agreements: [...(initial.agreements ?? [])],
+    agreementAuditEvents: [...(initial.agreementAuditEvents ?? [])],
     offerEligibilityState: [...(initial.offerEligibilityState ?? [])],
     auditLog: [...(initial.auditLog ?? [])],
   };
@@ -172,12 +197,23 @@ function createContext(initial: Partial<Tables> = {}) {
   };
 
   const ctx = { db } as TestContext;
-  ctx.runMutation = async (_fnRef: unknown, args: Record<string, unknown>) =>
-    invokeRegisteredMutation(
-      offerEligibilityModule.recalculateEligibilityInternal,
-      ctx,
-      args,
-    );
+  ctx.runMutation = async (_fnRef: unknown, args: Record<string, unknown>) => {
+    if ("eventType" in args && "visibility" in args && "occurredAt" in args) {
+      return await invokeRegisteredMutation(
+        agreementAuditModule.recordEventInternal,
+        ctx,
+        args,
+      );
+    }
+    if ("buyerId" in args && "dealRoomId" in args && "actorUserId" in args) {
+      return await invokeRegisteredMutation(
+        offerEligibilityModule.recalculateEligibilityInternal,
+        ctx,
+        args,
+      );
+    }
+    throw new Error("Unexpected mutation reference");
+  };
 
   const runMutationSpy = vi.spyOn(ctx, "runMutation");
 
@@ -204,6 +240,8 @@ function makeAgreement(
     dealRoomId: "deal_room_1",
     type: "full_representation",
     status: "draft",
+    createdAt: "2026-04-01T00:00:00.000Z",
+    updatedAt: "2026-04-01T00:00:00.000Z",
     ...rest,
   };
 }
@@ -255,8 +293,9 @@ describe("agreement lifecycle eligibility sync", () => {
     );
 
     expect(agreementId).toBeDefined();
-    expect(runMutationSpy).toHaveBeenCalledTimes(1);
-    expect(runMutationSpy.mock.calls[0]?.[1]).toMatchObject({
+    const eligibilityCalls = getEligibilityCalls(runMutationSpy);
+    expect(eligibilityCalls).toHaveLength(1);
+    expect(eligibilityCalls[0]?.[1]).toMatchObject({
       buyerId: "buyer_1",
       dealRoomId: "deal_room_1",
       actorUserId: BROKER_USER._id,
@@ -268,6 +307,12 @@ describe("agreement lifecycle eligibility sync", () => {
       isEligible: false,
       blockingReasonCode: "no_signed_agreement",
       requiredAction: "sign_agreement",
+    });
+    expect(tables.agreementAuditEvents).toHaveLength(1);
+    expect(tables.agreementAuditEvents[0]).toMatchObject({
+      agreementId,
+      eventType: "created",
+      nextStatus: "draft",
     });
   });
 
@@ -291,8 +336,9 @@ describe("agreement lifecycle eligibility sync", () => {
       },
     );
 
-    expect(runMutationSpy).toHaveBeenCalledTimes(1);
-    expect(runMutationSpy.mock.calls[0]?.[1]).toMatchObject({
+    const eligibilityCalls = getEligibilityCalls(runMutationSpy);
+    expect(eligibilityCalls).toHaveLength(1);
+    expect(eligibilityCalls[0]?.[1]).toMatchObject({
       buyerId: "buyer_1",
       dealRoomId: "deal_room_1",
       actorUserId: BROKER_USER._id,
@@ -303,6 +349,8 @@ describe("agreement lifecycle eligibility sync", () => {
       blockingReasonCode: "no_signed_agreement",
       requiredAction: "sign_agreement",
     });
+    expect(tables.agreementAuditEvents.find((row) => row.eventType === "sent_for_signing"))
+      .toBeDefined();
   });
 
   it("recalculates after recordSignature and persists an eligible verdict", async () => {
@@ -323,14 +371,23 @@ describe("agreement lifecycle eligibility sync", () => {
       ctx,
       {
         agreementId: "agreement_sent",
+        documentStorageId: "storage_signed",
+        documentFileName: "buyer-agreement.pdf",
+        documentContentType: "application/pdf",
+        documentSizeBytes: 128000,
       },
     );
 
-    expect(runMutationSpy).toHaveBeenCalledTimes(1);
+    const eligibilityCalls = getEligibilityCalls(runMutationSpy);
+    expect(eligibilityCalls).toHaveLength(1);
     expect(tables.agreements[0]).toMatchObject({
       _id: "agreement_sent",
       status: "signed",
       type: "full_representation",
+      documentStorageId: "storage_signed",
+      documentFileName: "buyer-agreement.pdf",
+      documentContentType: "application/pdf",
+      documentSizeBytes: 128000,
     });
     expect(tables.offerEligibilityState[0]).toMatchObject({
       buyerId: "buyer_1",
@@ -340,6 +397,12 @@ describe("agreement lifecycle eligibility sync", () => {
       governingAgreementId: "agreement_sent",
       blockingReasonCode: undefined,
       requiredAction: "none",
+    });
+    expect(
+      tables.agreementAuditEvents.find((row) => row.eventType === "signed"),
+    ).toMatchObject({
+      agreementId: "agreement_sent",
+      documentStorageId: "storage_signed",
     });
 
     const eligibilityAudit = tables.auditLog.find(
@@ -394,7 +457,8 @@ describe("agreement lifecycle eligibility sync", () => {
       },
     );
 
-    expect(runMutationSpy).toHaveBeenCalledTimes(1);
+    const eligibilityCalls = getEligibilityCalls(runMutationSpy);
+    expect(eligibilityCalls).toHaveLength(1);
     expect(tables.agreements[0]).toMatchObject({
       _id: "agreement_signed",
       status: "canceled",
@@ -407,6 +471,12 @@ describe("agreement lifecycle eligibility sync", () => {
       governingAgreementId: "agreement_signed",
       blockingReasonCode: "agreement_canceled",
       requiredAction: "sign_agreement",
+    });
+    expect(
+      tables.agreementAuditEvents.find((row) => row.eventType === "canceled"),
+    ).toMatchObject({
+      agreementId: "agreement_signed",
+      reason: "buyer_requested",
     });
 
     const eligibilityAudit = tables.auditLog.findLast(
@@ -462,8 +532,9 @@ describe("agreement lifecycle eligibility sync", () => {
     );
 
     expect(newAgreementId).toBeDefined();
-    expect(runMutationSpy).toHaveBeenCalledTimes(1);
-    expect(runMutationSpy.mock.calls[0]?.[1]).toMatchObject({
+    const eligibilityCalls = getEligibilityCalls(runMutationSpy);
+    expect(eligibilityCalls).toHaveLength(1);
+    expect(eligibilityCalls[0]?.[1]).toMatchObject({
       buyerId: "buyer_1",
       dealRoomId: "deal_room_1",
       actorUserId: BROKER_USER._id,
@@ -473,10 +544,128 @@ describe("agreement lifecycle eligibility sync", () => {
       status: "replaced",
       replacedById: newAgreementId,
     });
+    expect(
+      tables.agreementAuditEvents.filter((row) => row.eventType === "created"),
+    ).toHaveLength(1);
+    expect(
+      tables.agreementAuditEvents.find((row) => row.eventType === "replaced"),
+    ).toMatchObject({
+      agreementId: "agreement_current",
+      successorAgreementId: newAgreementId,
+    });
     expect(tables.offerEligibilityState[0]).toMatchObject({
       isEligible: false,
       blockingReasonCode: "no_signed_agreement",
       requiredAction: "sign_agreement",
+    });
+  });
+
+  it("returns a typed current governing read model with role-aware document fields", async () => {
+    const { ctx } = createContext({
+      agreements: [
+        makeAgreement({
+          _id: "agreement_signed",
+          status: "signed",
+          signedAt: "2026-04-03T00:00:00.000Z",
+          effectiveStartAt: "2026-04-03T00:00:00.000Z",
+          documentStorageId: "storage_signed",
+          documentFileName: "buyer-agreement.pdf",
+          documentContentType: "application/pdf",
+          documentSizeBytes: 128000,
+          documentChecksumSha256: "abc123",
+          documentSource: "manual_upload",
+          documentUploadedAt: "2026-04-03T00:00:00.000Z",
+          documentUploadedByUserId: BROKER_USER._id,
+        }),
+      ],
+    });
+
+    sessionMocks.requireAuth.mockResolvedValueOnce({
+      ...BROKER_USER,
+      role: "buyer",
+      _id: "buyer_1",
+    });
+
+    const buyerView = await invokeRegisteredQuery<any>(
+      agreementsModule.getCurrentGoverning,
+      ctx,
+      { buyerId: "buyer_1" },
+    );
+    expect(buyerView).toMatchObject({
+      agreementId: "agreement_signed",
+      isCurrentGoverning: true,
+      canAccessDocument: true,
+      document: {
+        fileName: "buyer-agreement.pdf",
+        contentType: "application/pdf",
+        sizeBytes: 128000,
+      },
+    });
+    expect(buyerView.document.storageId).toBeUndefined();
+    expect(buyerView.document.checksumSha256).toBeUndefined();
+
+    sessionMocks.requireAuth.mockResolvedValueOnce(BROKER_USER);
+    const brokerView = await invokeRegisteredQuery<any>(
+      agreementsModule.getCurrentGoverning,
+      ctx,
+      { buyerId: "buyer_1" },
+    );
+    expect(brokerView.document).toMatchObject({
+      storageId: "storage_signed",
+      checksumSha256: "abc123",
+      source: "manual_upload",
+      uploadedByUserId: BROKER_USER._id,
+    });
+  });
+
+  it("audits document access and denies unauthorized viewers", async () => {
+    const { ctx, tables } = createContext({
+      agreements: [
+        makeAgreement({
+          _id: "agreement_signed",
+          status: "signed",
+          signedAt: "2026-04-03T00:00:00.000Z",
+          documentStorageId: "storage_signed",
+        }),
+      ],
+    });
+
+    sessionMocks.requireAuth.mockResolvedValueOnce({
+      ...BROKER_USER,
+      role: "buyer",
+      _id: "buyer_1",
+    });
+    const granted = await invokeRegisteredMutation<any>(
+      agreementsModule.authorizeDocumentAccess,
+      ctx,
+      { agreementId: "agreement_signed" },
+    );
+    expect(granted).toMatchObject({
+      agreementId: "agreement_signed",
+      fileId: "storage_signed",
+    });
+
+    sessionMocks.requireAuth.mockResolvedValueOnce({
+      ...BROKER_USER,
+      role: "buyer",
+      _id: "buyer_2",
+    });
+    await expect(
+      invokeRegisteredMutation(
+        agreementsModule.authorizeDocumentAccess,
+        ctx,
+        { agreementId: "agreement_signed" },
+      ),
+    ).rejects.toThrow("Not authorized to access this agreement document");
+
+    expect(
+      tables.agreementAuditEvents.filter((row) => row.eventType === "document_accessed"),
+    ).toHaveLength(2);
+    expect(
+      tables.agreementAuditEvents.find((row) => row.accessOutcome === "denied"),
+    ).toMatchObject({
+      agreementId: "agreement_signed",
+      reason: "not_authorized",
     });
   });
 });

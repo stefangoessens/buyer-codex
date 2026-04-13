@@ -1,4 +1,5 @@
 import { query, mutation, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { getSessionContext, requireAuth } from "./lib/session";
 import {
@@ -457,18 +458,40 @@ export const initiateUpgrade = mutation({
     }
 
     // Create new full_representation draft scoped to same buyer/deal room
+    const now = new Date().toISOString();
     const newId = await ctx.db.insert("agreements", {
       dealRoomId: currentTourPass.dealRoomId,
       buyerId: currentTourPass.buyerId,
       type: "full_representation",
       status: "draft",
       documentStorageId: args.documentStorageId,
+      documentSource: args.documentStorageId ? "manual_upload" : undefined,
+      documentUploadedAt: args.documentStorageId ? now : undefined,
+      documentUploadedByUserId: args.documentStorageId ? user._id : undefined,
+      createdAt: now,
+      updatedAt: now,
     });
 
     const successor = await ctx.db.get(newId);
     if (!successor) {
       throw new Error("Upgrade agreement was not created");
     }
+
+    await ctx.runMutation((internal as any).agreementAudit.recordEventInternal, {
+      agreementId: successor._id,
+      dealRoomId: successor.dealRoomId,
+      buyerId: successor.buyerId,
+      eventType: "created",
+      visibility: "buyer",
+      actorUserId: user._id,
+      actorRole: user.role,
+      nextStatus: "draft",
+      documentStorageId: successor.documentStorageId,
+      documentFileName: successor.documentFileName,
+      documentContentType: successor.documentContentType,
+      documentSizeBytes: successor.documentSizeBytes,
+      occurredAt: now,
+    });
 
     await applySupersessionState(ctx, {
       predecessor: currentTourPass,

@@ -30,6 +30,10 @@ export interface AgreementRecord {
   buyerId: string;
   type: "tour_pass" | "full_representation";
   status: "draft" | "sent" | "signed" | "canceled" | "replaced";
+  createdAt?: string;
+  updatedAt?: string;
+  effectiveStartAt?: string;
+  effectiveEndAt?: string;
   signedAt?: string;
   canceledAt?: string;
   supersededAt?: string;
@@ -41,6 +45,11 @@ export interface AgreementRecord {
     | "replace_expired"
     | "broker_decision";
   replacedById?: string;
+  documentStorageId?: string;
+  documentFileName?: string;
+  documentContentType?: string;
+  documentSizeBytes?: number;
+  documentChecksumSha256?: string;
   _creationTime?: number;
 }
 

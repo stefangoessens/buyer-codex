@@ -2,6 +2,11 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
   authProvider,
+  agreementAccessOutcome,
+  agreementAccessScope,
+  agreementAuditEventType,
+  agreementAuditVisibility,
+  agreementDocumentSource,
   assignmentStatus,
   availabilityOwnerType,
   availabilityStatus,
@@ -15,15 +20,18 @@ import {
   contractAdapterRunStatus,
   contractFormKey,
   contractHandoffStatus,
+  contractLifecycleStatus,
   contractProvider,
   contractSignatureEventType,
   contractSignatureProvider,
   eligibilityAgreementType,
   eligibilityBlockingReason,
   eligibilityRequiredAction,
-  feeLedgerEntryType,
+  feeLedgerBucket,
+  feeLedgerDimension,
   feeLedgerSource,
   financingType,
+  ledgerInternalReviewState,
   leadAttributionStatus,
   lenderValidationOutcome,
   lenderValidationReasonCode,
@@ -260,6 +268,18 @@ export default defineSchema({
       v.literal("replaced")
     ),
     documentStorageId: v.optional(v.id("_storage")),
+    documentFileName: v.optional(v.string()),
+    documentContentType: v.optional(v.string()),
+    documentSizeBytes: v.optional(v.number()),
+    documentChecksumSha256: v.optional(v.string()),
+    documentSource: v.optional(agreementDocumentSource),
+    documentUploadedAt: v.optional(v.string()),
+    documentUploadedByUserId: v.optional(v.id("users")),
+    effectiveStartAt: v.optional(v.string()),
+    effectiveEndAt: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+    sentAt: v.optional(v.string()),
     signedAt: v.optional(v.string()),
     canceledAt: v.optional(v.string()),
     supersededAt: v.optional(v.string()),
@@ -276,6 +296,56 @@ export default defineSchema({
     .index("by_dealRoomId", ["dealRoomId"])
     .index("by_buyerId", ["buyerId"])
     .index("by_buyerId_and_type", ["buyerId", "type"]),
+
+  agreementAuditEvents: defineTable({
+    agreementId: v.id("agreements"),
+    dealRoomId: v.id("dealRooms"),
+    buyerId: v.id("users"),
+    eventType: agreementAuditEventType,
+    visibility: agreementAuditVisibility,
+    actorUserId: v.optional(v.id("users")),
+    actorRole: v.optional(v.union(
+      v.literal("buyer"),
+      v.literal("broker"),
+      v.literal("admin")
+    )),
+    previousStatus: v.optional(v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("signed"),
+      v.literal("canceled"),
+      v.literal("replaced")
+    )),
+    nextStatus: v.optional(v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("signed"),
+      v.literal("canceled"),
+      v.literal("replaced")
+    )),
+    successorAgreementId: v.optional(v.id("agreements")),
+    documentStorageId: v.optional(v.id("_storage")),
+    documentFileName: v.optional(v.string()),
+    documentContentType: v.optional(v.string()),
+    documentSizeBytes: v.optional(v.number()),
+    reason: v.optional(v.string()),
+    supersessionReason: v.optional(v.union(
+      v.literal("upgrade_to_full_representation"),
+      v.literal("correction"),
+      v.literal("amendment"),
+      v.literal("renewal"),
+      v.literal("replace_expired"),
+      v.literal("broker_decision")
+    )),
+    accessScope: v.optional(agreementAccessScope),
+    accessOutcome: v.optional(agreementAccessOutcome),
+    effectiveStartAt: v.optional(v.string()),
+    effectiveEndAt: v.optional(v.string()),
+    occurredAt: v.string(),
+  })
+    .index("by_agreementId_and_occurredAt", ["agreementId", "occurredAt"])
+    .index("by_dealRoomId_and_occurredAt", ["dealRoomId", "occurredAt"])
+    .index("by_buyerId_and_occurredAt", ["buyerId", "occurredAt"]),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // TOURS
@@ -385,12 +455,7 @@ export default defineSchema({
     providerTransactionId: v.optional(v.string()),
     signatureEnvelopeId: v.optional(v.string()),
     documentStorageId: v.optional(v.id("_storage")),
-    status: v.union(
-      v.literal("pending_signatures"),
-      v.literal("fully_executed"),
-      v.literal("amended"),
-      v.literal("terminated")
-    ),
+    status: contractLifecycleStatus,
     generatedAt: v.optional(v.string()),
     signedAt: v.optional(v.string()),
     signatureDeclinedAt: v.optional(v.string()),
@@ -494,6 +559,9 @@ export default defineSchema({
   aiEngineOutputs: defineTable({
     propertyId: v.id("properties"),
     engineType: v.string(),
+    promptKey: v.optional(v.string()),
+    promptVersion: v.optional(v.string()),
+    inputSnapshot: v.optional(v.string()),
     confidence: v.number(),
     citations: v.array(v.string()),
     reviewState: v.union(
@@ -516,6 +584,7 @@ export default defineSchema({
 
   promptRegistry: defineTable({
     engineType: v.string(),
+    promptKey: v.optional(v.string()),
     version: v.string(),
     prompt: v.string(),
     systemPrompt: v.optional(v.string()),
@@ -527,7 +596,19 @@ export default defineSchema({
   })
     .index("by_engineType", ["engineType"])
     .index("by_engineType_and_version", ["engineType", "version"])
-    .index("by_engineType_and_isActive", ["engineType", "isActive"]),
+    .index("by_engineType_and_isActive", ["engineType", "isActive"])
+    .index("by_isActive", ["isActive"])
+    .index("by_engineType_and_promptKey", ["engineType", "promptKey"])
+    .index("by_engineType_and_promptKey_and_version", [
+      "engineType",
+      "promptKey",
+      "version",
+    ])
+    .index("by_engineType_and_promptKey_and_isActive", [
+      "engineType",
+      "promptKey",
+      "isActive",
+    ]),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // FEE LEDGER & COMPENSATION (KIN-814)
@@ -535,24 +616,31 @@ export default defineSchema({
 
   feeLedgerEntries: defineTable({
     dealRoomId: v.id("dealRooms"),
-    entryType: feeLedgerEntryType,
+    bucket: feeLedgerBucket,
+    dimension: feeLedgerDimension,
     amount: v.number(),
     description: v.string(),
     source: feeLedgerSource,
+    lifecycle: v.object({
+      dealStatus: dealStatus,
+      offerId: v.optional(v.id("offers")),
+      offerStatus: v.optional(offerStatus),
+      contractId: v.optional(v.id("contracts")),
+      contractStatus: v.optional(contractLifecycleStatus),
+      internalReviewState: ledgerInternalReviewState,
+      compensationStatus: compensationStatus,
+    }),
     provenance: v.object({
       actorId: v.optional(v.id("users")),
       triggeredBy: v.optional(v.string()),
       sourceDocument: v.optional(v.string()),
-      timestamp: v.string(),
+      changedAt: v.string(),
     }),
-    offerId: v.optional(v.id("offers")),
-    contractId: v.optional(v.id("contracts")),
-    financingType: v.optional(financingType),
-    ipcLimitPercent: v.optional(v.number()),
     createdAt: v.string(),
   })
     .index("by_dealRoomId", ["dealRoomId"])
-    .index("by_dealRoomId_and_entryType", ["dealRoomId", "entryType"])
+    .index("by_dealRoomId_and_bucket", ["dealRoomId", "bucket"])
+    .index("by_dealRoomId_and_dimension", ["dealRoomId", "dimension"])
     .index("by_createdAt", ["createdAt"]),
 
   compensationStatus: defineTable({
@@ -562,9 +650,10 @@ export default defineSchema({
     transitionReason: v.optional(v.string()),
     transitionActorId: v.optional(v.id("users")),
     lastTransitionAt: v.string(),
-    sellerDisclosedAmount: v.optional(v.number()),
-    negotiatedAmount: v.optional(v.number()),
-    buyerPaidAmount: v.optional(v.number()),
+    expectedBuyerFee: v.number(),
+    sellerPaidAmount: v.number(),
+    buyerPaidAmount: v.number(),
+    projectedClosingCredit: v.number(),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
@@ -574,9 +663,36 @@ export default defineSchema({
   reconciliationReports: defineTable({
     dealRoomId: v.id("dealRooms"),
     reportType: reconciliationReportType,
-    expectedTotal: v.number(),
-    actualTotal: v.optional(v.number()),
+    expectedRollup: v.object({
+      expectedBuyerFee: v.number(),
+      sellerPaidAmount: v.number(),
+      buyerPaidAmount: v.number(),
+      projectedClosingCredit: v.number(),
+      netBrokerCompensation: v.number(),
+      fundingGap: v.number(),
+    }),
+    actualRollup: v.optional(
+      v.object({
+        expectedBuyerFee: v.number(),
+        sellerPaidAmount: v.number(),
+        buyerPaidAmount: v.number(),
+        projectedClosingCredit: v.number(),
+        netBrokerCompensation: v.number(),
+        fundingGap: v.number(),
+      })
+    ),
+    deltaRollup: v.optional(
+      v.object({
+        expectedBuyerFee: v.number(),
+        sellerPaidAmount: v.number(),
+        buyerPaidAmount: v.number(),
+        projectedClosingCredit: v.number(),
+        netBrokerCompensation: v.number(),
+        fundingGap: v.number(),
+      })
+    ),
     discrepancyAmount: v.optional(v.number()),
+    discrepancyDimensions: v.optional(v.array(feeLedgerDimension)),
     discrepancyFlag: v.boolean(),
     discrepancyDetails: v.optional(v.string()),
     reviewStatus: reconciliationReviewStatus,

@@ -13,6 +13,7 @@
  */
 
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { requireAuth } from "./lib/session";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -173,21 +174,39 @@ export async function applySupersessionState(
     replacedById: successor._id,
     canceledAt: supersededAt,
     supersededAt,
+    effectiveEndAt: predecessor.effectiveEndAt ?? supersededAt,
     supersessionReason: args.reason,
+    updatedAt: supersededAt,
   });
 
-  await ctx.db.insert("auditLog", {
-    userId: args.actorUserId,
-    action: "agreement_superseded",
-    entityType: "agreements",
-    entityId: predecessor._id,
-    details: JSON.stringify({
-      predecessorId: predecessor._id,
-      successorId: successor._id,
-      reason: args.reason,
-      supersededAt,
-    }),
-    timestamp: supersededAt,
+  const updatedPredecessor = await ctx.db.get(predecessor._id);
+  if (!updatedPredecessor) {
+    throw new Error("Agreement disappeared during supersession");
+  }
+  const actor = args.actorUserId ? await ctx.db.get(args.actorUserId) : null;
+
+  await ctx.runMutation((internal as any).agreementAudit.recordEventInternal, {
+    agreementId: predecessor._id,
+    dealRoomId: predecessor.dealRoomId,
+    buyerId: predecessor.buyerId,
+    eventType: "replaced",
+    visibility: "buyer",
+    actorUserId: args.actorUserId,
+    actorRole:
+      actor?.role === "buyer" || actor?.role === "broker" || actor?.role === "admin"
+        ? actor.role
+        : undefined,
+    previousStatus: predecessor.status,
+    nextStatus: "replaced",
+    successorAgreementId: successor._id,
+    supersessionReason: args.reason,
+    effectiveStartAt: updatedPredecessor.effectiveStartAt,
+    effectiveEndAt: updatedPredecessor.effectiveEndAt,
+    documentStorageId: updatedPredecessor.documentStorageId,
+    documentFileName: updatedPredecessor.documentFileName,
+    documentContentType: updatedPredecessor.documentContentType,
+    documentSizeBytes: updatedPredecessor.documentSizeBytes,
+    occurredAt: supersededAt,
   });
 
   return { supersededAt };

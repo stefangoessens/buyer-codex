@@ -33,6 +33,365 @@ export type FinancingType =
   | "va"
   | "other";
 
+// ───────────────────────────────────────────────────────────────────────────
+// Buyer fee ledger + reconciliation
+// ───────────────────────────────────────────────────────────────────────────
+
+export const compensationStatuses = [
+  "unknown",
+  "seller_disclosed_off_mls",
+  "negotiated_in_offer",
+  "buyer_paid",
+] as const;
+
+export type CompensationStatus = (typeof compensationStatuses)[number];
+
+export const buyerFeeLedgerBuckets = ["projected", "actual"] as const;
+
+export type BuyerFeeLedgerBucket = (typeof buyerFeeLedgerBuckets)[number];
+
+export const buyerFeeLedgerDimensions = [
+  "expectedBuyerFee",
+  "sellerPaidAmount",
+  "buyerPaidAmount",
+  "projectedClosingCredit",
+] as const;
+
+export type BuyerFeeLedgerDimension =
+  (typeof buyerFeeLedgerDimensions)[number];
+
+export const buyerFeeLedgerSources = [
+  "listing_agent",
+  "offer_term",
+  "contract",
+  "closing_statement",
+  "manual",
+  "system",
+] as const;
+
+export type BuyerFeeLedgerSource = (typeof buyerFeeLedgerSources)[number];
+
+export const buyerFeeLedgerInternalReviewStates = [
+  "not_submitted",
+  "pending_review",
+  "approved",
+  "rejected",
+] as const;
+
+export type BuyerFeeLedgerInternalReviewState =
+  (typeof buyerFeeLedgerInternalReviewStates)[number];
+
+export const offerLifecycleStatuses = [
+  "draft",
+  "pending_review",
+  "approved",
+  "submitted",
+  "countered",
+  "accepted",
+  "rejected",
+  "withdrawn",
+  "expired",
+] as const;
+
+export type OfferLifecycleStatus = (typeof offerLifecycleStatuses)[number];
+
+export const contractLifecycleStatuses = [
+  "pending_signatures",
+  "fully_executed",
+  "amended",
+  "terminated",
+] as const;
+
+export type ContractLifecycleStatus =
+  (typeof contractLifecycleStatuses)[number];
+
+export interface BuyerFeeLedgerRollup {
+  expectedBuyerFee: number;
+  sellerPaidAmount: number;
+  buyerPaidAmount: number;
+  projectedClosingCredit: number;
+  netBrokerCompensation: number;
+  fundingGap: number;
+}
+
+export interface BuyerFeeLedgerLifecycleLink<TId = string> {
+  dealStatus: DealStatus;
+  offerId?: TId;
+  offerStatus?: OfferLifecycleStatus;
+  contractId?: TId;
+  contractStatus?: ContractLifecycleStatus;
+  internalReviewState: BuyerFeeLedgerInternalReviewState;
+  compensationStatus: CompensationStatus;
+}
+
+export interface BuyerFeeLedgerProvenance<TId = string> {
+  actorId?: TId;
+  triggeredBy?: string;
+  sourceDocument?: string;
+  changedAt: string;
+}
+
+export interface BuyerFeeLedgerEntryRecord<TId = string> {
+  id: TId;
+  dealRoomId: TId;
+  bucket: BuyerFeeLedgerBucket;
+  dimension: BuyerFeeLedgerDimension;
+  amount: number;
+  description: string;
+  source: BuyerFeeLedgerSource;
+  lifecycle: BuyerFeeLedgerLifecycleLink<TId>;
+  provenance: BuyerFeeLedgerProvenance<TId>;
+  createdAt: string;
+}
+
+export interface CompensationLedgerState<TId = string> {
+  dealRoomId: TId;
+  status: CompensationStatus;
+  previousStatus?: CompensationStatus;
+  transitionReason?: string;
+  transitionActorId?: TId;
+  lastTransitionAt: string;
+  expectedBuyerFee: number;
+  sellerPaidAmount: number;
+  buyerPaidAmount: number;
+  projectedClosingCredit: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BuyerFeeLedgerEntryBuyerView<TId = string> {
+  id: TId;
+  bucket: BuyerFeeLedgerBucket;
+  dimension: BuyerFeeLedgerDimension;
+  amount: number;
+  description: string;
+  source: BuyerFeeLedgerSource;
+  createdAt: string;
+}
+
+export interface BuyerFeeLedgerEntryInternalView<TId = string>
+  extends BuyerFeeLedgerEntryBuyerView<TId> {
+  lifecycle: BuyerFeeLedgerLifecycleLink<TId>;
+  provenance: BuyerFeeLedgerProvenance<TId>;
+}
+
+export type BuyerFeeLedgerVariant = "buyer_safe" | "internal";
+
+export interface BuyerFeeLedgerReadModelBase<TId = string> {
+  dealRoomId: TId;
+  variant: BuyerFeeLedgerVariant;
+  compensation: CompensationLedgerState<TId>;
+  projected: BuyerFeeLedgerRollup;
+  actual: BuyerFeeLedgerRollup | null;
+  latestActualAt: string | null;
+}
+
+export interface BuyerFeeLedgerBuyerReadModel<TId = string>
+  extends BuyerFeeLedgerReadModelBase<TId> {
+  variant: "buyer_safe";
+  entries: BuyerFeeLedgerEntryBuyerView<TId>[];
+}
+
+export interface BuyerFeeLedgerInternalReadModel<TId = string>
+  extends BuyerFeeLedgerReadModelBase<TId> {
+  variant: "internal";
+  entries: BuyerFeeLedgerEntryInternalView<TId>[];
+}
+
+export type BuyerFeeLedgerReadModel<TId = string> =
+  | BuyerFeeLedgerBuyerReadModel<TId>
+  | BuyerFeeLedgerInternalReadModel<TId>;
+
+export interface BuyerFeeLedgerReconciliation {
+  expected: BuyerFeeLedgerRollup;
+  actual: BuyerFeeLedgerRollup | null;
+  delta: BuyerFeeLedgerRollup | null;
+  discrepancyAmount: number | null;
+  discrepancyDimensions: BuyerFeeLedgerDimension[];
+  discrepancyFlag: boolean;
+  discrepancyDetails?: string;
+}
+
+const compensationTransitionGraph: Record<CompensationStatus, CompensationStatus[]> =
+  {
+    unknown: ["seller_disclosed_off_mls", "negotiated_in_offer", "buyer_paid"],
+    seller_disclosed_off_mls: ["negotiated_in_offer", "buyer_paid"],
+    negotiated_in_offer: ["buyer_paid"],
+    buyer_paid: [],
+  };
+
+export function isValidCompensationTransition(
+  from: CompensationStatus,
+  to: CompensationStatus,
+): boolean {
+  return compensationTransitionGraph[from]?.includes(to) ?? false;
+}
+
+export function createEmptyBuyerFeeLedgerRollup(): BuyerFeeLedgerRollup {
+  return {
+    expectedBuyerFee: 0,
+    sellerPaidAmount: 0,
+    buyerPaidAmount: 0,
+    projectedClosingCredit: 0,
+    netBrokerCompensation: 0,
+    fundingGap: 0,
+  };
+}
+
+function finalizeBuyerFeeLedgerRollup(
+  partial: Omit<BuyerFeeLedgerRollup, "netBrokerCompensation" | "fundingGap">,
+): BuyerFeeLedgerRollup {
+  const netBrokerCompensation =
+    partial.sellerPaidAmount +
+    partial.buyerPaidAmount -
+    partial.projectedClosingCredit;
+
+  return {
+    ...partial,
+    netBrokerCompensation,
+    fundingGap: partial.expectedBuyerFee - netBrokerCompensation,
+  };
+}
+
+export function rollupBuyerFeeLedgerEntries<TId>(
+  entries: Array<
+    Pick<BuyerFeeLedgerEntryRecord<TId>, "bucket" | "dimension" | "amount">
+  >,
+  bucket: BuyerFeeLedgerBucket,
+): BuyerFeeLedgerRollup {
+  const partial = {
+    expectedBuyerFee: 0,
+    sellerPaidAmount: 0,
+    buyerPaidAmount: 0,
+    projectedClosingCredit: 0,
+  };
+
+  for (const entry of entries) {
+    if (entry.bucket !== bucket) continue;
+    partial[entry.dimension] += entry.amount;
+  }
+
+  return finalizeBuyerFeeLedgerRollup(partial);
+}
+
+function buildDeltaRollup(
+  expected: BuyerFeeLedgerRollup,
+  actual: BuyerFeeLedgerRollup,
+): BuyerFeeLedgerRollup {
+  return finalizeBuyerFeeLedgerRollup({
+    expectedBuyerFee: actual.expectedBuyerFee - expected.expectedBuyerFee,
+    sellerPaidAmount: actual.sellerPaidAmount - expected.sellerPaidAmount,
+    buyerPaidAmount: actual.buyerPaidAmount - expected.buyerPaidAmount,
+    projectedClosingCredit:
+      actual.projectedClosingCredit - expected.projectedClosingCredit,
+  });
+}
+
+export function reconcileBuyerFeeLedger(
+  expected: BuyerFeeLedgerRollup,
+  actual: BuyerFeeLedgerRollup | null,
+  threshold = 50,
+): BuyerFeeLedgerReconciliation {
+  if (!actual) {
+    return {
+      expected,
+      actual: null,
+      delta: null,
+      discrepancyAmount: null,
+      discrepancyDimensions: [],
+      discrepancyFlag: false,
+    };
+  }
+
+  const delta = buildDeltaRollup(expected, actual);
+  const discrepancyDimensions = buyerFeeLedgerDimensions.filter(
+    (dimension) => Math.abs(delta[dimension]) > threshold,
+  );
+  const discrepancyAmount = buyerFeeLedgerDimensions.reduce(
+    (sum, dimension) => sum + Math.abs(delta[dimension]),
+    0,
+  );
+
+  const detailSegments = discrepancyDimensions.map((dimension) => {
+    const label = dimension
+      .replace(/([A-Z])/g, " $1")
+      .replace(/^./, (letter) => letter.toUpperCase());
+    return `${label}: expected $${expected[dimension].toFixed(2)}, actual $${actual[
+      dimension
+    ].toFixed(2)} (${delta[dimension] >= 0 ? "+" : ""}$${delta[
+      dimension
+    ].toFixed(2)})`;
+  });
+
+  return {
+    expected,
+    actual,
+    delta,
+    discrepancyAmount,
+    discrepancyDimensions,
+    discrepancyFlag: discrepancyDimensions.length > 0,
+    discrepancyDetails:
+      detailSegments.length > 0 ? detailSegments.join("; ") : undefined,
+  };
+}
+
+export function buildBuyerFeeLedgerReadModel<TId>(
+  args: {
+    dealRoomId: TId;
+    compensation: CompensationLedgerState<TId>;
+    entries: BuyerFeeLedgerEntryRecord<TId>[];
+    forRole: "buyer" | "broker" | "admin";
+  },
+): BuyerFeeLedgerReadModel<TId> {
+  const projected = rollupBuyerFeeLedgerEntries(args.entries, "projected");
+  const actual = rollupBuyerFeeLedgerEntries(args.entries, "actual");
+  const hasActualEntries = args.entries.some((entry) => entry.bucket === "actual");
+  const latestActualAt = hasActualEntries
+    ? args.entries
+        .filter((entry) => entry.bucket === "actual")
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]?.createdAt ??
+      null
+    : null;
+
+  const buyerEntries: BuyerFeeLedgerEntryBuyerView<TId>[] = args.entries.map(
+    (entry) => ({
+      id: entry.id,
+      bucket: entry.bucket,
+      dimension: entry.dimension,
+      amount: entry.amount,
+      description: entry.description,
+      source: entry.source,
+      createdAt: entry.createdAt,
+    }),
+  );
+
+  if (args.forRole === "buyer") {
+    return {
+      dealRoomId: args.dealRoomId,
+      variant: "buyer_safe",
+      compensation: args.compensation,
+      projected,
+      actual: hasActualEntries ? actual : null,
+      latestActualAt,
+      entries: buyerEntries,
+    };
+  }
+
+  return {
+    dealRoomId: args.dealRoomId,
+    variant: "internal",
+    compensation: args.compensation,
+    projected,
+    actual: hasActualEntries ? actual : null,
+    latestActualAt,
+    entries: args.entries.map((entry) => ({
+      ...buyerEntries.find((buyerEntry) => buyerEntry.id === entry.id)!,
+      lifecycle: entry.lifecycle,
+      provenance: entry.provenance,
+    })),
+  };
+}
+
 export interface PropertyAddress {
   street: string;
   city: string;
@@ -64,6 +423,126 @@ export interface AIEngineOutput {
   reviewState: AIReviewState;
   generatedAt: string;
   modelId: string;
+}
+
+export const agreementTypes = [
+  "tour_pass",
+  "full_representation",
+] as const;
+
+export type AgreementType = (typeof agreementTypes)[number];
+
+export const agreementStatuses = [
+  "draft",
+  "sent",
+  "signed",
+  "canceled",
+  "replaced",
+] as const;
+
+export type AgreementStatus = (typeof agreementStatuses)[number];
+
+export const supersessionReasons = [
+  "upgrade_to_full_representation",
+  "correction",
+  "amendment",
+  "renewal",
+  "replace_expired",
+  "broker_decision",
+] as const;
+
+export type SupersessionReason = (typeof supersessionReasons)[number];
+
+export const agreementDocumentSources = [
+  "manual_upload",
+  "signature_provider",
+  "internal_generated",
+] as const;
+
+export type AgreementDocumentSource =
+  (typeof agreementDocumentSources)[number];
+
+export const agreementAuditEventTypes = [
+  "created",
+  "sent_for_signing",
+  "signed",
+  "canceled",
+  "replaced",
+  "document_accessed",
+] as const;
+
+export type AgreementAuditEventType =
+  (typeof agreementAuditEventTypes)[number];
+
+export const agreementAuditVisibilities = ["buyer", "internal"] as const;
+
+export type AgreementAuditVisibility =
+  (typeof agreementAuditVisibilities)[number];
+
+export const agreementAccessScopes = [
+  "deal_room_list",
+  "current_governing",
+  "signed_document",
+] as const;
+
+export type AgreementAccessScope = (typeof agreementAccessScopes)[number];
+
+export const agreementAccessOutcomes = ["granted", "denied"] as const;
+
+export type AgreementAccessOutcome = (typeof agreementAccessOutcomes)[number];
+
+export interface AgreementDocumentMetadata {
+  storageId?: string;
+  fileName?: string;
+  contentType?: string;
+  sizeBytes?: number;
+  checksumSha256?: string;
+  source?: AgreementDocumentSource;
+  uploadedAt?: string;
+  uploadedByUserId?: string;
+}
+
+export interface AgreementReadModel {
+  agreementId: string;
+  dealRoomId: string;
+  buyerId: string;
+  type: AgreementType;
+  status: AgreementStatus;
+  createdAt: string;
+  updatedAt: string;
+  sentAt?: string;
+  signedAt?: string;
+  canceledAt?: string;
+  supersededAt?: string;
+  effectiveStartAt?: string;
+  effectiveEndAt?: string;
+  supersessionReason?: SupersessionReason;
+  replacedById?: string;
+  document?: AgreementDocumentMetadata;
+  canAccessDocument: boolean;
+  isCurrentGoverning: boolean;
+}
+
+export interface AgreementAuditEventReadModel {
+  eventId: string;
+  agreementId: string;
+  dealRoomId: string;
+  buyerId: string;
+  eventType: AgreementAuditEventType;
+  visibility: AgreementAuditVisibility;
+  occurredAt: string;
+  actorUserId?: string;
+  actorRole?: "buyer" | "broker" | "admin";
+  previousStatus?: AgreementStatus;
+  nextStatus?: AgreementStatus;
+  successorAgreementId?: string;
+  reason?: string;
+  supersessionReason?: SupersessionReason;
+  accessScope?: AgreementAccessScope;
+  accessOutcome?: AgreementAccessOutcome;
+  effectiveStartAt?: string;
+  effectiveEndAt?: string;
+  document?: AgreementDocumentMetadata;
 }
 
 // ───────────────────────────────────────────────────────────────────────────

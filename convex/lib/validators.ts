@@ -48,6 +48,37 @@ export const supersessionReason = v.union(
   v.literal("broker_decision")
 );
 
+export const agreementDocumentSource = v.union(
+  v.literal("manual_upload"),
+  v.literal("signature_provider"),
+  v.literal("internal_generated")
+);
+
+export const agreementAuditEventType = v.union(
+  v.literal("created"),
+  v.literal("sent_for_signing"),
+  v.literal("signed"),
+  v.literal("canceled"),
+  v.literal("replaced"),
+  v.literal("document_accessed")
+);
+
+export const agreementAuditVisibility = v.union(
+  v.literal("buyer"),
+  v.literal("internal")
+);
+
+export const agreementAccessScope = v.union(
+  v.literal("deal_room_list"),
+  v.literal("current_governing"),
+  v.literal("signed_document")
+);
+
+export const agreementAccessOutcome = v.union(
+  v.literal("granted"),
+  v.literal("denied")
+);
+
 // Offer statuses
 export const offerStatus = v.union(
   v.literal("draft"),
@@ -143,6 +174,13 @@ export const contractSignatureEventType = v.union(
   v.literal("declined")
 );
 
+export const contractLifecycleStatus = v.union(
+  v.literal("pending_signatures"),
+  v.literal("fully_executed"),
+  v.literal("amended"),
+  v.literal("terminated")
+);
+
 // ─── Fee Ledger & Compensation (KIN-814) ────────────────────────────────────
 
 // Compensation status state machine
@@ -153,14 +191,25 @@ export const compensationStatus = v.union(
   v.literal("buyer_paid")
 );
 
-// Fee ledger entry types
-export const feeLedgerEntryType = v.union(
-  v.literal("fee_set"),
-  v.literal("seller_credit"),
-  v.literal("buyer_credit"),
-  v.literal("closing_credit_projection"),
-  v.literal("actual_closing"),
-  v.literal("adjustment")
+// Internal review state attached to ledger lifecycle links.
+export const ledgerInternalReviewState = v.union(
+  v.literal("not_submitted"),
+  v.literal("pending_review"),
+  v.literal("approved"),
+  v.literal("rejected")
+);
+
+// Fee ledger rows are typed by bucket + dimension.
+export const feeLedgerBucket = v.union(
+  v.literal("projected"),
+  v.literal("actual")
+);
+
+export const feeLedgerDimension = v.union(
+  v.literal("expectedBuyerFee"),
+  v.literal("sellerPaidAmount"),
+  v.literal("buyerPaidAmount"),
+  v.literal("projectedClosingCredit")
 );
 
 // Fee ledger source
@@ -501,6 +550,7 @@ export const smsIntakeOutcome = v.union(
   v.literal("start_received"),   // START / UNSTOP — re-opted in
   v.literal("invalid_url"),      // message has text but no supported URL
   v.literal("unsupported_url"),  // URL is valid but not from a supported portal
+  v.literal("rate_limited"),     // caller hit SMS abuse / throttling guardrails
   v.literal("suppressed"),       // user is in opted_out or suppressed state
   v.literal("duplicate"),        // messageSid already processed
   v.literal("empty_body")        // no body at all
