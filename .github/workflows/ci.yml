@@ -18,10 +18,10 @@ jobs:
     permissions:
       contents: read
     outputs:
-      ci: ${{ steps.filter.outputs.ci }}
       convex: ${{ steps.filter.outputs.convex }}
       ios: ${{ steps.filter.outputs.ios }}
       shared: ${{ steps.filter.outputs.shared }}
+      shared_platform: ${{ steps.filter.outputs.shared_platform }}
       web: ${{ steps.filter.outputs.web }}
       workers: ${{ steps.filter.outputs.workers }}
     steps:
@@ -33,9 +33,6 @@ jobs:
         id: filter
         with:
           filters: |
-            ci:
-              - '.github/**'
-              - 'scripts/**'
             web:
               - 'src/**'
               - 'next.config.ts'
@@ -45,11 +42,13 @@ jobs:
               - 'tsconfig.json'
               - 'vitest.config.ts'
               - 'playwright.config.ts'
-              - '.env.example'
             convex:
               - 'convex/**'
             shared:
               - 'packages/shared/**'
+              - '!packages/shared/src/config.ts'
+            shared_platform:
+              - 'packages/shared/src/config.ts'
             ios:
               - 'ios/**'
             workers:
@@ -62,7 +61,6 @@ jobs:
     name: Web quality
     needs: changes
     if: |
-      needs.changes.outputs.ci == 'true' ||
       needs.changes.outputs.web == 'true' ||
       needs.changes.outputs.shared == 'true' ||
       needs.changes.outputs.convex == 'true'
@@ -106,7 +104,6 @@ jobs:
     name: Convex quality
     needs: changes
     if: |
-      needs.changes.outputs.ci == 'true' ||
       needs.changes.outputs.convex == 'true' ||
       needs.changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
@@ -134,8 +131,8 @@ jobs:
     name: Shared package quality
     needs: changes
     if: |
-      needs.changes.outputs.ci == 'true' ||
-      needs.changes.outputs.shared == 'true'
+      needs.changes.outputs.shared == 'true' ||
+      needs.changes.outputs.shared_platform == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -160,10 +157,7 @@ jobs:
   ios:
     name: iOS quality
     needs: changes
-    if: |
-      needs.changes.outputs.ci == 'true' ||
-      needs.changes.outputs.ios == 'true' ||
-      needs.changes.outputs.shared == 'true'
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-latest
     permissions:
       contents: read
@@ -180,9 +174,7 @@ jobs:
   workers:
     name: Worker quality
     needs: changes
-    if: |
-      needs.changes.outputs.ci == 'true' ||
-      needs.changes.outputs.workers == 'true'
+    if: needs.changes.outputs.workers == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -253,7 +245,6 @@ jobs:
       github.event_name == 'pull_request' &&
       vars.PREVIEW_WEB_URL_TEMPLATE != '' &&
       (
-        needs.changes.outputs.ci == 'true' ||
         needs.changes.outputs.web == 'true' ||
         needs.changes.outputs.shared == 'true' ||
         needs.changes.outputs.convex == 'true'
@@ -288,10 +279,7 @@ jobs:
     if: |
       github.event_name == 'pull_request' &&
       vars.PREVIEW_EXTRACTION_URL_TEMPLATE != '' &&
-      (
-        needs.changes.outputs.ci == 'true' ||
-        needs.changes.outputs.workers == 'true'
-      )
+      needs.changes.outputs.workers == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
