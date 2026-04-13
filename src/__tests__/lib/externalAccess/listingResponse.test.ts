@@ -4,6 +4,7 @@ import {
   isDuplicateSubmission,
   LISTING_RESPONSE_TYPES,
   LISTING_RESPONSE_ERROR_CODES,
+  getListingResponseAccessAction,
   type ListingResponseInput,
 } from "@/lib/externalAccess/listingResponse";
 
@@ -372,5 +373,26 @@ describe("constants", () => {
     expect(LISTING_RESPONSE_ERROR_CODES).toContain("invalid_response_type");
     expect(LISTING_RESPONSE_ERROR_CODES).toContain("missing_counter_offer_payload");
     expect(LISTING_RESPONSE_ERROR_CODES).toContain("offer_required_for_counter");
+  });
+
+  it("maps response types to their limited-access actions", () => {
+    expect(getListingResponseAccessAction("offer_acknowledged")).toBe(
+      "acknowledge_receipt",
+    );
+    expect(getListingResponseAccessAction("generic_acknowledged")).toBe(
+      "acknowledge_receipt",
+    );
+    expect(getListingResponseAccessAction("offer_countered")).toBe(
+      "submit_response",
+    );
+    expect(getListingResponseAccessAction("offer_rejected")).toBe(
+      "submit_response",
+    );
+    expect(getListingResponseAccessAction("compensation_confirmed")).toBe(
+      "confirm_compensation",
+    );
+    expect(getListingResponseAccessAction("compensation_disputed")).toBe(
+      "confirm_compensation",
+    );
   });
 });

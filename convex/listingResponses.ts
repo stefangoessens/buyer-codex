@@ -33,6 +33,7 @@ import type { TokenDenialReason } from "../packages/shared/src/external-access";
 import {
   authorizeListingResponseSubmission,
   buildListingResponseReviewModel,
+  getListingResponseAccessAction,
   type ListingResponseReviewModel,
 } from "./lib/listingResponses";
 
@@ -196,7 +197,7 @@ function deniedSubmissionError(reason: TokenDenialReason): string {
     case "revoked":
       return "TOKEN_REVOKED: token has been revoked";
     case "action_not_allowed":
-      return "ACTION_NOT_ALLOWED: token does not permit submit_response";
+      return "ACTION_NOT_ALLOWED: token does not permit the required listing response action";
     case "scope_mismatch":
       return "TOKEN_SCOPE_MISMATCH: token is not scoped to this submission";
   }
@@ -206,6 +207,11 @@ const accessContextValidator = v.object({
   kind: v.literal("external_access"),
   tokenId: v.id("externalAccessTokens"),
   resource: v.literal("offer"),
+  action: v.union(
+    v.literal("submit_response"),
+    v.literal("confirm_compensation"),
+    v.literal("acknowledge_receipt"),
+  ),
   dealRoomId: v.id("dealRooms"),
   offerId: v.optional(v.id("offers")),
   role: counterpartyRoleValidator,
@@ -427,6 +433,7 @@ async function submitResponseHandler(
   },
 ): Promise<Id<"listingResponses">> {
   const now = new Date().toISOString();
+  const responseAction = getListingResponseAccessAction(args.responseType);
 
   const token = await ctx.db
     .query("externalAccessTokens")
@@ -459,9 +466,9 @@ async function submitResponseHandler(
         tokenId: token?._id,
         eventType: "denied",
         dealRoomId: token?.dealRoomId ?? args.dealRoomId,
-        attemptedAction: "submit_response",
+        attemptedAction: responseAction,
         denialReason: authorized.reason,
-        summary: `Denied submit_response attempt (${authorized.reason})`,
+        summary: `Denied ${responseAction} attempt (${authorized.reason})`,
       });
       throw new Error(deniedSubmissionError(authorized.reason));
     }
@@ -470,7 +477,7 @@ async function submitResponseHandler(
       tokenId: authorized.token._id,
       eventType: "denied",
       dealRoomId: authorized.token.dealRoomId,
-      attemptedAction: "submit_response",
+      attemptedAction: responseAction,
       denialReason: "duplicate_submission",
       summary: `Rejected duplicate ${args.responseType} submission`,
     });
@@ -479,13 +486,18 @@ async function submitResponseHandler(
     );
   }
 
-  const { accessContext, session, token: validToken } = authorized;
+  const {
+    accessContext,
+    action: authorizedAction,
+    session,
+    token: validToken,
+  } = authorized;
 
   await ctx.runMutation(externalAccessRecordEvent, {
     tokenId: validToken._id,
     eventType: "accessed",
     dealRoomId: validToken.dealRoomId,
-    attemptedAction: "submit_response",
+    attemptedAction: authorizedAction,
     summary: `Authorized ${session.scope.resource} submission access`,
   });
 
@@ -496,7 +508,7 @@ async function submitResponseHandler(
         tokenId: validToken._id,
         eventType: "denied",
         dealRoomId: validToken.dealRoomId,
-        attemptedAction: "submit_response",
+        attemptedAction: authorizedAction,
         denialReason: "scope_mismatch",
         summary: "Submission referenced an unknown offer",
       });
@@ -507,7 +519,7 @@ async function submitResponseHandler(
         tokenId: validToken._id,
         eventType: "denied",
         dealRoomId: validToken.dealRoomId,
-        attemptedAction: "submit_response",
+        attemptedAction: authorizedAction,
         denialReason: "scope_mismatch",
         summary: "Submission targeted an offer outside the deal room scope",
       });
@@ -536,7 +548,7 @@ async function submitResponseHandler(
       tokenId: validToken._id,
       eventType: "denied",
       dealRoomId: validToken.dealRoomId,
-      attemptedAction: "submit_response",
+      attemptedAction: authorizedAction,
       denialReason: "payload_invalid",
       summary: message.slice(0, 200),
     });
@@ -564,6 +576,7 @@ async function submitResponseHandler(
     disputeReason: args.disputeReason?.trim(),
     accessKind: accessContext.kind,
     accessResource: accessContext.resource,
+    accessAction: accessContext.action,
     accessAllowedActions: accessContext.allowedActions,
     accessExpiresAt: accessContext.expiresAt,
     reviewStatus: "unreviewed",
@@ -574,7 +587,7 @@ async function submitResponseHandler(
     tokenId: validToken._id,
     eventType: "submitted",
     dealRoomId: validToken.dealRoomId,
-    attemptedAction: "submit_response",
+    attemptedAction: authorizedAction,
     summary: `Submitted ${args.responseType}`,
   });
 
@@ -588,6 +601,7 @@ async function submitResponseHandler(
       dealRoomId: args.dealRoomId,
       accessKind: accessContext.kind,
       accessResource: accessContext.resource,
+      accessAction: accessContext.action,
       accessExpiresAt: accessContext.expiresAt,
     }),
     timestamp: now,

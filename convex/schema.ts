@@ -2605,6 +2605,13 @@ export default defineSchema({
     // Optional for forward compatibility with rows created before KIN-971.
     accessKind: v.optional(v.literal("external_access")),
     accessResource: v.optional(v.literal("offer")),
+    accessAction: v.optional(
+      v.union(
+        v.literal("submit_response"),
+        v.literal("confirm_compensation"),
+        v.literal("acknowledge_receipt"),
+      ),
+    ),
     accessAllowedActions: v.optional(
       v.array(
         v.union(
