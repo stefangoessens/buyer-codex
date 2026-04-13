@@ -234,10 +234,17 @@ export interface CostAssumptions {
   maintenancePct: number;     // e.g., 0.01 for 1% of value/yr
   pmiRate: number;            // e.g., 0.005 for 0.5%/yr
   closingCostPct: number;     // e.g., 0.03 for 3%
+  closingCostRangeSpreadPct: number; // e.g., 0.15 for +/- 15%
+  floridaHomesteadExemptionValue: number; // e.g., 50000
+  floridaHomesteadNonSchoolPortion: number; // e.g., 0.7 for second $25k
 }
 
 export interface CostInput {
   purchasePrice: number;
+  state?: string;
+  county?: string;
+  ownerOccupied?: boolean;
+  applyHomesteadExemption?: boolean;
   taxAnnual?: number;
   taxAssessedValue?: number;
   hoaFee?: number;
@@ -248,7 +255,16 @@ export interface CostInput {
   stormShutters?: boolean;
   constructionType?: string;
   floodZone?: string;
+  waterfrontType?: string;
+  coastDistanceMiles?: number;
+  elevationFeet?: number;
   assumptions?: Partial<CostAssumptions>;
+}
+
+export interface CostRange {
+  low: number;
+  mid: number;
+  high: number;
 }
 
 export interface CostLineItem {
@@ -257,9 +273,12 @@ export interface CostLineItem {
   monthlyLow: number;
   monthlyMid: number;
   monthlyHigh: number;
+  annualLow: number;
   annualMid: number;
+  annualHigh: number;
   source: "fact" | "assumption" | "estimate";
   notes: string;
+  basis?: Record<string, string | number | boolean>;
 }
 
 export interface CostOutput {
@@ -268,10 +287,15 @@ export interface CostOutput {
   totalMonthlyMid: number;
   totalMonthlyHigh: number;
   totalAnnual: number;
+  totalAnnualLow: number;
+  totalAnnualHigh: number;
+  annualRange: CostRange;
   upfrontCosts: {
     downPayment: number;
     closingCosts: number;
     total: number;
+    closingCostsRange: CostRange;
+    totalRange: CostRange;
   };
   assumptions: CostAssumptions;
   disclaimers: string[];
