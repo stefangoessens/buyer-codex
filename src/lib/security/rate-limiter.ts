@@ -106,6 +106,11 @@ export type RateLimitState =
       reason: "window_exceeded" | "block_active";
     };
 
+export interface ExplicitRateLimitState {
+  status: "retry_later" | "blocked";
+  retryAt: string;
+}
+
 /**
  * Caller-facing denial shape. UI surfaces only care whether the caller
  * should retry later or is currently blocked, plus when the gate lifts.
@@ -180,6 +185,28 @@ export function escalatingBlockMs(
   const scaled = config.baseBlockMs * Math.pow(2, safeExponent);
 
   return Math.min(scaled, config.maxBlockMs);
+}
+
+export function shouldFlagSuspiciousSpike(
+  channel: Channel,
+  previousActiveCount: number,
+  nextActiveCount: number,
+): boolean {
+  const threshold = Math.max(
+    3,
+    Math.ceil(CHANNEL_CONFIGS[channel].maxRequests * 0.8),
+  );
+
+  return previousActiveCount < threshold && nextActiveCount >= threshold;
+}
+
+export function toExplicitRateLimitState(
+  state: Extract<RateLimitState, { allowed: false }>,
+): ExplicitRateLimitState {
+  return {
+    status: state.reason === "block_active" ? "blocked" : "retry_later",
+    retryAt: state.blockedUntil,
+  };
 }
 
 /**
