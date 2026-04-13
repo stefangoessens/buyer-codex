@@ -1,21 +1,25 @@
 # Design References
 
-Reference materials for the buyer-codex design system.
+Durable capture pack for `KIN-946`.
 
-## Files
+## Reference Status
 
-- `tokens.css` — CSS custom properties for all design tokens
-- `tokens.ts` — TypeScript constants mirroring CSS tokens
-- `component-catalog.md` — Harvested component patterns with usage notes
+| Reference | Status | Directory |
+| --- | --- | --- |
+| PayFit | Captured | `design-references/payfit/` |
+| Hosman | Captured | `design-references/hosman/` |
+| shadcn preset `b2D0wqNxS` | Captured with preview mismatch note | `design-references/shadcn-b2D0wqNxS/` |
+| RealAdvisor | Blocked by Cloudflare | `design-references/realadvisor/` |
 
-## Reference Sites
+## Shared Outputs
 
-- [PayFit](https://payfit.com/) — Primary aesthetic (color, type, spacing, motion)
-- [Hosman](https://www.hosman.co/) — Primary structure (page architecture, conversion flows)
-- [RealAdvisor](https://realadvisor.ch/en/find-agent) — Supplementary (data viz, scores)
+- `component-catalog.md` - harvested components, adoption status, and surface mapping for `KIN-945`
+- `core-primitives.md` - shared primitives and provisional gaps for `KIN-945`
+- `token-candidates.json` - machine-readable token proposal for `KIN-944`
+- `tokens.ts` - TypeScript export of the adopted candidate tokens
+- `tokens.css` - CSS custom properties mirroring the adopted candidate tokens
 
-## North Star
+## Notes
 
-> PayFit aesthetic in Hosman structural form.
-
-See DESIGN.md for full design system documentation.
+- The PayFit/Hosman/shadcn captures are stable enough for downstream agents to work from without re-opening those sources.
+- RealAdvisor is the only unresolved reference. Its blocker pack includes screenshots and raw transport evidence so a future agent can resume from a concrete stopping point instead of rediscovering the failure mode.
