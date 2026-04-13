@@ -1,213 +1,381 @@
-# buyer-codex Design System
+# buyer-codex Design Decisions
 
-Canonical design language for the buyer-codex platform. Every UI surface — marketing site, deal room, dashboards, broker console, iOS app — derives from this document.
+This file is the implementation-facing design source of truth for buyer-codex.
 
-Implementation note: the canonical token contract now lives in `packages/shared/src/theme.ts` and is mirrored into `design-references/tokens.ts`, `design-references/tokens.css`, and `ios/BuyerCodex/Sources/Design/BrandTheme.swift` via `pnpm tokens:sync`. This document captures rationale and surface mapping; the generated token artifacts are the exact implementation values.
+It is not a mood board. It exists so another agent can build a homepage hero, trust section, pricing/calculator section, property card, or authenticated shell without reopening the reference sites.
 
----
+Implementation note: the canonical token contract lives in `packages/shared/src/theme.ts` and is mirrored into `design-references/tokens.ts`, `design-references/tokens.css`, and `ios/BuyerCodex/Sources/Design/BrandTheme.swift` via `pnpm tokens:sync`. This document captures rationale and surface mapping; the generated token artifacts are the exact implementation values.
 
-## 1. North Star
+## 1. Decision Hierarchy
 
-> **PayFit aesthetic in Hosman structural form.**
+- **Aesthetic winner:** PayFit
+- **Structural winner:** Hosman
+- **Authenticated shell winner:** shadcn preset `b2D0wqNxS` family
+- **Supplementary only:** RealAdvisor
 
-This means two things working in concert:
+When references conflict:
 
-**PayFit supplies the visual identity.** Deep trust blues, cool teal action accents, restrained violet secondary depth, generous whitespace, crisp geometric typography (Inter), smooth micro-interactions, and polished component surfaces (cards with subtle shadows, rounded inputs, pill badges). The overall feeling is modern European SaaS — professional without being corporate, friendly without being juvenile.
+1. Use **Hosman** for page sequencing, conversion flow, and hero/trust/calculator structure.
+2. Use **PayFit** for spacing rhythm, type confidence, card/button polish, and motion restraint.
+3. Use **shadcn `b2D0wqNxS`** for dashboard shell, left-nav rhythm, card density, and app scaffolding.
+4. Use **RealAdvisor** only for data-specific motifs such as compact numeric badges and optional list-plus-map composition.
 
-**Hosman supplies the page architecture.** Full-width hero sections with a prominent search/input CTA, scrolling trust strips with logos and stats, structured calculator and pricing sections, testimonial blocks, and conversion-oriented layout sequencing (hook → credibility → value prop → proof → CTA). Every public page follows Hosman's proven real estate marketing cadence.
+**PayFit still defines the base atmosphere:** deep trust blues, cool teal action accents, restrained violet secondary depth, generous whitespace, crisp type confidence, smooth micro-interactions, and polished component surfaces. The overall feeling should remain modern European SaaS: professional without feeling corporate, friendly without feeling juvenile.
 
-**RealAdvisor supplements with data patterns.** Score badges (e.g., 9.4/10 pills), comparison tables, agent matching cards, and data visualization conventions for metrics-heavy surfaces like the deal room and broker console.
+## 2. Screenshot Provenance
 
-The result: a platform that *looks* like the best SaaS tools in Europe and *flows* like the best real estate marketing sites.
+- `Hosman`, `PayFit`, and `shadcn` screenshots in `design-references/screenshots/` were captured on **2026-04-13** via Chrome DevTools MCP in this branch.
+- `RealAdvisor` was behind a Cloudflare verification wall in Chrome DevTools on **2026-04-13**. The vendored files under `design-references/screenshots/realadvisor/` come from a prior **2026-03-23 Chrome browser automation capture** already present on disk. They are used only for supplementary pattern decisions.
+- When a rule below says **Inference**, it means the implementation rule is derived from the screenshot plus the priority hierarchy above, not copied literally from the reference.
 
----
+## 3. Fast Rules
 
-## 2. Reference Hierarchy
+- Public pages should feel **trustworthy, bright, and guided**, not clever or experimental.
+- Authenticated pages should feel **calmer and denser** than marketing pages, but still belong to the same system.
+- One strong CTA is better than multiple competing actions.
+- Property decisions must feel **high-signal**. Avoid decorative noise, novelty layouts, or startup-generic AI styling.
+- Use `design-references/tokens.css` and `design-references/tokens.ts` for exact token values. This file decides **which pattern wins** and **how to use it**.
 
-| Source | What We Take | What We Skip |
-|---|---|---|
-| **PayFit** | Color palette (deep blue + teal), typography (Inter, geometric sans), spacing system (generous), component polish (cards, buttons, inputs, badges), motion language (subtle, purposeful), illustration tone (friendly, minimal), empty state patterns | HR/payroll domain content, pricing tiers layout, enterprise feature comparison grids |
-| **Hosman** | Page architecture (hero → trust → features → CTA), hero with prominent input, calculator/pricing section placement, trust bar pattern, testimonial layout, section sequencing, conversion flow, information architecture | French-specific real estate content, agent matching directory, city-specific landing page templates |
-| **RealAdvisor** | Score badge component (numeric pill), data visualization patterns, comparison table layout, metric cards, property data display conventions | Agent directory layout, Swiss market specifics, multi-language navigation patterns |
+## 4. Surface Winner Matrix
 
----
+| Surface | Winning reference | Supporting reference | Explicit loser(s) |
+| --- | --- | --- | --- |
+| Homepage hero | Hosman | PayFit polish | PayFit app-demo hero, RealAdvisor valuation hero |
+| Trust strip | Hosman | PayFit spacing discipline | Review-card carousels, logo-wall-only trust rows |
+| Pricing / calculator section | Hosman | PayFit input/card polish | SaaS pricing-tier tables, wizard-first flows |
+| Paste-link CTA card | Hosman | PayFit button/input finish | Multi-field tools, stepper-first entry |
+| Score badge | RealAdvisor | PayFit color discipline | Hosman ribbons, generic shadcn text badges |
+| Property / search card | Hosman | RealAdvisor map/list ideas | Portal-density cards, map-inside-card layouts |
+| Dashboard shell | shadcn `b2D0wqNxS` family | PayFit calmness | Hosman landing-page composition in app space |
+| Left nav | shadcn `b2D0wqNxS` family | PayFit spacing discipline | Top-nav-only app shells, icon-only expanded nav |
+| Section spacing rhythm | PayFit | Hosman sequencing | Tight SaaS spacing, dense portal packing |
 
-## 3. Color Palette
+Implement these choices through semantic aliases rather than source-named tokens. Components should depend on intent-level tokens such as `background`, `foreground`, `surface`, `border`, `primary`, `muted`, and `shadow`, while the shared theme contract owns the underlying scales.
 
-### Brand Colors
+## 5. Surface Rules
 
-| Token | Value | Usage |
-|---|---|---|
-| `brand-primary` | `#1B2B65` | Primary UI surfaces, headings, nav, trust |
-| `brand-primary-light` | `#2A3F8F` | Hover states, secondary surfaces |
-| `brand-primary-dark` | `#111D45` | Deep backgrounds, footer |
-| `brand-accent` | `#FF6B4A` | CTAs, action buttons, highlights, warmth |
-| `brand-accent-light` | `#FF8A70` | Hover on accent, soft emphasis |
-| `brand-accent-dark` | `#E85535` | Active/pressed state on accent |
-| `brand-secondary` | `#0FA573` | Success states, positive metrics, confirmations |
-| `brand-secondary-light` | `#34C791` | Lighter success surfaces |
-| `brand-secondary-dark` | `#0B7D57` | Dark success emphasis |
+### 5.1 Homepage Hero
 
-### Neutrals (Cool Gray)
+**Winner:** Hosman  
+**Why:** Hosman is the clearest reference for a real-estate conversion hero with one dominant action above the fold. PayFit improves finish, but not structure.
 
-| Token | Value |
-|---|---|
-| `neutral-50` | `#F8FAFC` |
-| `neutral-100` | `#F1F5F9` |
-| `neutral-200` | `#E2E8F0` |
-| `neutral-300` | `#CBD5E1` |
-| `neutral-400` | `#94A3B8` |
-| `neutral-500` | `#64748B` |
-| `neutral-600` | `#475569` |
-| `neutral-700` | `#334155` |
-| `neutral-800` | `#1E293B` |
-| `neutral-900` | `#0F172A` |
-| `neutral-950` | `#020617` |
+![Hosman homepage hero](design-references/screenshots/hosman/hero-homepage.png)
 
-### Semantic Colors
+**Adopted patterns**
 
-| Token | Value | Usage |
-|---|---|---|
-| `success` | `#0FA573` | Positive outcomes, confirmations |
-| `success-light` | `#ECFDF5` | Success backgrounds |
-| `warning` | `#F59E0B` | Caution, pending states |
-| `warning-light` | `#FFFBEB` | Warning backgrounds |
-| `error` | `#EF4444` | Errors, destructive actions |
-| `error-light` | `#FEF2F2` | Error backgrounds |
-| `info` | `#3B82F6` | Informational, links, help |
-| `info-light` | `#EFF6FF` | Info backgrounds |
+- Two-zone hero: message and entry action on the left, visual proof/product-adjacent imagery on the right.
+- Headline is short, outcome-led, and easy to scan in two or three lines.
+- The primary action is embedded in the hero itself, not deferred to a later section.
+- Supporting proof sits immediately below the action cluster rather than in a disconnected band.
 
-### Surface Colors
+**Rejected patterns**
 
-| Token | Value | Usage |
-|---|---|---|
-| `surface-white` | `#FFFFFF` | Card backgrounds, modals |
-| `surface-subtle` | `#F8FAFC` | Page background, alternating sections |
-| `surface-muted` | `#F1F5F9` | Disabled surfaces, secondary panels |
-| `surface-tinted` | `#EEF2FF` | Brand-tinted background (hero, feature sections) |
-| `surface-dark` | `#1B2B65` | Dark sections (footer, dark hero variant) |
-| `surface-overlay` | `rgba(15, 23, 42, 0.6)` | Modal/dialog backdrop |
+- PayFit's product-demo-first hero. It is too SaaS-tool oriented and makes buyer-codex feel like software before it feels like brokerage guidance.
+- RealAdvisor's valuation-first hero. It is too tool-driven and too blue-portal in tone for the homepage.
+- Centered generic startup hero layouts with floating gradients and no directional flow.
 
----
+**Do**
 
-## 4. Typography
+- Keep the hero interaction visible without scrolling.
+- Let the right side show believable housing or workflow context, not abstract illustration alone.
+- Preserve a strong left-to-right reading order.
 
-### Font Stack
+**Don't**
 
-| Role | Font | Fallback |
-|---|---|---|
-| **Display / Headings** | `Inter` | `system-ui, -apple-system, sans-serif` |
-| **Body** | `Inter` | `system-ui, -apple-system, sans-serif` |
-| **Monospace** | `JetBrains Mono` | `ui-monospace, 'Cascadia Code', monospace` |
+- Do not stack multiple equal CTAs.
+- Do not use a dark hero or an all-center layout for the homepage.
+- Do not make the hero feel like a finance calculator landing page.
 
-Load via `next/font/google` for automatic optimization:
+### 5.2 Trust Strip
 
-```tsx
-import { Inter, JetBrains_Mono } from 'next/font/google';
+**Winner:** Hosman  
+**Why:** Hosman turns trust into a quick proof band with simple numbers and plain-language labels. It is closer to our brokerage trust problem than PayFit's broader logo-and-reviews treatment.
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' });
-```
+![Hosman trust strip](design-references/screenshots/hosman/trust-strip.png)
 
-### Type Scale
+**Adopted patterns**
 
-| Token | Size | Line Height | Usage |
-|---|---|---|---|
-| `text-xs` | 12px | 1.5 | Captions, fine print, badges |
-| `text-sm` | 14px | 1.5 | Secondary text, table cells, helper text |
-| `text-base` | 16px | 1.5 | Body text (default) |
-| `text-lg` | 18px | 1.5 | Lead paragraphs, emphasized body |
-| `text-xl` | 20px | 1.35 | Card headings, section subheads |
-| `text-2xl` | 24px | 1.3 | Section headings |
-| `text-3xl` | 30px | 1.25 | Page titles |
-| `text-4xl` | 36px | 1.2 | Hero subheadings |
-| `text-5xl` | 48px | 1.15 | Hero headings |
-| `text-6xl` | 60px | 1.1 | Display (marketing hero, large) |
-| `text-7xl` | 72px | 1.1 | Display (max, used sparingly) |
+- Immediate post-hero proof band with 3-4 concise trust facts.
+- Equal-weight stat modules with minimal decoration.
+- Short labels that explain why the stat matters.
 
-### Font Weights
+**Rejected patterns**
 
-| Token | Weight | Usage |
-|---|---|---|
-| `font-regular` | 400 | Body text, descriptions |
-| `font-medium` | 500 | Labels, nav items, emphasis |
-| `font-semibold` | 600 | Subheadings, buttons, card titles |
-| `font-bold` | 700 | Hero headings, display text, strong emphasis |
+- Review-carousel trust treatments. They are too slow and too content-heavy for the first proof moment.
+- Logo-cloud-only rows. They signal partnerships, not buyer confidence.
+- Dense metric dashboards. This is reassurance, not analytics.
 
-### Letter Spacing
+**Do**
 
-| Token | Value | Usage |
-|---|---|---|
-| `tracking-tight` | `-0.02em` | Headings (text-2xl and above) |
-| `tracking-normal` | `0` | Body text |
-| `tracking-wide` | `0.05em` | All-caps labels, overlines |
+- Use plain language and strong numerals.
+- Keep the strip visually quieter than the hero.
+- Let the strip confirm credibility before the page asks for more reading.
 
----
+**Don't**
 
-## 5. Spacing
+- Do not turn the trust strip into testimonial cards.
+- Do not add more than four proof points on desktop.
+- Do not use playful iconography or loud accent colors here.
 
-Base unit: **4px**. All spacing values are multiples of 4.
+### 5.3 Pricing / Calculator Section
 
-| Token | Value | Usage |
-|---|---|---|
-| `space-0` | 0px | Reset |
-| `space-1` | 4px | Tight internal padding (badge, tag) |
-| `space-2` | 8px | Icon-to-text gap, inline spacing |
-| `space-3` | 12px | Input padding, compact card padding |
-| `space-4` | 16px | Standard padding, form gaps |
-| `space-5` | 20px | Card padding, button padding-x |
-| `space-6` | 24px | Gutter (min), section-internal spacing |
-| `space-8` | 32px | Gutter (standard), card-to-card gap |
-| `space-10` | 40px | Large component spacing |
-| `space-12` | 48px | Section padding (compact) |
-| `space-16` | 64px | Section padding (standard) |
-| `space-20` | 80px | Section padding (generous) |
-| `space-24` | 96px | Section padding (max) |
+**Winner:** Hosman  
+**Why:** Hosman handles pricing as a credibility-building calculator/explainer, which matches buyer-codex better than subscription-table pricing.
 
-### Layout Constants
+![Hosman pricing and calculator section](design-references/screenshots/hosman/pricing-calculator.png)
 
-| Constant | Value |
-|---|---|
-| Container max-width | `1280px` |
-| Container padding-x | `24px` (mobile), `32px` (tablet+) |
-| Section padding-y | `64px` (mobile), `80px` (tablet), `96px` (desktop) |
-| Grid gutter | `24px` (mobile), `32px` (desktop) |
-| Sidebar width | `260px` (collapsed: `64px`) |
-| Top nav height | `64px` |
+**Adopted patterns**
 
----
+- A single calculator/explainer section in the middle of the page.
+- Inputs and payoff live in the same visual frame.
+- The section explains savings or value transparently instead of asking for commitment first.
 
-## 6. Border Radii
+**Rejected patterns**
 
-| Token | Value | Usage |
-|---|---|---|
-| `radius-sm` | `6px` | Inputs, badges, small tags |
-| `radius-md` | `8px` | Cards, dropdowns, tooltips |
-| `radius-lg` | `12px` | Modals, panels, large cards |
-| `radius-xl` | `16px` | Hero cards, featured CTAs, promo banners |
-| `radius-full` | `9999px` | Pills, avatars, circular buttons |
+- Multi-plan SaaS pricing tables from PayFit-style software pages.
+- Full-screen valuation wizard entry from RealAdvisor.
+- Dense shadcn settings forms used as marketing sections.
 
----
+**Do**
 
-## 7. Elevation / Shadows
+- Present one core input group and one results/benchmark group.
+- Keep the result legible at a glance.
+- Treat the section as trust-building evidence, not as a checkout page.
 
-| Token | Value | Usage |
-|---|---|---|
-| `shadow-sm` | `0 1px 2px rgba(0, 0, 0, 0.05)` | Inputs, subtle lift |
-| `shadow-md` | `0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)` | Cards, dropdowns |
-| `shadow-lg` | `0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)` | Modals, popovers, floating panels |
-| `shadow-xl` | `0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)` | Full-page overlays, hero feature cards |
-| `shadow-inner` | `inset 0 2px 4px rgba(0, 0, 0, 0.05)` | Pressed inputs, inset surfaces |
-| `shadow-none` | `none` | Reset |
+**Don't**
 
-### Elevation Usage Pattern
+- Do not use three-column pricing plans.
+- Do not hide the result behind a modal or next-step gate.
+- Do not overload the calculator with secondary filters before the first result is shown.
 
-- **Resting**: `shadow-sm` or none (most components)
-- **Interactive hover**: `shadow-md` (cards, buttons)
-- **Floating**: `shadow-lg` (dropdowns, popovers, tooltips)
-- **Modal**: `shadow-xl` (dialogs, full overlays)
+### 5.4 Paste-Link CTA Card
 
----
+**Winner:** Hosman  
+**Why:** The Hosman hero input establishes the right interaction model: one prominent field, one clear action, immediate momentum.
+
+![Hosman paste-link CTA baseline](design-references/screenshots/hosman/paste-link-cta.png)
+
+**Adopted patterns**
+
+- One large input field plus one decisive submit control.
+- Placeholder text explains the action by example.
+- Proof or reassurance belongs directly under the field.
+
+**Rejected patterns**
+
+- PayFit dual-button CTA clusters with no text input.
+- Wizard-first entry that asks multiple questions before accepting the source URL.
+- Busy card layouts with side filters, toggles, or segmented controls.
+
+**Do**
+
+- Keep the card focused on a single pasted listing URL.
+- Attach loading, validation, and parse states directly to this field.
+- Make the card feel premium through spacing and finish, not through extra chrome.
+
+**Don't**
+
+- Do not add multiple fields to the first interaction.
+- Do not bury the submit action under helper copy.
+- Do not make this look like a developer tool or a search console.
+
+### 5.5 Score Badge
+
+**Winner:** RealAdvisor  
+**Why:** RealAdvisor is the best supplementary reference for compact numeric emphasis sitting directly on top of real-estate imagery.  
+**Inference:** We adopt the pill shape, contrast, and overlay behavior from the valuation badge, but adapt the content from currency-per-meter to buyer-codex score/confidence language.
+
+![RealAdvisor numeric badge reference](design-references/screenshots/realadvisor/score-badge.png)
+
+**Adopted patterns**
+
+- One compact, filled numeric pill with very short text.
+- Badge overlays media or sits beside the title, never as its own card.
+- Strong contrast and immediate readability matter more than subtlety.
+
+**Rejected patterns**
+
+- Hosman ribbons such as `SOLD` or energy-grade labels. Those communicate market state, not analytical confidence.
+- Default shadcn badges as the primary score treatment. They are too neutral and text-first.
+- PayFit review stars or trust snippets as a proxy for deal scoring.
+
+**Do**
+
+- Keep the badge to one number plus, at most, one short label.
+- Use it once per card as the main analytical signal.
+- Keep the silhouette pill-like and glanceable.
+
+**Don't**
+
+- Do not make the badge multi-line.
+- Do not turn the badge into a progress bar or mini chart.
+- Do not place multiple competing badges on the same property image.
+
+### 5.6 Property / Search Card
+
+**Winner:** Hosman  
+**Why:** Hosman's listing cards are closer to the photo-first, metadata-light card we want. RealAdvisor helps with optional list-plus-map composition, but not with the default card chrome.
+
+![Hosman property card rhythm](design-references/screenshots/hosman/property-cards.png)
+
+**Supporting supplementary reference:** RealAdvisor shows how list + map can coexist, but it should remain optional rather than define the base card.
+
+![RealAdvisor search and map composition](design-references/screenshots/realadvisor/search-map-composition.png)
+
+**Adopted patterns**
+
+- Photo-first card with short metadata and a single primary number.
+- Address or area label first, price or value next, supporting stats in one muted row.
+- Score badge floats on the image or sits immediately beside the heading.
+
+**Rejected patterns**
+
+- Map-dominant portal composition as the default experience.
+- Dense attribute stacks inside every card.
+- Generic SaaS information cards from PayFit.
+
+**Do**
+
+- Keep cards clean enough for 3-up desktop grids and 1-up mobile stacks.
+- Let imagery carry part of the decision-making workload.
+- Use one muted metrics row for beds, baths, sqft, or equivalent.
+
+**Don't**
+
+- Do not embed a mini map inside each card.
+- Do not use long unlabeled metadata dumps.
+- Do not add multiple secondary chips under every listing.
+
+### 5.7 Dashboard Shell
+
+**Winner:** shadcn `b2D0wqNxS` family  
+**Why:** The shadcn dashboard block gives the best starting shell for authenticated product surfaces: fixed left rail, quiet utility header, KPI row, then primary work area. That matches buyer-codex's buyer dashboard and internal tools better than either marketing reference.
+
+![shadcn dashboard shell](design-references/screenshots/shadcn/dashboard-shell.png)
+
+**Adopted patterns**
+
+- Permanent left rail with a clear content canvas.
+- Summary cards up top, followed by one dominant data/work surface.
+- Quiet chrome: app framing should support work, not compete with content.
+
+**Rejected patterns**
+
+- Reusing marketing-page section choreography inside authenticated pages.
+- Hero-sized headings or oversized promotional cards in the app shell.
+- RealAdvisor consumer-portal search layouts as the default dashboard scaffold.
+
+**Do**
+
+- Use the shell for both buyer-facing and internal authenticated surfaces.
+- Restyle through buyer-codex tokens rather than inventing a second app system.
+- Group information into clear work zones: summary, primary task surface, secondary context.
+
+**Don't**
+
+- Do not build authenticated areas as free-floating cards on a marketing page background.
+- Do not make the app depend on a top-nav-only structure.
+- Do not use decorative marketing imagery inside the shell itself.
+
+### 5.8 Left Nav
+
+**Winner:** shadcn `b2D0wqNxS` family  
+**Why:** shadcn's sidebar blocks are the strongest reference for expandable, grouped, product-grade navigation with clear text rhythm and bottom-anchored account utilities.
+
+![shadcn left navigation](design-references/screenshots/shadcn/left-nav.png)
+
+**Adopted patterns**
+
+- Grouped navigation sections with visible labels in expanded state.
+- Utility and account actions anchored away from the primary route stack.
+- Optional collapse-to-icons mode, but only as a secondary behavior.
+
+**Rejected patterns**
+
+- Icon-only expanded navigation.
+- Hosman or PayFit top-nav patterns for authenticated surfaces.
+- Header search bars acting as the primary app navigation model.
+
+**Do**
+
+- Keep the primary nav list short and decisive.
+- Use consistent row rhythm and muted active states.
+- Reserve badges for real exceptions, not every item.
+
+**Don't**
+
+- Do not stuff marketing CTAs into the sidebar.
+- Do not show more than one level of navigation by default unless the page truly needs it.
+- Do not treat the collapsed rail as the default desktop state.
+
+### 5.9 Section Spacing Rhythm
+
+**Winner:** PayFit  
+**Why:** PayFit handles vertical cadence better than the other references. It gives us the right amount of calm space between sections without making the page feel sparse or editorially slow.
+
+![PayFit section spacing rhythm](design-references/screenshots/payfit/section-spacing-rhythm.png)
+
+**Adopted patterns**
+
+- Generous vertical section spacing on public pages.
+- Tighter spacing inside cards than between sections.
+- Clear white-space reset before a new section starts.
+
+**Rejected patterns**
+
+- Tight SaaS startup spacing that makes trust-heavy content feel rushed.
+- RealAdvisor-style portal density on marketing pages.
+- Large editorial interruptions or image-led pauses after every short section.
+
+**Do**
+
+- Keep marketing sections visually separated even when backgrounds are the same.
+- Let headings breathe above grids and calculators.
+- Tighten only after entering authenticated shells.
+
+**Don't**
+
+- Do not compress public sections into dashboard spacing.
+- Do not leave giant dead zones between the hero and trust strip.
+- Do not alternate every section with oversized decorative imagery.
+
+## 6. Global Do / Don't Rules
+
+### Do
+
+- Combine **Hosman structure** with **PayFit polish**.
+- Use **shadcn** as the authenticated scaffold, then restyle it through our tokens.
+- Use **RealAdvisor** only where buyer-codex needs a compact numeric real-estate signal or optional map/list composition.
+- Prefer calm, obvious hierarchy over novelty.
+- Keep one primary action per section.
+
+### Don't
+
+- Do not import RealAdvisor's overall visual system wholesale.
+- Do not default to generic SaaS pricing tables or app-demo heroes.
+- Do not use purple gradients, glassmorphism, or AI-generic ornamentation.
+- Do not treat dense portal layouts as the homepage default.
+- Do not fork the public site and authenticated product into two unrelated visual systems.
+
+## 7. If An Agent Has To Choose Quickly
+
+If an implementation choice is not explicitly documented elsewhere, use these defaults:
+
+1. **Public page layout:** Hosman structure.
+2. **Spacing and finish:** PayFit.
+3. **Authenticated shell and nav:** shadcn.
+4. **Numeric overlay / score treatment:** RealAdvisor, adapted through our tokens.
+5. **Property card:** Hosman card body plus RealAdvisor-style numeric emphasis only where needed.
+
+If a new implementation still feels plausible in multiple ways after applying those rules, reject the option that is:
+
+- denser
+- darker
+- more tool-like
+- more multi-CTA
+- more decorative
+
+buyer-codex should feel like a high-trust brokerage product first, and a software product second.
 
 ## 8. Motion
 
@@ -238,184 +406,121 @@ Base unit: **4px**. All spacing values are multiples of 4.
 
 ---
 
-## 9. Surface Mapping
+### Motion Decision Rules
 
-How design patterns map to buyer-codex surfaces:
+Use these rules when more than one animation approach would be plausible:
 
-| Surface | Primary Reference | Layout Pattern | Key Components |
+| Situation | Choose | Why it matches PayFit | Do not choose |
 |---|---|---|---|
-| **Public homepage** | Hosman hero + PayFit polish | Full-width hero → trust strip → feature cards → calculator teaser → testimonials → CTA | `PasteLinkInput`, `TrustBar`, `FeatureCard`, `TestimonialCard` |
-| **Pricing / FAQ** | Hosman structure + PayFit tables | Section-based vertical scroll: hero → pricing table → FAQ accordion → CTA | `PricingTable`, `AccordionFAQ`, `ComparisonRow` |
-| **Savings calculator** | Hosman placement + PayFit inputs | Two-column: controls (sliders, inputs) left, results (cards, chart) right | `SliderInput`, `ResultCard`, `SavingsChart` |
-| **Deal room** | RealAdvisor data + PayFit cards | Dashboard grid: property header → score panel → analysis tabs → timeline | `ScoreBadge`, `PropertyCard`, `AnalysisPanel`, `TimelineStep` |
-| **Buyer dashboard** | PayFit SaaS dashboard | Left sidebar nav + main content area with card grid | `NavSidebar`, `DealCard`, `TaskList`, `KPICard` |
-| **Broker console** | PayFit ops + shadcn data tables | Left sidebar nav + table/detail split view | `DataTable`, `QueueCard`, `KPICard`, `StatusBadge` |
-| **Onboarding flow** | PayFit onboarding stepper | Centered card with progress stepper, one question per step | `StepIndicator`, `QuestionCard`, `ProgressBar` |
-| **Auth screens** | PayFit minimal | Centered card on tinted background, logo + form | `AuthCard`, `SocialLoginButton` |
+| Primary CTA hover | Background tint shift + shadow increase + at most 1-2px perceived lift at `150-200ms` | PayFit buttons feel responsive and polished, but never theatrical | Bounce, glow, elastic scale, icon spin |
+| Card hover | Shadow step (`shadow-sm` → `shadow-md`) and optional `scale(1.01)` | Keeps the surface feeling touchable without looking like a draggable tile | 3D tilt, `scale(1.04+)`, hard drop shadows |
+| Section reveal on public pages | Fade-up `8-12px`, `250-400ms`, stagger `40-60ms`, one pass only | PayFit uses reveal as orchestration, not as an ambient effect | Re-triggering on every scroll, long parallax, layered timelines |
+| Step-to-step onboarding transition | Outgoing content fades to `0` while incoming content slides `12-16px` on the x-axis and fades in at `250ms` | Feels guided and product-like, not like a marketing carousel | Full-screen wipes, slide decks, modal-like cross-zooms |
+| Expand/collapse disclosures or FAQ | Height/opacity transition at `200-250ms` with `ease-in-out` | Keeps compliance/help copy readable and calm | Overshoot springs, accordion snap, collapsing multiple panels at once |
+| Async confirmation | Subtle color confirmation, check icon fade-in, or border accent | Trust surfaces should reinforce certainty, not celebrate | Confetti, success bursts, looping checkmark pulses |
+| Loading | Skeleton sweep or steady pulse `1.4-1.8s` | Matches PayFit's "system is working" feel | Spinners as the default for content regions, jittery shimmer, rainbow loaders |
+
+### Public vs. Authenticated Motion
+
+| Surface type | Motion posture | Allowed emphasis | Restricted behaviors |
+|---|---|---|---|
+| **Public marketing** | Guided, slightly more spacious | Section reveals, CTA hover lift, feature-card hover, controlled testimonial/proof entrance | Auto-rotating testimonial carousels, floating decorative shapes, looping hero motion |
+| **Intake / onboarding** | Reassuring, task-forward | Step transitions, validation states, disclosure expansion, progress indicator updates | Multiple simultaneous reveals, attention traps near inputs, animated distractions next to legal copy |
+| **Authenticated product** | Quiet, utility-first | Instant hover feedback, panel open/close, inline optimistic updates, skeletons | Large staggered reveals after first paint, animated counters on every refresh, marketing-style hero entrances |
+
+### Motion Anti-Patterns
+
+- Too flashy: parallax, marquee logos, count-up vanity metrics, pulsing trust badges, floating gradient blobs, autoplay carousels.
+- Too startup-generic: springy cards, micro-bounce on every click, animated mascot scenes, attention-grabbing cursor-follow effects.
+- Too enterprise-flat: zero hover feedback, abrupt accordion snaps, no progress cues in onboarding, dead/static empty states.
+- `ease-spring` is reserved for tiny input affordances only. Never use it for trust claims, testimonials, disclosures, or page-level transitions.
 
 ---
 
-## 10. Component Patterns
+## 9. Illustration
 
-Key reusable components derived from the reference sites. Each component lists its source inspiration, visual characteristics, and buyer-codex adaptation.
+### Choose Illustration vs. Product UI vs. Photography
 
-### PasteLinkInput
-- **Source**: Hosman hero search bar, adapted for URL paste
-- **Visual**: Large input (48-56px height), rounded-xl, prominent placeholder, brand-accent submit button, subtle shadow-md
-- **Behavior**: Paste or type a Zillow/Redfin/Realtor.com URL; validates on paste; animates to loading state
-- **Surface**: Public homepage hero
+| If the message is about... | Use | Why | Avoid |
+|---|---|---|---|
+| Workflow clarity, dashboard output, automation, or search results | Product UI screenshot/mock frame | Real interface detail builds credibility faster than metaphor | Abstract illustration standing in for a concrete product claim |
+| Guidance, reassurance, empty states, onboarding support, or invisible service work | Minimal illustration | Softens the experience without pretending to be evidence | Dense UI screenshots that overwhelm a lightweight support moment |
+| Real humans, outcomes, reviews, or properties | Photography | Trust comes from specific people and real homes, not from illustration | Generic stock office scenes or AI-looking people |
+| Pricing math, legal framing, disclosures, or data-heavy comparison | Plain UI + typography | These surfaces need clarity over charm | Decorative scenes, oversized icons, or emotional imagery competing with legal copy |
 
-### ScoreBadge
-- **Source**: RealAdvisor score pills (e.g., "9.4" / "7.4")
-- **Visual**: Rounded-full pill, bold numeric value, color-coded background (green/amber/red based on score), compact (28-32px height)
-- **Variants**: `positive` (green), `neutral` (amber), `negative` (red), `info` (blue)
-- **Surface**: Deal room, property cards, analysis panels
+### Illustration Treatment Rules
 
-### PropertyCard
-- **Source**: Hosman property listing + RealAdvisor metrics
-- **Visual**: radius-md card with photo (aspect-video), score badge overlay, address, key metrics row (price, beds, baths, sqft), subtle shadow-md on hover
-- **Surface**: Buyer dashboard, deal room, search results
+1. **Style**: flat or softly shaded 2D, geometric, human but not character-led, with clean outlines or crisp fill boundaries.
+2. **Palette**: one dominant brand-primary family, one warm accent, one success/support color, and neutral grounding. Illustrations should feel like an extension of the token system, not a separate palette.
+3. **Complexity**: one clear idea per illustration. PayFit's illustrations are compositional support, not puzzle images.
+4. **Framing**: keep illustrations inside cards, split-content sections, or empty-state containers. Do not let them float as disconnected collage elements.
+5. **Relationship to UI**: product UI wins whenever the claim can be shown directly. Illustration is secondary and explanatory.
+6. **Scale**: on marketing pages, one illustration per major narrative section is enough. In authenticated surfaces, restrict illustration to empty states, onboarding side panels, and light contextual support.
+7. **Texture**: use clean fills, sparse highlights, and subtle shadows only where they reinforce depth. No grain-heavy poster treatment, hand-drawn sketching, or glossy 3D rendering.
 
-### TrustBar
-- **Source**: Hosman trust strip
-- **Visual**: Full-width, neutral-50 background, horizontally scrolling or evenly spaced partner logos, optional stats ("500+ buyers served", "$2M+ saved")
-- **Surface**: Public homepage, below hero
+### Illustration Anti-Patterns
 
-### KPICard
-- **Source**: PayFit dashboard metric cards
-- **Visual**: radius-md card, large numeric value (text-3xl, font-bold), label below (text-sm, neutral-500), optional trend indicator (up/down arrow + percentage), optional sparkline
-- **Surface**: Buyer dashboard, broker console
-
-### TimelineStep
-- **Source**: PayFit process stepper
-- **Visual**: Vertical timeline with circle indicators (brand-primary filled for complete, accent for current, neutral-300 for future), connecting line, step label + description
-- **Variants**: `completed`, `current`, `upcoming`
-- **Surface**: Deal room timeline, onboarding flow
-
-### FeatureCard
-- **Source**: PayFit feature sections
-- **Visual**: radius-lg card, icon (40px, brand-primary tint), heading (text-xl, font-semibold), description (text-base, neutral-600), optional link
-- **Surface**: Public homepage feature sections
-
-### AccordionFAQ
-- **Source**: Hosman FAQ section
-- **Visual**: Clean accordion with neutral-200 dividers, smooth expand/collapse (duration-normal), chevron rotation, generous padding
-- **Surface**: Pricing/FAQ page
-
-### EmptyState
-- **Source**: PayFit empty states
-- **Visual**: Centered layout, friendly illustration (minimal line art style, brand-primary + accent colors), heading, description, primary CTA button
-- **Surface**: Any list/dashboard with no data
-
-### LoadingState
-- **Source**: PayFit skeleton loaders
-- **Visual**: Skeleton shapes matching the component they replace (rounded rects for text, circles for avatars, aspect-video rects for images), pulse animation with neutral-200/neutral-100 gradient
-- **Surface**: All async-loaded components
-
-### DataTable
-- **Source**: shadcn/ui Table + PayFit styling
-- **Visual**: Clean header row (font-medium, neutral-500, text-sm), alternating row backgrounds (white/neutral-50), hover highlight (surface-tinted), sortable column indicators, pagination
-- **Surface**: Broker console, admin views
-
-### StatusBadge
-- **Source**: PayFit status indicators
-- **Visual**: Rounded-full pill, dot indicator + label, color-coded per status
-- **Variants**: `active` (green), `pending` (amber), `closed` (neutral), `urgent` (red)
-- **Surface**: Dashboards, tables, cards
+- Too flashy: 3D isometric scenes, mascots, exaggerated gradients, oversized decorative ribbons, layered floating stickers.
+- Too startup-generic: generic AI orbit graphics, purple blob collages, emoji-led scenes, abstract "innovation" visuals.
+- Too enterprise-flat: icon-only sections where a supportive illustration should soften the page, grayscale compliance panels with no visual relief.
+- Do not imitate PayFit's exact characters, product scenes, or compositions literally. Borrow the level of friendliness and restraint, not the proprietary artwork.
 
 ---
 
-## 11. Adopted vs. Rejected Patterns
+## 10. Trust Surfaces
 
-### PayFit
+### Trust Surface Formula
 
-| Adopted | Rationale |
-|---|---|
-| Deep blue + warm accent palette | Conveys trust (real estate) + action (conversion) |
-| Inter typeface at all scales | Clean, geometric, excellent readability, free |
-| Generous whitespace and section padding | Premium feel, reduces cognitive load |
-| Card-based component surfaces with subtle shadows | Consistent containment, clear hierarchy |
-| Skeleton loading states | Smooth perceived performance |
-| Dashboard sidebar + content layout | Proven SaaS pattern, good for dense data |
-| Metric cards with trend indicators | Quick buyer/broker status comprehension |
-| Stepper/timeline for multi-step flows | Clear progress indication for long processes |
-| Micro-interactions (hover lift, fade-up entrance) | Polish without distraction |
-| Empty state with illustration + CTA | Guides users to action vs. blank screen |
+Every trust-forward surface should combine at least **two** of these evidence types:
 
-| Rejected | Rationale |
-|---|---|
-| HR/payroll content patterns | Different domain (real estate) |
-| Enterprise pricing tier layout | buyer-codex has a single commission model, not SaaS tiers |
-| Complex multi-tab settings UI | Over-engineered for buyer-codex's simpler config needs |
-| Illustration-heavy onboarding | buyer-codex onboarding is URL-paste-first, not tour-based |
+| Evidence type | What counts | Typical location |
+|---|---|---|
+| **Outcome proof** | Savings figures, time-to-close, buyer count, response-time metric, score improvement | Trust bar, calculator support, KPI rail |
+| **Human proof** | Buyer testimonial, named reviewer, broker review, partner/press/customer logo | Mid-page proof section, footer trust strip, onboarding reassurance panel |
+| **Operational proof** | Licensed brokerage note, broker review process, secure document handling, disclosure language, certification badges | Calculator support, onboarding, footer, deal-room side panels |
 
-### Hosman
+A trust surface is weak if it relies on only one evidence type. Example: a testimonial carousel with no quantified outcome or operational framing is too soft; a disclosure wall with no human or outcome proof is too cold.
 
-| Adopted | Rationale |
-|---|---|
-| Full-width hero with prominent search/input | URL paste is the primary intent signal — hero input is the #1 conversion surface |
-| Trust strip below hero | Social proof is critical in real estate |
-| Calculator section in marketing flow | Savings calculator is a core value prop |
-| Section-based scroll architecture | Proven real estate marketing cadence |
-| Testimonial blocks with photos | Builds trust for high-stakes transactions |
-| FAQ accordion in pricing context | Answers objections at the decision point |
-| Footer with structured sitemap | SEO + navigation completeness |
+### Trust Pattern Selection
 
-| Rejected | Rationale |
-|---|---|
-| French real estate content patterns | buyer-codex is Florida-specific |
-| Agent matching directory | buyer-codex has its own broker assignment model |
-| City-specific landing page templates | Not needed at launch (FL-first) |
-| Hosman's specific color scheme | Replaced by PayFit-derived brand palette |
+Use this table when choosing between plausible trust implementations:
 
-### RealAdvisor
+| Need | Choose | Composition rules | Do not substitute with |
+|---|---|---|---|
+| Immediate reassurance below the hero | `TrustBar` | 3-5 items max; mix one quantified outcome, one human/company signal, one operational signal; keep copy fragment-length | Long testimonials, badge clouds, auto-scrolling logo belts |
+| Support a calculator or savings claim | Result card + `DisclosureStack` + one proof block or testimonial | Put the strongest disclosure directly under the result, then an expandable stack for the rest; adjacent proof should support the claim, not repeat it | Hiding disclosure in tooltip/modals, putting legal copy only in footer |
+| Convince a skeptical public visitor mid-page | Testimonial cluster with proof companion stats | 2-3 testimonials max per row; pair with one stat rail or one licensing/process note | Full-wall review dumps, testimonial carousels that autoplay |
+| Reassure a user inside onboarding | Compact `TrustPanel` | Focus on broker oversight, data handling, timeline clarity, and next-step certainty; keep it sidebar/card scale | Marketing testimonials, large logo strips, animated proof counters |
+| Reinforce legitimacy near the footer/CTA | Certification or policy rail | Use restrained badges plus one sentence on what the certification/process means | Giant stamp graphics, legal text blocks that dominate the CTA |
 
-| Adopted | Rationale |
-|---|---|
-| Numeric score badge (pill with value) | Perfect for deal room property scoring |
-| Data visualization in property context | AI engine outputs need clear visual representation |
-| Comparison table layout | Useful for comp analysis in deal room |
-| Metric-dense card patterns | Broker console needs information density |
+### Public vs. Authenticated Trust
 
-| Rejected | Rationale |
-|---|---|
-| Agent directory listing layout | buyer-codex doesn't have a public agent directory |
-| Swiss market navigation patterns | Different market |
-| Multi-language selector UI | English-only at launch |
-| Review/rating collection UI | buyer-codex doesn't collect public reviews |
+| Surface type | Primary trust mechanism | Secondary support | Tone |
+|---|---|---|---|
+| **Public marketing** | Social proof and outcome proof | Disclosures, licensing, certifications, buyer stories | Warm, spacious, persuasive |
+| **Intake / onboarding** | Operational proof | One calm testimonial or proof stat only if it directly reduces hesitation | Guided, low-friction, reassuring |
+| **Authenticated product** | System reliability and process clarity | Audit trail language, status badges, broker review cues, secure-upload messaging | Calm, compact, non-promotional |
 
----
+Rules:
 
-## 12. Coverage Rationale
+1. Public surfaces may use testimonials, logos, proof stats, and licensing together, but the visual hierarchy must still lead with the task or value proposition.
+2. Authenticated surfaces should almost never reuse marketing-style testimonial cards. After login, trust comes from state clarity, response expectations, and visible process ownership.
+3. On onboarding surfaces, operational proof beats social proof. "Reviewed by a licensed broker" is stronger than "buyers love us" next to a required form.
+4. Trust surfaces should be interleaved with decision points. Do not stack multiple trust-heavy sections back-to-back without advancing the user.
 
-### What This Document Covers
+### Implementation Guardrails
 
-This design system covers every visual and structural decision needed to build buyer-codex's UI surfaces:
+These are product rules, not optional styling advice:
 
-- **Color**: Full brand palette with primary, accent, secondary, neutrals, semantic, and surface colors — sufficient for all UI states.
-- **Typography**: Font family, scale (12-72px), weights, line heights, and letter spacing — covers everything from badge captions to hero display text.
-- **Spacing**: 4px-base grid with 15 tokens from 0-96px, plus layout constants (container, gutter, section padding, sidebar, nav height).
-- **Shape**: Border radii from 6px (inputs) to 9999px (pills) — 5 tokens covering all component shapes.
-- **Elevation**: 6 shadow tokens with clear usage guidance (resting → hover → floating → modal).
-- **Motion**: Duration, easing, and animation rules with accessibility compliance (prefers-reduced-motion).
-- **Surface mapping**: 8 distinct surfaces mapped to reference sources, layout patterns, and key components.
-- **Component patterns**: 12 key components with source attribution, visual specification, and surface assignments.
-- **Adopted/rejected patterns**: Explicit decisions for all three reference sites with rationale.
+1. Public proof blocks and case studies must render through `src/lib/trustProof/policy.ts` and `src/lib/trustProof/types.ts`. Do not hand-roll testimonial/proof arrays inside components.
+2. If proof is illustrative rather than live, the visible label policy from `DEFAULT_LABELING_POLICY` is mandatory. Never make illustrative examples look like verified transaction proof.
+3. Calculator trust support must consume `src/lib/pricing/disclosures.ts`. The strongest disclosure belongs immediately under the headline claim; the rest may collapse, but they may not disappear.
+4. If there is no verified proof yet, prefer a clearly labeled illustrative example or plain process explanation over vague vanity metrics.
+5. Regulatory or brokerage claims should be phrased as process assurance, then backed by a specific note. Example shape: claim, one-sentence explanation, disclosure link/accordion.
 
-### What Is Intentionally Out of Scope
+### Trust Anti-Patterns
 
-- **Icon library**: Uses Lucide (configured in `components.json`). No custom icon set needed.
-- **Illustration style**: Will be defined when illustration assets are commissioned. Guideline: minimal line art, brand-primary + accent colors, friendly tone (per PayFit).
-- **iOS-specific tokens**: SwiftUI adaptations will derive from these tokens but are documented in `ios/DESIGN_IOS.md` when that milestone begins.
-- **Dark mode**: Not in scope for launch. The neutral scale and surface tokens are structured to support it later.
-- **Print styles**: Not applicable.
-- **Email templates**: Separate design concern, will reference brand colors and typography but not component patterns.
-
-### Token Implementation
-
-Design tokens are implemented in two companion files (owned by the token-impl teammate):
-
-- `design-references/tokens.css` — CSS custom properties for all tokens above
-- `design-references/tokens.ts` — TypeScript constants mirroring CSS tokens for use in component logic
-
-These files are the single source of truth for token *values*. This document (`DESIGN.md`) is the single source of truth for token *semantics and usage*.
+- Too flashy: animated number counters, flashing ratings, rotating certification badges, testimonial carousels on timers.
+- Too startup-generic: anonymous five-star grids, vague "trusted by top buyers" copy, AI-generated avatars, unqualified superlatives.
+- Too enterprise-flat: monochrome disclosure walls, unlabeled dense legal tables, sterile proof sections with no human context.
+- Do not copy PayFit's Trustpilot-heavy composition literally. Reuse the pacing and evidence balance, not the exact review-provider treatment.
