@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
-import { useQuery } from "convex/react";
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { LoadingState } from "@/components/product/LoadingState";
@@ -17,6 +17,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import type { BrokerOverrideReasonCategory } from "@/lib/analyticsEvents/contract";
+import {
+  buildBuyerSafeSummaryText,
+  trackAdvisoryBrokerAdjudicationOpened,
+  trackAdvisoryConfidenceDetailsExpanded,
+  trackAdvisoryMemoViewed,
+  trackAdvisoryNextBestActionClicked,
+  trackAdvisoryRecommendationFeedback,
+  trackAdvisoryRecommendationViewed,
+  trackAdvisorySourceTraceOpened,
+  trackAdvisorySummaryCopied,
+  trackAdvisorySummaryShared,
+} from "@/lib/dealroom/advisoryTelemetry";
 import { isConfigured } from "@/lib/env";
 import type { PropertyCaseOverviewSurface } from "@/lib/dealroom/property-case-overview";
 import { trackDealRoomUnlocked } from "@/lib/intake/pasteLinkFunnel";
@@ -26,6 +39,24 @@ import { previewPropertyCaseOverview } from "./preview-data";
 interface PropertyCaseOverviewProps {
   dealRoomId: Id<"dealRooms">;
 }
+
+interface RejectSourceInput {
+  citationId: string;
+  reasonCategory: BrokerOverrideReasonCategory;
+  reasonDetail?: string;
+}
+
+const BROKER_OVERRIDE_REASON_OPTIONS: Array<{
+  value: BrokerOverrideReasonCategory;
+  label: string;
+}> = [
+  { value: "unsupported_evidence", label: "Unsupported evidence" },
+  { value: "stale_evidence", label: "Stale evidence" },
+  { value: "policy_guardrail", label: "Policy guardrail" },
+  { value: "market_context_shift", label: "Market context shifted" },
+  { value: "human_judgment", label: "Human judgment" },
+  { value: "other", label: "Other" },
+];
 
 export function PropertyCaseOverview({
   dealRoomId,
@@ -41,6 +72,8 @@ function LivePropertyCaseOverview({
   dealRoomId,
 }: PropertyCaseOverviewProps) {
   const trackedDealRoomId = useRef<string | null>(null);
+  const approveOutput = useMutation(api.aiEngineOutputs.approveOutput);
+  const rejectOutput = useMutation(api.aiEngineOutputs.rejectOutput);
   const overview = useQuery(api.dealRoomCaseOverview.getOverview, {
     dealRoomId,
   }) as PropertyCaseOverviewSurface | null | undefined;
@@ -71,14 +104,165 @@ function LivePropertyCaseOverview({
     );
   }
 
-  return <PropertyCaseOverviewBody overview={overview} />;
+  return (
+    <PropertyCaseOverviewBody
+      overview={overview}
+      telemetryEnabled
+      onApproveSource={async (citationId) => {
+        await approveOutput({
+          outputId: citationId as Id<"aiEngineOutputs">,
+        });
+      }}
+      onRejectSource={async ({ citationId, reasonCategory, reasonDetail }) => {
+        await rejectOutput({
+          outputId: citationId as Id<"aiEngineOutputs">,
+          dealRoomId,
+          surface: "deal_room_overview",
+          reasonCategory,
+          reasonDetail: reasonDetail?.trim() || undefined,
+        });
+      }}
+    />
+  );
 }
 
 function PropertyCaseOverviewBody({
   overview,
+  telemetryEnabled = false,
+  onApproveSource,
+  onRejectSource,
 }: {
   overview: PropertyCaseOverviewSurface;
+  telemetryEnabled?: boolean;
+  onApproveSource?: (citationId: string) => Promise<void>;
+  onRejectSource?: (input: RejectSourceInput) => Promise<void>;
 }) {
+  const memoViewKey = useRef<string | null>(null);
+  const recommendationViewKey = useRef<string | null>(null);
+  const [summaryStatus, setSummaryStatus] = useState<string | null>(null);
+  const [feedbackDecision, setFeedbackDecision] = useState<
+    "accepted" | "dismissed" | "deferred" | null
+  >(null);
+  const canNativeShare =
+    typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const summaryText = buildBuyerSafeSummaryText(overview);
+
+  useEffect(() => {
+    if (!telemetryEnabled) return;
+
+    const nextKey = [
+      overview.dealRoomId,
+      overview.generatedAt ?? "none",
+      overview.viewState,
+      overview.viewerRole,
+    ].join(":");
+
+    if (memoViewKey.current === nextKey) return;
+    memoViewKey.current = nextKey;
+    trackAdvisoryMemoViewed(overview);
+  }, [
+    overview.dealRoomId,
+    overview.generatedAt,
+    overview.viewState,
+    overview.viewerRole,
+    telemetryEnabled,
+    overview,
+  ]);
+
+  useEffect(() => {
+    if (!telemetryEnabled || !overview.action) return;
+
+    const nextKey = [
+      overview.dealRoomId,
+      overview.generatedAt ?? "none",
+      overview.action.openingPrice,
+      overview.action.confidence,
+    ].join(":");
+
+    if (recommendationViewKey.current === nextKey) return;
+    recommendationViewKey.current = nextKey;
+    trackAdvisoryRecommendationViewed(overview);
+  }, [
+    overview.action,
+    overview.dealRoomId,
+    overview.generatedAt,
+    telemetryEnabled,
+    overview,
+  ]);
+
+  async function handleCopySummary() {
+    try {
+      if (
+        typeof navigator === "undefined" ||
+        typeof navigator.clipboard?.writeText !== "function"
+      ) {
+        throw new Error("Clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(summaryText);
+      if (telemetryEnabled) {
+        trackAdvisorySummaryCopied(overview, summaryText);
+      }
+      setSummaryStatus("Summary copied");
+    } catch {
+      setSummaryStatus("Copy failed");
+    }
+  }
+
+  async function handleShareSummary() {
+    if (!canNativeShare || typeof navigator === "undefined") return;
+
+    try {
+      await navigator.share({
+        title: overview.propertyAddress,
+        text: summaryText,
+        url: typeof window !== "undefined" ? window.location.href : undefined,
+      });
+      if (telemetryEnabled) {
+        trackAdvisorySummaryShared(overview, {
+          summaryText,
+          method: "native_share",
+        });
+      }
+      setSummaryStatus("Summary shared");
+    } catch {
+      // User-cancelled shares are not analytics-worthy.
+    }
+  }
+
+  function handleRecommendationFeedback(
+    decision: "accepted" | "dismissed" | "deferred",
+  ) {
+    setFeedbackDecision(decision);
+    if (telemetryEnabled) {
+      trackAdvisoryRecommendationFeedback(overview, decision);
+    }
+  }
+
+  function handleConfidenceToggle(open: boolean) {
+    if (open && telemetryEnabled) {
+      trackAdvisoryConfidenceDetailsExpanded(overview);
+    }
+  }
+
+  function handleSourceTraceClick(
+    citationId: string,
+    trigger: "claim_link" | "broker_adjudication" = "claim_link",
+    claimId?: string,
+  ) {
+    if (!telemetryEnabled) return;
+
+    const source = overview.sources.find((item) => item.citationId === citationId);
+    if (!source) return;
+
+    trackAdvisorySourceTraceOpened(overview, {
+      source,
+      trigger,
+      claim: claimId
+        ? overview.claims.find((item) => item.id === claimId)
+        : undefined,
+    });
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <section className="overflow-hidden rounded-[32px] border border-neutral-200/80 bg-white shadow-[0_18px_40px_-34px_rgba(3,14,29,0.1)]">
@@ -155,19 +339,112 @@ function PropertyCaseOverviewBody({
               </p>
             </div>
 
+            <details
+              className="rounded-[20px] border border-neutral-200/80 bg-neutral-50/80 p-4"
+              onToggle={(event) =>
+                handleConfidenceToggle(
+                  (event.currentTarget as HTMLDetailsElement).open,
+                )
+              }
+            >
+              <summary className="cursor-pointer list-none text-sm font-semibold text-neutral-900">
+                Confidence details
+              </summary>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                <MetricTile
+                  label="Overall confidence"
+                  value={overview.overallConfidenceLabel}
+                  light
+                />
+                <MetricTile
+                  label="Available signals"
+                  value={String(overview.coverageStats.availableCount)}
+                  light
+                />
+                <MetricTile
+                  label="Pending review"
+                  value={String(overview.coverageStats.pendingCount)}
+                  light
+                />
+                <MetricTile
+                  label="Held back"
+                  value={String(
+                    overview.coverageStats.uncertainCount +
+                      overview.coverageStats.missingCount,
+                  )}
+                  light
+                />
+              </div>
+              <p className="mt-4 text-sm leading-6 text-neutral-600">
+                The memo stays sparse on purpose. Signals that are pending review or
+                too weak to trust remain visible as gaps instead of becoming
+                unsupported conclusions.
+              </p>
+            </details>
+
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <Button asChild className="justify-between">
-                <Link href={`/dealroom/${overview.dealRoomId}/offer`}>
+                <Link
+                  href={`/dealroom/${overview.dealRoomId}/offer`}
+                  onClick={() =>
+                    telemetryEnabled
+                      ? trackAdvisoryNextBestActionClicked(overview, {
+                          target: "offer_cockpit",
+                          ctaId: "overview_offer_cockpit",
+                          nextActionLabel: overview.status.nextAction ?? undefined,
+                        })
+                      : undefined
+                  }
+                >
                   Offer cockpit
                   <span aria-hidden="true">→</span>
                 </Link>
               </Button>
               <Button asChild variant="outline" className="justify-between">
-                <Link href={`/dealroom/${overview.dealRoomId}/close`}>
+                <Link
+                  href={`/dealroom/${overview.dealRoomId}/close`}
+                  onClick={() =>
+                    telemetryEnabled
+                      ? trackAdvisoryNextBestActionClicked(overview, {
+                          target: "close_dashboard",
+                          ctaId: "overview_close_dashboard",
+                          nextActionLabel: overview.status.nextAction ?? undefined,
+                        })
+                      : undefined
+                  }
+                >
                   Close dashboard
                   <span aria-hidden="true">→</span>
                 </Link>
               </Button>
+            </div>
+
+            <div className="space-y-3 rounded-[20px] border border-neutral-200/80 bg-white/90 p-4">
+              <p className="text-sm font-semibold text-neutral-900">
+                Buyer-safe summary
+              </p>
+              <p className="text-sm leading-6 text-neutral-600">
+                Copy or share the current memo in plain language without exposing
+                internal-only review detail.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={handleCopySummary}>
+                  Copy summary
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleShareSummary}
+                  disabled={!canNativeShare}
+                >
+                  Share summary
+                </Button>
+              </div>
+              {summaryStatus ? (
+                <p className="text-xs font-medium text-neutral-500">
+                  {summaryStatus}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -243,6 +520,9 @@ function PropertyCaseOverviewBody({
                     <a
                       href={`#${claim.sourceAnchorId}`}
                       className="font-medium text-primary transition-colors hover:text-primary/80"
+                      onClick={() =>
+                        handleSourceTraceClick(claim.citationId, "claim_link", claim.id)
+                      }
                     >
                       View source
                     </a>
@@ -341,6 +621,46 @@ function PropertyCaseOverviewBody({
                       </div>
                     </div>
                   )}
+
+                  <div className="rounded-xl border border-dashed border-neutral-200 p-3">
+                    <p className="text-sm font-semibold text-neutral-900">
+                      How are you using this recommendation?
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        variant={
+                          feedbackDecision === "accepted" ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => handleRecommendationFeedback("accepted")}
+                      >
+                        Using it
+                      </Button>
+                      <Button
+                        variant={
+                          feedbackDecision === "deferred" ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => handleRecommendationFeedback("deferred")}
+                      >
+                        Not yet
+                      </Button>
+                      <Button
+                        variant={
+                          feedbackDecision === "dismissed" ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => handleRecommendationFeedback("dismissed")}
+                      >
+                        Not useful
+                      </Button>
+                    </div>
+                    {feedbackDecision ? (
+                      <p className="mt-3 text-xs font-medium text-neutral-500">
+                        Saved as a calibration signal for this recommendation.
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               ) : (
                 <EmptyStateCard
@@ -487,6 +807,14 @@ function PropertyCaseOverviewBody({
                     )}
                   </div>
                 </div>
+
+                <BrokerAdjudicationSection
+                  overview={overview}
+                  telemetryEnabled={telemetryEnabled}
+                  onApproveSource={onApproveSource}
+                  onRejectSource={onRejectSource}
+                  onSourceTraceClick={handleSourceTraceClick}
+                />
               </CardContent>
             </Card>
           )}
@@ -649,21 +977,290 @@ function RiskBadge({
   );
 }
 
+function BrokerAdjudicationSection({
+  overview,
+  telemetryEnabled,
+  onApproveSource,
+  onRejectSource,
+  onSourceTraceClick,
+}: {
+  overview: Extract<PropertyCaseOverviewSurface, { variant: "internal" }>;
+  telemetryEnabled: boolean;
+  onApproveSource?: (citationId: string) => Promise<void>;
+  onRejectSource?: (input: RejectSourceInput) => Promise<void>;
+  onSourceTraceClick: (
+    citationId: string,
+    trigger: "claim_link" | "broker_adjudication",
+  ) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [rejectCategoryById, setRejectCategoryById] = useState<
+    Record<string, BrokerOverrideReasonCategory>
+  >({});
+  const [rejectDetailById, setRejectDetailById] = useState<Record<string, string>>(
+    {},
+  );
+  const [submittingById, setSubmittingById] = useState<Record<string, boolean>>({});
+  const [errorById, setErrorById] = useState<Record<string, string>>({});
+
+  async function handleApprove(citationId: string) {
+    if (!onApproveSource) return;
+    setSubmittingById((current) => ({ ...current, [citationId]: true }));
+    setErrorById((current) => ({ ...current, [citationId]: "" }));
+
+    try {
+      await onApproveSource(citationId);
+    } catch {
+      setErrorById((current) => ({
+        ...current,
+        [citationId]: "Approval failed. Try again.",
+      }));
+    } finally {
+      setSubmittingById((current) => ({ ...current, [citationId]: false }));
+    }
+  }
+
+  async function handleReject(citationId: string) {
+    if (!onRejectSource) return;
+    const reasonCategory =
+      rejectCategoryById[citationId] ?? "unsupported_evidence";
+
+    setSubmittingById((current) => ({ ...current, [citationId]: true }));
+    setErrorById((current) => ({ ...current, [citationId]: "" }));
+
+    try {
+      await onRejectSource({
+        citationId,
+        reasonCategory,
+        reasonDetail: rejectDetailById[citationId],
+      });
+    } catch {
+      setErrorById((current) => ({
+        ...current,
+        [citationId]: "Override failed. Try again.",
+      }));
+    } finally {
+      setSubmittingById((current) => ({ ...current, [citationId]: false }));
+    }
+  }
+
+  return (
+    <details
+      open={open}
+      onToggle={(event) => {
+        const nextOpen = (event.currentTarget as HTMLDetailsElement).open;
+        setOpen(nextOpen);
+        if (nextOpen && telemetryEnabled) {
+          trackAdvisoryBrokerAdjudicationOpened(overview);
+        }
+      }}
+      className="rounded-[22px] border border-white/10 bg-white/5 p-4"
+    >
+      <summary className="cursor-pointer list-none text-sm font-semibold text-white">
+        Broker adjudication
+      </summary>
+      <p className="mt-3 text-sm leading-6 text-white/70">
+        Review which engine outputs are still pending, inspect linked claims, and
+        capture typed override reasons when the memo should not inherit a source as-is.
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <MetricTile
+          label="Pending"
+          value={String(overview.internal.adjudicationSummary.pendingCount)}
+        />
+        <MetricTile
+          label="Approved"
+          value={String(overview.internal.adjudicationSummary.approvedCount)}
+        />
+        <MetricTile
+          label="Rejected"
+          value={String(overview.internal.adjudicationSummary.rejectedCount)}
+        />
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {overview.internal.adjudicationItems.length > 0 ? (
+          overview.internal.adjudicationItems.map((item) => {
+            const isSubmitting = submittingById[item.citationId] === true;
+            const selectedReason =
+              rejectCategoryById[item.citationId] ?? "unsupported_evidence";
+
+            return (
+              <div
+                key={item.citationId}
+                className="rounded-2xl border border-white/10 bg-black/10 p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      {item.engineLabel}
+                    </p>
+                    <p className="mt-1 font-mono text-xs text-white/45">
+                      {item.citationId}
+                    </p>
+                  </div>
+                  <Badge
+                    className={cn(
+                      "border-transparent",
+                      item.reviewState === "approved" &&
+                        "bg-success-500/15 text-success-200",
+                      item.reviewState === "pending" &&
+                        "bg-warning-500/15 text-warning-100",
+                      item.reviewState === "rejected" &&
+                        "bg-error-500/15 text-error-100",
+                    )}
+                  >
+                    {item.reviewState}
+                  </Badge>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-3 text-sm text-white/70">
+                  <span>{item.confidenceLabel}</span>
+                  <span className="text-white/25">•</span>
+                  <span>
+                    {item.linkedClaimCount} linked claim
+                    {item.linkedClaimCount === 1 ? "" : "s"}
+                  </span>
+                  {item.generatedAtLabel ? (
+                    <>
+                      <span className="text-white/25">•</span>
+                      <span>{item.generatedAtLabel}</span>
+                    </>
+                  ) : null}
+                </div>
+
+                {item.linkedClaimCount > 0 ? (
+                  <div className="mt-3">
+                    <a
+                      href={`#source-${item.citationId.replace(/[^a-zA-Z0-9_-]+/g, "-")}`}
+                      className="text-sm font-medium text-white underline decoration-white/30 underline-offset-4"
+                      onClick={() =>
+                        onSourceTraceClick(item.citationId, "broker_adjudication")
+                      }
+                    >
+                      Open linked source trace
+                    </a>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-white/55">
+                    No buyer-visible claim currently references this output.
+                  </p>
+                )}
+
+                {(onApproveSource || onRejectSource) && (
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={isSubmitting || !onApproveSource}
+                        onClick={() => handleApprove(item.citationId)}
+                      >
+                        Approve source
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isSubmitting || !onRejectSource}
+                        onClick={() => handleReject(item.citationId)}
+                      >
+                        Override source
+                      </Button>
+                    </div>
+
+                    <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,220px)_1fr]">
+                      <label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
+                        Reason category
+                        <select
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
+                          value={selectedReason}
+                          onChange={(event) =>
+                            setRejectCategoryById((current) => ({
+                              ...current,
+                              [item.citationId]:
+                                event.target.value as BrokerOverrideReasonCategory,
+                            }))
+                          }
+                        >
+                          {BROKER_OVERRIDE_REASON_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
+                        Detail (optional)
+                        <textarea
+                          className="mt-2 min-h-24 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
+                          value={rejectDetailById[item.citationId] ?? ""}
+                          onChange={(event) =>
+                            setRejectDetailById((current) => ({
+                              ...current,
+                              [item.citationId]: event.target.value,
+                            }))
+                          }
+                          placeholder="Add optional broker context for this override."
+                        />
+                      </label>
+                    </div>
+
+                    {errorById[item.citationId] ? (
+                      <p className="mt-3 text-xs font-medium text-error-200">
+                        {errorById[item.citationId]}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <p className="text-sm text-white/65">
+            No adjudication rows yet. This rail fills as advisory outputs are
+            generated and reviewed.
+          </p>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function MetricTile({
   label,
   value,
   monospace = false,
+  light = false,
 }: {
   label: string;
   value: string;
   monospace?: boolean;
+  light?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-white/5 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/55">
+    <div
+      className={cn(
+        "rounded-2xl p-4",
+        light ? "bg-white text-neutral-900" : "bg-white/5",
+      )}
+    >
+      <p
+        className={cn(
+          "text-xs font-semibold uppercase tracking-[0.18em]",
+          light ? "text-neutral-500" : "text-white/55",
+        )}
+      >
         {label}
       </p>
-      <p className={cn("mt-2 text-sm text-white", monospace && "font-mono")}>
+      <p
+        className={cn(
+          "mt-2 text-sm",
+          light ? "text-neutral-900" : "text-white",
+          monospace && "font-mono",
+        )}
+      >
         {value}
       </p>
     </div>

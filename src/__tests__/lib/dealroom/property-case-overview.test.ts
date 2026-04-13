@@ -116,6 +116,7 @@ describe("buildPropertyCaseOverview", () => {
     });
 
     expect(surface.variant).toBe("buyer_safe");
+    expect(surface.viewerRole).toBe("buyer");
     expect(surface.viewState).toBe("ready");
     expect(surface.claims).toHaveLength(3);
     expect(surface.claims[0]?.guardrailState).toBe("softened");
@@ -123,6 +124,7 @@ describe("buildPropertyCaseOverview", () => {
     expect(surface.action?.openingPriceLabel).toBe("$615,000");
     expect(surface.action?.guardrailState).toBe("softened");
     expect(surface.sources[0]?.anchorId).toBe("source-engineOut_pricing_1");
+    expect(surface.coverageStats.availableCount).toBe(4);
     expect(surface.internal).toBeUndefined();
   });
 
@@ -170,6 +172,12 @@ describe("buildPropertyCaseOverview", () => {
     });
 
     expect(surface.viewState).toBe("partial");
+    expect(surface.coverageStats).toMatchObject({
+      availableCount: 2,
+      pendingCount: 1,
+      uncertainCount: 1,
+      missingCount: 0,
+    });
     expect(surface.action).toBeNull();
     expect(surface.missingStates).toEqual(
       expect.arrayContaining([
@@ -222,9 +230,19 @@ describe("buildPropertyCaseOverview", () => {
       throw new Error("expected internal surface");
     }
 
+    expect(surface.viewerRole).toBe("broker");
     expect(surface.internal.hitCount).toBe(7);
     expect(surface.internal.inputHash).toBe("deadbeef");
     expect(surface.internal.droppedEngines).toContain("leverage");
+    expect(surface.internal.adjudicationSummary).toEqual({
+      pendingCount: 0,
+      approvedCount: 1,
+      rejectedCount: 0,
+    });
+    expect(surface.internal.adjudicationItems[0]).toMatchObject({
+      citationId: "engineOut_pricing_1",
+      reviewState: "approved",
+    });
     expect(surface.internal.guardrails[0]).toMatchObject({
       engineLabel: "Pricing",
       state: "softened",

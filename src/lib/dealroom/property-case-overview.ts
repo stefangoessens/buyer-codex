@@ -20,6 +20,7 @@ import {
 export type CoverageEngineKey = "pricing" | "comps" | "leverage" | "offer";
 export type PropertyCaseOverviewVariant = "buyer_safe" | "internal";
 export type PropertyCaseOverviewViewState = "ready" | "partial" | "empty";
+export type PropertyCaseOverviewViewerRole = "buyer" | "broker" | "admin";
 
 export interface PropertyCaseCoverageInput {
   key: CoverageEngineKey;
@@ -101,8 +102,10 @@ export interface PropertyCaseMissingState {
 export interface PropertyCaseSourceView {
   citationId: string;
   anchorId: string;
+  engineType: string | null;
   engineLabel: string;
   status: "available" | "pending" | "unavailable";
+  reviewState: "pending" | "approved" | "rejected" | null;
   confidenceLabel: string;
   generatedAtLabel: string | null;
   claimCount: number;
@@ -111,8 +114,34 @@ export interface PropertyCaseSourceView {
   approvalPath: AdvisoryApprovalPath;
 }
 
+export interface PropertyCaseCoverageStats {
+  availableCount: number;
+  pendingCount: number;
+  uncertainCount: number;
+  missingCount: number;
+}
+
+export interface PropertyCaseAdjudicationSummary {
+  pendingCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+}
+
+export interface PropertyCaseAdjudicationItem {
+  citationId: string;
+  engineType: string;
+  engineLabel: string;
+  reviewState: "pending" | "approved" | "rejected";
+  confidence: number | null;
+  confidenceLabel: string;
+  generatedAt: string | null;
+  generatedAtLabel: string | null;
+  linkedClaimCount: number;
+}
+
 interface PropertyCaseOverviewBase {
   variant: PropertyCaseOverviewVariant;
+  viewerRole: PropertyCaseOverviewViewerRole;
   dealRoomId: string;
   propertyId: string;
   propertyAddress: string;
@@ -126,6 +155,7 @@ interface PropertyCaseOverviewBase {
   overallConfidence: number | null;
   overallConfidenceLabel: string;
   overallConfidenceTone: "strong" | "mixed" | "weak";
+  coverageStats: PropertyCaseCoverageStats;
   coverageSummary: string;
   headerDescription: string;
   claims: PropertyCaseClaimView[];
@@ -138,18 +168,22 @@ interface PropertyCaseOverviewBase {
 export interface BuyerSafePropertyCaseOverview
   extends PropertyCaseOverviewBase {
   variant: "buyer_safe";
+  viewerRole: "buyer";
   internal?: undefined;
 }
 
 export interface InternalPropertyCaseOverview
   extends PropertyCaseOverviewBase {
   variant: "internal";
+  viewerRole: "broker" | "admin";
   internal: {
     inputHash: string | null;
     synthesisVersion: string | null;
     contributingEngines: number;
     droppedEngines: string[];
     hitCount: number;
+    adjudicationSummary: PropertyCaseAdjudicationSummary;
+    adjudicationItems: PropertyCaseAdjudicationItem[];
     guardrails: Array<{
       citationId: string;
       engineLabel: string;
@@ -190,8 +224,7 @@ const topicLabels: Record<ClaimTopic, string> = {
 export function buildPropertyCaseOverview(
   input: BuildPropertyCaseOverviewInput,
 ): PropertyCaseOverviewSurface {
-  const isInternal =
-    input.viewerRole === "broker" || input.viewerRole === "admin";
+  const isInternal = input.viewerRole === "broker" || input.viewerRole === "admin";
   const status = buildStatusBadge(input.dealStatus);
   const payload = input.caseRecord?.payload ?? null;
   const coverageByKey = new Map(
@@ -210,8 +243,14 @@ export function buildPropertyCaseOverview(
     action,
     offerGuardrail,
   );
+  const coverageStats = buildCoverageStats(input.coverage, payload);
   const keyTakeaways = buildTakeaways(claims);
   const sources = buildSources(payload?.claims ?? [], input.citations ?? []);
+  const adjudicationItems = buildAdjudicationItems(
+    payload?.claims ?? [],
+    input.citations ?? [],
+  );
+  const adjudicationSummary = summarizeAdjudication(adjudicationItems);
   const viewState = resolveViewState(payload, claims.length, missingStates);
   const overallConfidence = payload ? payload.overallConfidence : null;
   const overallConfidenceLabel =
@@ -230,6 +269,7 @@ export function buildPropertyCaseOverview(
 
   const base: PropertyCaseOverviewBase = {
     variant: isInternal ? "internal" : "buyer_safe",
+    viewerRole: input.viewerRole,
     dealRoomId: input.dealRoomId,
     propertyId: input.propertyId,
     propertyAddress: input.propertyAddress,
@@ -248,6 +288,7 @@ export function buildPropertyCaseOverview(
     overallConfidence,
     overallConfidenceLabel,
     overallConfidenceTone,
+    coverageStats,
     coverageSummary,
     headerDescription,
     claims,
@@ -261,18 +302,22 @@ export function buildPropertyCaseOverview(
     return {
       ...base,
       variant: "buyer_safe",
+      viewerRole: "buyer",
     };
   }
 
   return {
     ...base,
     variant: "internal",
+    viewerRole: input.viewerRole as "broker" | "admin",
     internal: {
       inputHash: payload?.inputHash ?? null,
       synthesisVersion: payload?.synthesisVersion ?? null,
       contributingEngines: payload?.contributingEngines ?? 0,
       droppedEngines: [...(payload?.droppedEngines ?? [])],
       hitCount: input.caseRecord?.hitCount ?? 0,
+      adjudicationSummary,
+      adjudicationItems,
       guardrails: Array.from(citationGuardrails.entries())
         .map(([citationId, assessment]) => ({
           citationId,
@@ -444,6 +489,40 @@ function buildMissingStates(
   return states;
 }
 
+function buildCoverageStats(
+  coverage: PropertyCaseCoverageInput[],
+  payload: PropertyCase | null,
+): PropertyCaseCoverageStats {
+  const dropped = new Set(payload?.droppedEngines ?? []);
+  const stats: PropertyCaseCoverageStats = {
+    availableCount: 0,
+    pendingCount: 0,
+    uncertainCount: 0,
+    missingCount: 0,
+  };
+
+  for (const entry of coverage) {
+    if (dropped.has(entry.key)) {
+      stats.uncertainCount += 1;
+      continue;
+    }
+
+    if (entry.status === "available") {
+      stats.availableCount += 1;
+      continue;
+    }
+
+    if (entry.status === "pending") {
+      stats.pendingCount += 1;
+      continue;
+    }
+
+    stats.missingCount += 1;
+  }
+
+  return stats;
+}
+
 function buildSources(
   claims: ComparativeClaim[],
   citations: PropertyCaseCitationInput[],
@@ -470,17 +549,21 @@ function buildSources(
         reviewState: citation?.reviewState,
       });
       const status: PropertyCaseSourceView["status"] =
-        citation?.reviewState === "pending"
+        !citation
+          ? "unavailable"
+          : citation.reviewState === "pending"
           ? "pending"
-          : citation?.reviewState === "rejected"
+          : citation.reviewState === "rejected"
             ? "unavailable"
             : "available";
 
       return {
         citationId,
         anchorId: sourceAnchorId(citationId),
+        engineType: citation?.engineType ?? null,
         engineLabel: humanizeEngineType(citation?.engineType),
         status,
+        reviewState: citation?.reviewState ?? null,
         confidenceLabel:
           typeof citation?.confidence === "number"
             ? `${formatPercent(citation.confidence)} source confidence`
@@ -495,6 +578,71 @@ function buildSources(
       };
     })
     .sort((a, b) => a.engineLabel.localeCompare(b.engineLabel));
+}
+
+function buildAdjudicationItems(
+  claims: ComparativeClaim[],
+  citations: PropertyCaseCitationInput[],
+): PropertyCaseAdjudicationItem[] {
+  const linkedClaimsByCitation = new Map<string, number>();
+  for (const claim of claims) {
+    linkedClaimsByCitation.set(
+      claim.citation,
+      (linkedClaimsByCitation.get(claim.citation) ?? 0) + 1,
+    );
+  }
+
+  return citations
+    .filter(
+      (
+        citation,
+      ): citation is PropertyCaseCitationInput & {
+        reviewState: "pending" | "approved" | "rejected";
+      } => citation.reviewState != null,
+    )
+    .map((citation) => ({
+      citationId: citation.citationId,
+      engineType: citation.engineType,
+      engineLabel: humanizeEngineType(citation.engineType),
+      reviewState: citation.reviewState,
+      confidence:
+        typeof citation.confidence === "number" ? citation.confidence : null,
+      confidenceLabel:
+        typeof citation.confidence === "number"
+          ? `${formatPercent(citation.confidence)} source confidence`
+          : "Confidence unavailable",
+      generatedAt: citation.generatedAt ?? null,
+      generatedAtLabel: citation.generatedAt
+        ? formatShortDate(citation.generatedAt)
+        : null,
+      linkedClaimCount: linkedClaimsByCitation.get(citation.citationId) ?? 0,
+    }))
+    .sort((a, b) => {
+      if (a.reviewState === b.reviewState) {
+        return a.engineLabel.localeCompare(b.engineLabel);
+      }
+
+      const rank = { pending: 0, rejected: 1, approved: 2 } as const;
+      return rank[a.reviewState] - rank[b.reviewState];
+    });
+}
+
+function summarizeAdjudication(
+  items: PropertyCaseAdjudicationItem[],
+): PropertyCaseAdjudicationSummary {
+  return items.reduce<PropertyCaseAdjudicationSummary>(
+    (summary, item) => {
+      if (item.reviewState === "pending") summary.pendingCount += 1;
+      if (item.reviewState === "approved") summary.approvedCount += 1;
+      if (item.reviewState === "rejected") summary.rejectedCount += 1;
+      return summary;
+    },
+    {
+      pendingCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+    },
+  );
 }
 
 function resolveViewState(

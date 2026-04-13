@@ -94,6 +94,90 @@ export const CALCULATOR_TYPES = [
 
 export type CalculatorType = (typeof CALCULATOR_TYPES)[number];
 
+export const ADVISORY_ACTOR_ROLES = ["buyer", "broker", "admin"] as const;
+
+export type AdvisoryActorRole = (typeof ADVISORY_ACTOR_ROLES)[number];
+
+export const ADVISORY_SURFACES = [
+  "deal_room_overview",
+  "broker_review_queue",
+] as const;
+
+export type AdvisorySurface = (typeof ADVISORY_SURFACES)[number];
+
+export const ADVISORY_VIEW_VARIANTS = ["buyer_safe", "internal"] as const;
+
+export type AdvisoryViewVariant = (typeof ADVISORY_VIEW_VARIANTS)[number];
+
+export const ADVISORY_VIEW_STATES = ["ready", "partial", "empty"] as const;
+
+export type AdvisoryViewState = (typeof ADVISORY_VIEW_STATES)[number];
+
+export const ADVISORY_NEXT_ACTION_TARGETS = [
+  "offer_cockpit",
+  "close_dashboard",
+] as const;
+
+export type AdvisoryNextActionTarget =
+  (typeof ADVISORY_NEXT_ACTION_TARGETS)[number];
+
+export const ADVISORY_SOURCE_TRACE_TRIGGERS = [
+  "claim_link",
+  "broker_adjudication",
+] as const;
+
+export type AdvisorySourceTraceTrigger =
+  (typeof ADVISORY_SOURCE_TRACE_TRIGGERS)[number];
+
+export const ADVISORY_RECOMMENDATION_DECISIONS = [
+  "accepted",
+  "dismissed",
+  "deferred",
+] as const;
+
+export type AdvisoryRecommendationDecision =
+  (typeof ADVISORY_RECOMMENDATION_DECISIONS)[number];
+
+export const ADVISORY_SUMMARY_SHARE_METHODS = [
+  "clipboard",
+  "native_share",
+] as const;
+
+export type AdvisorySummaryShareMethod =
+  (typeof ADVISORY_SUMMARY_SHARE_METHODS)[number];
+
+export const ADVISORY_SOURCE_STATUSES = [
+  "available",
+  "pending",
+  "unavailable",
+] as const;
+
+export type AdvisorySourceStatus = (typeof ADVISORY_SOURCE_STATUSES)[number];
+
+export const ADVISORY_RISK_LEVELS = ["low", "medium", "high"] as const;
+
+export type AdvisoryRiskLevel = (typeof ADVISORY_RISK_LEVELS)[number];
+
+export const AI_OUTPUT_REVIEW_STATES = [
+  "pending",
+  "approved",
+  "rejected",
+] as const;
+
+export type AiOutputReviewState = (typeof AI_OUTPUT_REVIEW_STATES)[number];
+
+export const BROKER_OVERRIDE_REASON_CATEGORIES = [
+  "unsupported_evidence",
+  "stale_evidence",
+  "policy_guardrail",
+  "market_context_shift",
+  "human_judgment",
+  "other",
+] as const;
+
+export type BrokerOverrideReasonCategory =
+  (typeof BROKER_OVERRIDE_REASON_CATEGORIES)[number];
+
 export interface AnalyticsEventMap extends LaunchEventMap {
   extension_intake_succeeded: {
     platform: ExtensionIntakePlatform;
@@ -141,6 +225,206 @@ export interface AnalyticsEventMap extends LaunchEventMap {
     dealRoomId: string;
     engineType: AiAnalysisEngineType;
     confidence: number;
+  };
+  advisory_memo_viewed: {
+    dealRoomId: string;
+    propertyId: string;
+    actorRole: AdvisoryActorRole;
+    surface: AdvisorySurface;
+    variant: AdvisoryViewVariant;
+    viewState: AdvisoryViewState;
+    claimCount: number;
+    sourceCount: number;
+    missingSignalCount: number;
+    coverageAvailableCount: number;
+    coveragePendingCount: number;
+    coverageUncertainCount: number;
+    coverageMissingCount: number;
+    hasRecommendation: boolean;
+    generatedAt?: string;
+    overallConfidence?: number;
+    recommendationConfidence?: number;
+  };
+  advisory_recommendation_viewed: {
+    dealRoomId: string;
+    propertyId: string;
+    actorRole: AdvisoryActorRole;
+    surface: AdvisorySurface;
+    variant: AdvisoryViewVariant;
+    viewState: AdvisoryViewState;
+    claimCount: number;
+    sourceCount: number;
+    missingSignalCount: number;
+    coverageAvailableCount: number;
+    coveragePendingCount: number;
+    coverageUncertainCount: number;
+    coverageMissingCount: number;
+    openingPrice: number;
+    recommendationConfidence: number;
+    riskLevel: AdvisoryRiskLevel;
+    suggestedContingencyCount: number;
+    rationaleCount: number;
+    generatedAt?: string;
+    overallConfidence?: number;
+  };
+  advisory_next_best_action_clicked: {
+    dealRoomId: string;
+    propertyId: string;
+    actorRole: AdvisoryActorRole;
+    surface: AdvisorySurface;
+    variant: AdvisoryViewVariant;
+    viewState: AdvisoryViewState;
+    claimCount: number;
+    sourceCount: number;
+    missingSignalCount: number;
+    coverageAvailableCount: number;
+    coveragePendingCount: number;
+    coverageUncertainCount: number;
+    coverageMissingCount: number;
+    target: AdvisoryNextActionTarget;
+    ctaId: string;
+    nextActionLabel?: string;
+    generatedAt?: string;
+    overallConfidence?: number;
+    recommendationConfidence?: number;
+  };
+  advisory_confidence_details_expanded: {
+    dealRoomId: string;
+    propertyId: string;
+    actorRole: AdvisoryActorRole;
+    surface: AdvisorySurface;
+    variant: AdvisoryViewVariant;
+    viewState: AdvisoryViewState;
+    claimCount: number;
+    sourceCount: number;
+    missingSignalCount: number;
+    coverageAvailableCount: number;
+    coveragePendingCount: number;
+    coverageUncertainCount: number;
+    coverageMissingCount: number;
+    generatedAt?: string;
+    overallConfidence?: number;
+    recommendationConfidence?: number;
+  };
+  advisory_source_trace_opened: {
+    dealRoomId: string;
+    propertyId: string;
+    actorRole: AdvisoryActorRole;
+    surface: AdvisorySurface;
+    variant: AdvisoryViewVariant;
+    viewState: AdvisoryViewState;
+    claimCount: number;
+    sourceCount: number;
+    missingSignalCount: number;
+    coverageAvailableCount: number;
+    coveragePendingCount: number;
+    coverageUncertainCount: number;
+    coverageMissingCount: number;
+    citationId: string;
+    engineType: string;
+    linkedClaimCount: number;
+    sourceStatus: AdvisorySourceStatus;
+    trigger: AdvisorySourceTraceTrigger;
+    claimTopic?: string;
+    generatedAt?: string;
+    overallConfidence?: number;
+    recommendationConfidence?: number;
+  };
+  advisory_broker_adjudication_opened: {
+    dealRoomId: string;
+    propertyId: string;
+    actorRole: Extract<AdvisoryActorRole, "broker" | "admin">;
+    surface: AdvisorySurface;
+    variant: Extract<AdvisoryViewVariant, "internal">;
+    viewState: AdvisoryViewState;
+    claimCount: number;
+    sourceCount: number;
+    missingSignalCount: number;
+    coverageAvailableCount: number;
+    coveragePendingCount: number;
+    coverageUncertainCount: number;
+    coverageMissingCount: number;
+    pendingSourceCount: number;
+    approvedSourceCount: number;
+    rejectedSourceCount: number;
+    generatedAt?: string;
+    overallConfidence?: number;
+    recommendationConfidence?: number;
+  };
+  advisory_broker_override_submitted: {
+    outputId: string;
+    propertyId: string;
+    actorRole: Extract<AdvisoryActorRole, "broker" | "admin">;
+    surface: AdvisorySurface;
+    engineType: string;
+    priorReviewState: AiOutputReviewState;
+    reasonCategory: BrokerOverrideReasonCategory;
+    hasReasonDetail: boolean;
+    outputConfidence: number;
+    linkedClaimCount: number;
+    reviewLatencyMs: number;
+    dealRoomId?: string;
+    generatedAt?: string;
+  };
+  advisory_buyer_safe_summary_copied: {
+    dealRoomId: string;
+    propertyId: string;
+    actorRole: AdvisoryActorRole;
+    surface: AdvisorySurface;
+    variant: AdvisoryViewVariant;
+    viewState: AdvisoryViewState;
+    claimCount: number;
+    sourceCount: number;
+    missingSignalCount: number;
+    coverageAvailableCount: number;
+    coveragePendingCount: number;
+    coverageUncertainCount: number;
+    coverageMissingCount: number;
+    summaryLength: number;
+    includesRecommendation: boolean;
+    generatedAt?: string;
+    overallConfidence?: number;
+    recommendationConfidence?: number;
+  };
+  advisory_buyer_safe_summary_shared: {
+    dealRoomId: string;
+    propertyId: string;
+    actorRole: AdvisoryActorRole;
+    surface: AdvisorySurface;
+    variant: AdvisoryViewVariant;
+    viewState: AdvisoryViewState;
+    claimCount: number;
+    sourceCount: number;
+    missingSignalCount: number;
+    coverageAvailableCount: number;
+    coveragePendingCount: number;
+    coverageUncertainCount: number;
+    coverageMissingCount: number;
+    method: AdvisorySummaryShareMethod;
+    summaryLength: number;
+    includesRecommendation: boolean;
+    generatedAt?: string;
+    overallConfidence?: number;
+    recommendationConfidence?: number;
+  };
+  advisory_recommendation_feedback_recorded: {
+    dealRoomId: string;
+    propertyId: string;
+    actorRole: AdvisoryActorRole;
+    surface: AdvisorySurface;
+    variant: AdvisoryViewVariant;
+    viewState: AdvisoryViewState;
+    claimCount: number;
+    sourceCount: number;
+    missingSignalCount: number;
+    coverageAvailableCount: number;
+    coveragePendingCount: number;
+    coverageUncertainCount: number;
+    coverageMissingCount: number;
+    decision: AdvisoryRecommendationDecision;
+    generatedAt?: string;
+    overallConfidence?: number;
+    recommendationConfidence?: number;
   };
   document_uploaded: {
     documentId: string;
@@ -267,13 +551,13 @@ export interface AnalyticsEventContractRelease {
   changes: readonly string[];
 }
 
-export const CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION = "1.1.0" as const;
+export const CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION = "1.2.0" as const;
 export const CURRENT_ANALYTICS_EVENT_CONTRACT_DATE = "2026-04-13" as const;
 
 export const ANALYTICS_EVENT_CONTRACT_CHANGELOG = [
   {
-    version: CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION,
-    releasedOn: CURRENT_ANALYTICS_EVENT_CONTRACT_DATE,
+    version: "1.1.0",
+    releasedOn: "2026-04-13",
     summary:
       "Introduced the comprehensive shared analytics taxonomy for dashboard, deal workflow, communications, ops, and launch funnel events.",
     changes: [
@@ -282,6 +566,17 @@ export const ANALYTICS_EVENT_CONTRACT_CHANGELOG = [
       "Documented per-event source, when-fired rules, semantics, and PII posture in a serializable contract.",
       "Preserved typed event-call enforcement for web code while making the full catalog consumable by backend and iOS tooling.",
       "Added the KIN-942 public paste-link funnel event taxonomy and stage metadata for homepage-to-agreement tracking.",
+    ],
+  },
+  {
+    version: CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION,
+    releasedOn: CURRENT_ANALYTICS_EVENT_CONTRACT_DATE,
+    summary:
+      "Added advisory telemetry for memo usage, trust drill-downs, summary sharing, recommendation feedback, and broker overrides.",
+    changes: [
+      "Added typed KIN-1042 events for memo views, recommendation views, confidence expansions, source-trace opens, summary copy/share, and explicit recommendation feedback.",
+      "Added broker adjudication-opened and broker-override-submitted events with typed reason categories and review-latency context for calibration analysis.",
+      "Standardized advisory payload context across buyer and broker surfaces with actor role, surface, view state, coverage counts, and calibration-ready confidence fields.",
     ],
   },
 ] as const satisfies readonly AnalyticsEventContractRelease[];
@@ -487,6 +782,111 @@ function defineLaunchAnalyticsEvent<Name extends LaunchEventName>(
     piiSafe: metadata.piiSafe,
   } as unknown as AnalyticsEventDefinition<Name>;
 }
+
+const ADVISORY_CONTEXT_PROP_SPECS = {
+  dealRoomId: {
+    type: "string",
+    required: true,
+    description: "Deal room id tied to the advisory interaction.",
+  },
+  propertyId: {
+    type: "string",
+    required: true,
+    description: "Property id tied to the advisory interaction.",
+  },
+  actorRole: {
+    type: "enum",
+    required: true,
+    description: "Which role performed the advisory interaction.",
+    enumValues: ADVISORY_ACTOR_ROLES,
+  },
+  surface: {
+    type: "enum",
+    required: true,
+    description: "Advisory surface that emitted the interaction.",
+    enumValues: ADVISORY_SURFACES,
+  },
+  variant: {
+    type: "enum",
+    required: true,
+    description: "Whether the user saw the buyer-safe or internal advisory variant.",
+    enumValues: ADVISORY_VIEW_VARIANTS,
+  },
+  viewState: {
+    type: "enum",
+    required: true,
+    description: "Whether the memo was fully ready, partial, or empty when the event fired.",
+    enumValues: ADVISORY_VIEW_STATES,
+  },
+  claimCount: {
+    type: "integer",
+    required: true,
+    description: "Number of comparative claims visible in the memo.",
+    min: 0,
+  },
+  sourceCount: {
+    type: "integer",
+    required: true,
+    description: "Number of source-trace rows available in the memo.",
+    min: 0,
+  },
+  missingSignalCount: {
+    type: "integer",
+    required: true,
+    description:
+      "Number of pending, uncertain, or withheld signals visible alongside the memo.",
+    min: 0,
+  },
+  coverageAvailableCount: {
+    type: "integer",
+    required: true,
+    description: "Count of advisory engine inputs currently available.",
+    min: 0,
+  },
+  coveragePendingCount: {
+    type: "integer",
+    required: true,
+    description: "Count of advisory engine inputs still pending review or refresh.",
+    min: 0,
+  },
+  coverageUncertainCount: {
+    type: "integer",
+    required: true,
+    description:
+      "Count of advisory engine inputs intentionally withheld because confidence was too weak.",
+    min: 0,
+  },
+  coverageMissingCount: {
+    type: "integer",
+    required: true,
+    description: "Count of advisory engine inputs not yet available.",
+    min: 0,
+  },
+} as const satisfies Record<string, AnalyticsEventPropSpec>;
+
+const ADVISORY_CALIBRATION_PROP_SPECS = {
+  generatedAt: {
+    type: "string",
+    required: false,
+    description:
+      "ISO timestamp for the memo generation snapshot tied to this interaction, when one exists.",
+  },
+  overallConfidence: {
+    type: "number",
+    required: false,
+    description: "Overall memo confidence score at the time of interaction.",
+    min: 0,
+    max: 1,
+  },
+  recommendationConfidence: {
+    type: "number",
+    required: false,
+    description:
+      "Confidence score of the current recommendation, when a recommendation is present.",
+    min: 0,
+    max: 1,
+  },
+} as const satisfies Record<string, AnalyticsEventPropSpec>;
 
 export const ANALYTICS_EVENT_CONTRACT = {
   version: CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION,
@@ -827,6 +1227,391 @@ export const ANALYTICS_EVENT_CONTRACT = {
           description: "Confidence score attached to the AI output.",
           min: 0,
           max: 1,
+        },
+      },
+    },
+    advisory_memo_viewed: {
+      name: "advisory_memo_viewed",
+      category: "deal_room",
+      description:
+        "Buyer or broker sees the memo-first advisory surface with a resolved decision case.",
+      owner: "ai",
+      source: "web.deal_room.advisory_memo",
+      whenFired:
+        "Deal-room overview finishes rendering with the current buyer-safe or internal memo payload.",
+      semantics:
+        "Represents exposure to the memo artifact that buyer-codex expects users to trust, question, or ignore.",
+      piiSafe: true,
+      introducedIn: "1.2.0",
+      props: {
+        ...ADVISORY_CONTEXT_PROP_SPECS,
+        ...ADVISORY_CALIBRATION_PROP_SPECS,
+        hasRecommendation: {
+          type: "boolean",
+          required: true,
+          description: "Whether the rendered memo included a concrete recommendation.",
+        },
+      },
+    },
+    advisory_recommendation_viewed: {
+      name: "advisory_recommendation_viewed",
+      category: "deal_room",
+      description:
+        "Buyer or broker sees a specific recommended next move inside the advisory memo.",
+      owner: "ai",
+      source: "web.deal_room.advisory_recommendation",
+      whenFired:
+        "Recommendation card becomes visible with an opening price, confidence, and rationale payload.",
+      semantics:
+        "Represents exposure to the prescriptive recommendation, distinct from merely seeing the memo container.",
+      piiSafe: true,
+      introducedIn: "1.2.0",
+      props: {
+        ...ADVISORY_CONTEXT_PROP_SPECS,
+        ...ADVISORY_CALIBRATION_PROP_SPECS,
+        openingPrice: {
+          type: "integer",
+          required: true,
+          description: "Recommended opening price in whole dollars.",
+          min: 0,
+        },
+        riskLevel: {
+          type: "enum",
+          required: true,
+          description: "Risk label shown with the recommendation.",
+          enumValues: ADVISORY_RISK_LEVELS,
+        },
+        suggestedContingencyCount: {
+          type: "integer",
+          required: true,
+          description: "Number of contingencies shown with the recommendation.",
+          min: 0,
+        },
+        rationaleCount: {
+          type: "integer",
+          required: true,
+          description: "Number of rationale bullets shown for the recommendation.",
+          min: 0,
+        },
+      },
+    },
+    advisory_next_best_action_clicked: {
+      name: "advisory_next_best_action_clicked",
+      category: "deal_room",
+      description:
+        "User clicks a CTA that advances the advisory recommendation into the next workflow.",
+      owner: "brokerage",
+      source: "web.deal_room.advisory_cta",
+      whenFired:
+        "Offer cockpit or close-dashboard CTA is clicked from the memo overview shell.",
+      semantics:
+        "Represents recommendation follow-through into an operational workflow, which is stronger than passive viewing.",
+      piiSafe: true,
+      introducedIn: "1.2.0",
+      props: {
+        ...ADVISORY_CONTEXT_PROP_SPECS,
+        ...ADVISORY_CALIBRATION_PROP_SPECS,
+        target: {
+          type: "enum",
+          required: true,
+          description: "Workflow the CTA is intended to open.",
+          enumValues: ADVISORY_NEXT_ACTION_TARGETS,
+        },
+        ctaId: {
+          type: "string",
+          required: true,
+          description: "Stable identifier for the CTA that was clicked.",
+        },
+        nextActionLabel: {
+          type: "string",
+          required: false,
+          description:
+            "Human-readable next-action copy shown alongside the memo when the CTA fired.",
+        },
+      },
+    },
+    advisory_confidence_details_expanded: {
+      name: "advisory_confidence_details_expanded",
+      category: "deal_room",
+      description:
+        "User expands the confidence drill-down that explains why the memo is trustworthy or incomplete.",
+      owner: "ai",
+      source: "web.deal_room.advisory_confidence",
+      whenFired:
+        "Confidence details disclosure transitions from collapsed to open.",
+      semantics:
+        "Represents active trust inspection of the memo's calibration and coverage state.",
+      piiSafe: true,
+      introducedIn: "1.2.0",
+      props: {
+        ...ADVISORY_CONTEXT_PROP_SPECS,
+        ...ADVISORY_CALIBRATION_PROP_SPECS,
+      },
+    },
+    advisory_source_trace_opened: {
+      name: "advisory_source_trace_opened",
+      category: "deal_room",
+      description:
+        "User opens a source trace tied to a memo claim or broker adjudication row.",
+      owner: "ai",
+      source: "web.deal_room.advisory_source_trace",
+      whenFired:
+        "User clicks a source-trace affordance from a claim row or broker adjudication rail.",
+      semantics:
+        "Represents evidence verification behavior for a specific memo conclusion or engine output.",
+      piiSafe: true,
+      introducedIn: "1.2.0",
+      props: {
+        ...ADVISORY_CONTEXT_PROP_SPECS,
+        ...ADVISORY_CALIBRATION_PROP_SPECS,
+        citationId: {
+          type: "string",
+          required: true,
+          description: "Source-trace citation or output id that was opened.",
+        },
+        engineType: {
+          type: "string",
+          required: true,
+          description: "Engine backing the opened source trace.",
+        },
+        linkedClaimCount: {
+          type: "integer",
+          required: true,
+          description: "How many visible memo claims point at this source trace.",
+          min: 0,
+        },
+        sourceStatus: {
+          type: "enum",
+          required: true,
+          description: "Availability status shown for the source at click time.",
+          enumValues: ADVISORY_SOURCE_STATUSES,
+        },
+        trigger: {
+          type: "enum",
+          required: true,
+          description: "Which UI affordance opened the trace.",
+          enumValues: ADVISORY_SOURCE_TRACE_TRIGGERS,
+        },
+        claimTopic: {
+          type: "string",
+          required: false,
+          description: "Topic of the claim that prompted the trace open, when relevant.",
+        },
+      },
+    },
+    advisory_broker_adjudication_opened: {
+      name: "advisory_broker_adjudication_opened",
+      category: "deal_room",
+      description:
+        "Broker or admin opens the adjudication rail for source-review and override work.",
+      owner: "brokerage",
+      source: "web.deal_room.broker_adjudication",
+      whenFired:
+        "Broker adjudication disclosure expands from collapsed to open inside the internal memo variant.",
+      semantics:
+        "Represents an internal trust-and-override workflow opening, not merely a buyer-safe memo view.",
+      piiSafe: true,
+      introducedIn: "1.2.0",
+      props: {
+        ...ADVISORY_CONTEXT_PROP_SPECS,
+        ...ADVISORY_CALIBRATION_PROP_SPECS,
+        pendingSourceCount: {
+          type: "integer",
+          required: true,
+          description: "Count of reviewable advisory sources still pending adjudication.",
+          min: 0,
+        },
+        approvedSourceCount: {
+          type: "integer",
+          required: true,
+          description: "Count of advisory sources already approved.",
+          min: 0,
+        },
+        rejectedSourceCount: {
+          type: "integer",
+          required: true,
+          description: "Count of advisory sources already rejected or overridden.",
+          min: 0,
+        },
+      },
+    },
+    advisory_broker_override_submitted: {
+      name: "advisory_broker_override_submitted",
+      category: "deal_room",
+      description:
+        "Broker or admin overrides an advisory engine output and records why.",
+      owner: "brokerage",
+      source: "backend.ai_engine_review",
+      whenFired:
+        "Broker review action marks an advisory output as rejected or overridden with a typed reason category.",
+      semantics:
+        "Represents an explicit human disagreement with the advisory substrate, which later calibration should learn from.",
+      piiSafe: true,
+      introducedIn: "1.2.0",
+      props: {
+        outputId: {
+          type: "string",
+          required: true,
+          description: "AI engine output id that was overridden.",
+        },
+        propertyId: {
+          type: "string",
+          required: true,
+          description: "Property id associated with the overridden output.",
+        },
+        actorRole: {
+          type: "enum",
+          required: true,
+          description: "Which internal role submitted the override.",
+          enumValues: ["broker", "admin"],
+        },
+        surface: {
+          type: "enum",
+          required: true,
+          description: "Internal advisory surface that submitted the override.",
+          enumValues: ADVISORY_SURFACES,
+        },
+        engineType: {
+          type: "string",
+          required: true,
+          description: "Engine type of the overridden output.",
+        },
+        priorReviewState: {
+          type: "enum",
+          required: true,
+          description: "Review state before the override was submitted.",
+          enumValues: AI_OUTPUT_REVIEW_STATES,
+        },
+        reasonCategory: {
+          type: "enum",
+          required: true,
+          description: "Typed reason category explaining why the override happened.",
+          enumValues: BROKER_OVERRIDE_REASON_CATEGORIES,
+        },
+        hasReasonDetail: {
+          type: "boolean",
+          required: true,
+          description:
+            "Whether the override also included optional free-form detail beyond the typed category.",
+        },
+        outputConfidence: {
+          type: "number",
+          required: true,
+          description: "Confidence score attached to the overridden output.",
+          min: 0,
+          max: 1,
+        },
+        linkedClaimCount: {
+          type: "integer",
+          required: true,
+          description: "How many visible memo claims referenced the overridden output.",
+          min: 0,
+        },
+        reviewLatencyMs: {
+          type: "integer",
+          required: true,
+          description:
+            "Elapsed milliseconds between output generation and override submission.",
+          min: 0,
+        },
+        dealRoomId: {
+          type: "string",
+          required: false,
+          description:
+            "Deal room id where the override was submitted, when the action originated from a property memo.",
+        },
+        generatedAt: {
+          type: "string",
+          required: false,
+          description: "Original generation timestamp of the overridden output.",
+        },
+      },
+    },
+    advisory_buyer_safe_summary_copied: {
+      name: "advisory_buyer_safe_summary_copied",
+      category: "deal_room",
+      description:
+        "User copies a buyer-safe summary distilled from the current advisory memo.",
+      owner: "ai",
+      source: "web.deal_room.summary_export",
+      whenFired:
+        "Copy summary action writes the buyer-safe memo summary to the clipboard.",
+      semantics:
+        "Represents the memo being packaged for reuse outside the current surface while preserving buyer-safe wording.",
+      piiSafe: true,
+      introducedIn: "1.2.0",
+      props: {
+        ...ADVISORY_CONTEXT_PROP_SPECS,
+        ...ADVISORY_CALIBRATION_PROP_SPECS,
+        summaryLength: {
+          type: "integer",
+          required: true,
+          description: "Character length of the copied buyer-safe summary.",
+          min: 0,
+        },
+        includesRecommendation: {
+          type: "boolean",
+          required: true,
+          description: "Whether the copied summary included a concrete recommendation.",
+        },
+      },
+    },
+    advisory_buyer_safe_summary_shared: {
+      name: "advisory_buyer_safe_summary_shared",
+      category: "deal_room",
+      description:
+        "User shares a buyer-safe summary from the advisory memo via a supported share path.",
+      owner: "ai",
+      source: "web.deal_room.summary_export",
+      whenFired:
+        "Native share sheet or another supported share action completes for the buyer-safe summary.",
+      semantics:
+        "Represents the advisory memo being intentionally handed off outside the current session.",
+      piiSafe: true,
+      introducedIn: "1.2.0",
+      props: {
+        ...ADVISORY_CONTEXT_PROP_SPECS,
+        ...ADVISORY_CALIBRATION_PROP_SPECS,
+        method: {
+          type: "enum",
+          required: true,
+          description: "Which share path exported the buyer-safe summary.",
+          enumValues: ADVISORY_SUMMARY_SHARE_METHODS,
+        },
+        summaryLength: {
+          type: "integer",
+          required: true,
+          description: "Character length of the shared buyer-safe summary.",
+          min: 0,
+        },
+        includesRecommendation: {
+          type: "boolean",
+          required: true,
+          description: "Whether the shared summary included a concrete recommendation.",
+        },
+      },
+    },
+    advisory_recommendation_feedback_recorded: {
+      name: "advisory_recommendation_feedback_recorded",
+      category: "deal_room",
+      description:
+        "User explicitly records whether the current recommendation is being used, deferred, or dismissed.",
+      owner: "ai",
+      source: "web.deal_room.advisory_feedback",
+      whenFired:
+        "Recommendation feedback controls submit an explicit accepted, deferred, or dismissed response.",
+      semantics:
+        "Represents a direct usefulness signal for the recommendation rather than inferring trust from downstream clicks alone.",
+      piiSafe: true,
+      introducedIn: "1.2.0",
+      props: {
+        ...ADVISORY_CONTEXT_PROP_SPECS,
+        ...ADVISORY_CALIBRATION_PROP_SPECS,
+        decision: {
+          type: "enum",
+          required: true,
+          description: "Explicit user response to the recommendation.",
+          enumValues: ADVISORY_RECOMMENDATION_DECISIONS,
         },
       },
     },
