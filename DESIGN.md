@@ -2,6 +2,8 @@
 
 Canonical design language for the buyer-codex platform. Every UI surface — marketing site, deal room, dashboards, broker console, iOS app — derives from this document.
 
+Implementation note: the canonical token contract now lives in `packages/shared/src/theme.ts` and is mirrored into `design-references/tokens.ts`, `design-references/tokens.css`, and `ios/BuyerCodex/Sources/Design/BrandTheme.swift` via `pnpm tokens:sync`. This document captures rationale and surface mapping; the generated token artifacts are the exact implementation values.
+
 ---
 
 ## 1. North Star
@@ -10,7 +12,7 @@ Canonical design language for the buyer-codex platform. Every UI surface — mar
 
 This means two things working in concert:
 
-**PayFit supplies the visual identity.** Deep blues that convey trust, warm coral accents that invite action, generous whitespace, crisp geometric typography (Inter), smooth micro-interactions, and polished component surfaces (cards with subtle shadows, rounded inputs, pill badges). The overall feeling is modern European SaaS — professional without being corporate, friendly without being juvenile.
+**PayFit supplies the visual identity.** Deep trust blues, cool teal action accents, restrained violet secondary depth, generous whitespace, crisp geometric typography (Inter), smooth micro-interactions, and polished component surfaces (cards with subtle shadows, rounded inputs, pill badges). The overall feeling is modern European SaaS — professional without being corporate, friendly without being juvenile.
 
 **Hosman supplies the page architecture.** Full-width hero sections with a prominent search/input CTA, scrolling trust strips with logos and stats, structured calculator and pricing sections, testimonial blocks, and conversion-oriented layout sequencing (hook → credibility → value prop → proof → CTA). Every public page follows Hosman's proven real estate marketing cadence.
 
@@ -24,7 +26,7 @@ The result: a platform that *looks* like the best SaaS tools in Europe and *flow
 
 | Source | What We Take | What We Skip |
 |---|---|---|
-| **PayFit** | Color palette (deep blue + coral), typography (Inter, geometric sans), spacing system (generous), component polish (cards, buttons, inputs, badges), motion language (subtle, purposeful), illustration tone (friendly, minimal), empty state patterns | HR/payroll domain content, pricing tiers layout, enterprise feature comparison grids |
+| **PayFit** | Color palette (deep blue + teal), typography (Inter, geometric sans), spacing system (generous), component polish (cards, buttons, inputs, badges), motion language (subtle, purposeful), illustration tone (friendly, minimal), empty state patterns | HR/payroll domain content, pricing tiers layout, enterprise feature comparison grids |
 | **Hosman** | Page architecture (hero → trust → features → CTA), hero with prominent input, calculator/pricing section placement, trust bar pattern, testimonial layout, section sequencing, conversion flow, information architecture | French-specific real estate content, agent matching directory, city-specific landing page templates |
 | **RealAdvisor** | Score badge component (numeric pill), data visualization patterns, comparison table layout, metric cards, property data display conventions | Agent directory layout, Swiss market specifics, multi-language navigation patterns |
 

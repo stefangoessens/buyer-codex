@@ -38,7 +38,8 @@
     "ci:workers": "pnpm workers:test",
     "lint": "next lint",
     "eval": "tsx scripts/ai-eval.ts",
-    "eval:drift": "tsx scripts/ai-eval.ts drift"
+    "eval:drift": "tsx scripts/ai-eval.ts drift",
+    "tokens:sync": "tsx scripts/sync-design-tokens.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",

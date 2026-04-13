@@ -13,6 +13,7 @@
     "./external-access": "./src/external-access.ts",
     "./launch-events": "./src/launch-events.ts",
     "./prompt-registry": "./src/prompt-registry.ts",
+    "./theme": "./src/theme.ts",
     "./utils": "./src/utils.ts"
   },
   "scripts": {

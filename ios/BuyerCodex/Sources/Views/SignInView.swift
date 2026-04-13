@@ -10,49 +10,50 @@ struct SignInView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: BrandTheme.Spacing.stackLoose) {
             Spacer()
 
             // Logo + title
-            VStack(spacing: 12) {
+            VStack(spacing: BrandTheme.Spacing.inlineDefault) {
                 Image(systemName: "house.fill")
                     .font(.system(size: 56))
-                    .foregroundStyle(Color(hex: 0x1B2B65))
+                    .foregroundStyle(BrandTheme.SemanticColor.actionPrimary)
                 Text("buyer-codex")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color(hex: 0x1B2B65))
+                    .font(.brand(BrandTheme.Typography.display))
+                    .foregroundStyle(BrandTheme.SemanticColor.textBrand)
                 Text("AI-native Florida buyer brokerage")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.brand(BrandTheme.Typography.body))
+                    .foregroundStyle(BrandTheme.SemanticColor.textSecondary)
             }
 
             // Form fields
-            VStack(spacing: 16) {
+            VStack(spacing: BrandTheme.Spacing.cardPaddingDense) {
                 TextField("Email", text: $email)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
-                    .padding(14)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .padding(.horizontal, BrandTheme.Spacing.controlX)
+                    .padding(.vertical, BrandTheme.Spacing.controlY)
+                    .background(BrandTheme.SemanticColor.surfaceMuted)
+                    .clipShape(RoundedRectangle(cornerRadius: BrandTheme.Radius.control))
 
                 SecureField("Password", text: $password)
                     .textContentType(.password)
-                    .padding(14)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .padding(.horizontal, BrandTheme.Spacing.controlX)
+                    .padding(.vertical, BrandTheme.Spacing.controlY)
+                    .background(BrandTheme.SemanticColor.surfaceMuted)
+                    .clipShape(RoundedRectangle(cornerRadius: BrandTheme.Radius.control))
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, BrandTheme.Layout.pagePaddingMobile)
 
             // Error message
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                    .font(.brand(BrandTheme.Typography.caption))
+                    .foregroundStyle(BrandTheme.SemanticColor.statusError)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, BrandTheme.Layout.pagePaddingMobile)
             }
 
             // Sign in button
@@ -62,26 +63,26 @@ struct SignInView: View {
                 Group {
                     if isLoading {
                         ProgressView()
-                            .tint(.white)
+                            .tint(BrandTheme.SemanticColor.textInverse)
                     } else {
                         Text("Sign In")
-                            .fontWeight(.semibold)
+                            .font(.brand(BrandTheme.Typography.body))
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .padding(.vertical, BrandTheme.Spacing.cardPaddingDense)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color(hex: 0xFF6B4A))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .padding(.horizontal, 24)
+            .tint(BrandTheme.SemanticColor.actionPrimary)
+            .clipShape(RoundedRectangle(cornerRadius: BrandTheme.Radius.control))
+            .padding(.horizontal, BrandTheme.Layout.pagePaddingMobile)
             .disabled(isLoading)
 
             Spacer()
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(BrandTheme.SemanticColor.surfaceCanvas)
     }
 
     // MARK: - Actions

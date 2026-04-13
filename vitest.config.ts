@@ -5,6 +5,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: "@buyer-codex/shared/theme",
+        replacement: path.resolve(__dirname, "./packages/shared/src/theme.ts"),
+      },
+      {
         find: "@buyer-codex/shared/",
         replacement: path.resolve(__dirname, "./packages/shared/src/"),
       },
