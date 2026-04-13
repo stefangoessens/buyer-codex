@@ -12,12 +12,16 @@ import { Input } from "@/components/ui/input";
 import { env, isConfigured } from "@/lib/env";
 import { buildListingIntakeHref } from "@/lib/intake/pasteLink";
 import {
+  trackDealRoomUnlocked,
   trackRegistrationCompleted,
   trackRegistrationPrompted,
   trackTeaserRendered,
 } from "@/lib/intake/pasteLinkFunnel";
 import type { SourcePlatform } from "@/lib/intake/types";
-import { linkFirstPropertyReference } from "@/lib/onboarding/api";
+import {
+  getSourceListingStatusReference,
+  linkFirstPropertyReference,
+} from "@/lib/onboarding/api";
 import {
   createBuyerOnboardingDraft,
   mergeBuyerOnboardingDraft,
@@ -29,6 +33,7 @@ import {
 } from "@/lib/onboarding/state";
 import { useStoredBuyerOnboardingDraft } from "@/lib/onboarding/storage";
 import { identifyUser } from "@/lib/posthog";
+import { SourceListingRecoveryBanner } from "./SourceListingRecoveryBanner";
 
 interface BuyerOnboardingFlowProps {
   listingUrl: string;
@@ -38,6 +43,8 @@ interface BuyerOnboardingFlowProps {
   intakeSource?: LinkPastedSource | null;
   submittedAtMs?: number | null;
   initialSourcePlatform?: SourcePlatform | null;
+  initialSourceListingId?: string | null;
+  initialAttemptId?: string | null;
 }
 
 const STEP_LABELS = [
@@ -157,6 +164,8 @@ function BuyerOnboardingFlowAuthDisabled({
   intakeSource = null,
   submittedAtMs = null,
   initialSourcePlatform = null,
+  initialSourceListingId = null,
+  initialAttemptId = null,
 }: BuyerOnboardingFlowProps) {
   const teaserTracked = useRef(false);
   const registrationPromptTracked = useRef(false);
@@ -282,11 +291,15 @@ function BuyerOnboardingFlowWithAuth({
   intakeSource = null,
   submittedAtMs = null,
   initialSourcePlatform = null,
+  initialSourceListingId = null,
+  initialAttemptId = null,
 }: BuyerOnboardingFlowProps) {
   const router = useRouter();
   const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
   const { draft, isHydrated, setDraft, clearDraft } = useStoredBuyerOnboardingDraft();
   const submitUrl = useMutation(api.intake.submitUrl);
+  const markAttemptTeaserViewed = useMutation(api.intake.markAttemptTeaserViewed);
+  const markAttemptDossierReady = useMutation(api.intake.markAttemptDossierReady);
   const saveBuyerProfile = useMutation(api.buyerProfiles.createOrUpdate);
   const linkFirstProperty = useMutation(linkFirstPropertyReference);
   const actor = useQuery(api.contracts.getCurrentActor, isAuthenticated ? {} : "skip");
@@ -295,6 +308,7 @@ function BuyerOnboardingFlowWithAuth({
   const captureRequestedFor = useRef<string | null>(null);
   const prefilledFromProfile = useRef(false);
   const teaserTracked = useRef(false);
+  const teaserMarkedFor = useRef<string | null>(null);
   const registrationPromptTracked = useRef(false);
 
   const [captureError, setCaptureError] = useState<string | null>(null);
@@ -313,6 +327,8 @@ function BuyerOnboardingFlowWithAuth({
       if (current?.listingUrl === listingUrl) {
         return mergeBuyerOnboardingDraft(current, {
           intakeSource: current.intakeSource ?? intakeSource,
+          intakeAttemptId: current.intakeAttemptId ?? initialAttemptId,
+          sourceListingId: current.sourceListingId ?? initialSourceListingId,
           sourcePlatform: current.sourcePlatform ?? initialSourcePlatform,
         });
       }
@@ -320,10 +336,20 @@ function BuyerOnboardingFlowWithAuth({
       return createBuyerOnboardingDraft({
         listingUrl,
         intakeSource,
+        intakeAttemptId: initialAttemptId,
+        sourceListingId: initialSourceListingId,
         sourcePlatform: initialSourcePlatform,
       });
     });
-  }, [initialSourcePlatform, intakeSource, isHydrated, listingUrl, setDraft]);
+  }, [
+    initialAttemptId,
+    initialSourceListingId,
+    initialSourcePlatform,
+    intakeSource,
+    isHydrated,
+    listingUrl,
+    setDraft,
+  ]);
 
   useEffect(() => {
     if (!draft || draft.listingUrl !== listingUrl) return;
@@ -332,7 +358,14 @@ function BuyerOnboardingFlowWithAuth({
     captureRequestedFor.current = listingUrl;
     setCaptureError(null);
 
-    void submitUrl({ url: listingUrl })
+    void submitUrl({
+      url: listingUrl,
+      source: intakeSource ?? "unknown",
+      submittedAt:
+        typeof submittedAtMs === "number"
+          ? new Date(submittedAtMs).toISOString()
+          : undefined,
+    })
       .then((result) => {
         if (!result.success) {
           setCaptureError(result.error);
@@ -343,6 +376,7 @@ function BuyerOnboardingFlowWithAuth({
         setDraft((current) => {
           if (!current || current.listingUrl !== listingUrl) return current;
           return mergeBuyerOnboardingDraft(current, {
+            intakeAttemptId: String(result.attemptId),
             sourceListingId: String(result.sourceListingId),
             sourcePlatform: result.platform,
           });
@@ -354,7 +388,7 @@ function BuyerOnboardingFlowWithAuth({
         );
         captureRequestedFor.current = null;
       });
-  }, [draft, listingUrl, setDraft, submitUrl]);
+  }, [draft, intakeSource, listingUrl, setDraft, submitUrl, submittedAtMs]);
 
   useEffect(() => {
     if (!draft) return;
@@ -399,8 +433,19 @@ function BuyerOnboardingFlowWithAuth({
       : createBuyerOnboardingDraft({
           listingUrl,
           intakeSource,
+          intakeAttemptId: initialAttemptId,
+          sourceListingId: initialSourceListingId,
           sourcePlatform: initialSourcePlatform,
         });
+
+  const sourceListingStatus = useQuery(
+    getSourceListingStatusReference,
+    isAuthenticated && activeDraft.sourceListingId
+      ? {
+          sourceListingId: activeDraft.sourceListingId as Id<"sourceListings">,
+        }
+      : "skip",
+  );
 
   const registrationSource = activeDraft.intakeSource ?? intakeSource ?? "hero";
   const teaserSource = `${registrationSource}:intake_teaser`;
@@ -425,6 +470,19 @@ function BuyerOnboardingFlowWithAuth({
     submittedAtMs,
     teaserSource,
   ]);
+
+  useEffect(() => {
+    if (!activeDraft.intakeAttemptId) return;
+    if (teaserMarkedFor.current === activeDraft.intakeAttemptId) return;
+
+    teaserMarkedFor.current = activeDraft.intakeAttemptId;
+    void markAttemptTeaserViewed({
+      attemptId: activeDraft.intakeAttemptId as Id<"intakeAttempts">,
+      viewedAt: new Date().toISOString(),
+    }).catch(() => {
+      teaserMarkedFor.current = null;
+    });
+  }, [activeDraft.intakeAttemptId, markAttemptTeaserViewed]);
 
   useEffect(() => {
     if (registrationPromptTracked.current) return;
@@ -478,6 +536,22 @@ function BuyerOnboardingFlowWithAuth({
       });
 
       if (result.status === "deal_room_ready") {
+        if (activeDraft.intakeAttemptId) {
+          void markAttemptDossierReady({
+            attemptId: activeDraft.intakeAttemptId as Id<"intakeAttempts">,
+            readyAt: new Date().toISOString(),
+          });
+        }
+        trackDealRoomUnlocked({
+          dealRoomId: String(result.dealRoomId),
+          propertyId: String(result.propertyId),
+          sourceListingId: activeDraft.sourceListingId ?? undefined,
+          platform: activeDraft.sourcePlatform ?? undefined,
+          latencyMs:
+            typeof submittedAtMs === "number"
+              ? Math.max(Date.now() - submittedAtMs, 0)
+              : undefined,
+        });
         clearDraft();
         router.push(`/dealroom/${result.dealRoomId}`);
         return;
@@ -503,6 +577,9 @@ function BuyerOnboardingFlowWithAuth({
   };
 
   const returnUrl = returnUrlFor(listingUrl);
+  const intakeHref = buildListingIntakeHref(listingUrl, {
+    source: activeDraft.intakeSource ?? undefined,
+  });
   const currentStep =
     !isAuthenticated
       ? "account"
@@ -634,6 +711,15 @@ function BuyerOnboardingFlowWithAuth({
             </div>
           ) : (
             <div className="space-y-6">
+              {sourceListingStatus &&
+              sourceListingStatus.status !== "property_ready" ? (
+                <SourceListingRecoveryBanner
+                  resolution={sourceListingStatus}
+                  listingUrl={listingUrl}
+                  intakeHref={intakeHref}
+                />
+              ) : null}
+
               <div>
                 <h2 className="text-xl font-semibold text-neutral-900">
                   Step 2: Fill in your buyer basics
@@ -768,7 +854,15 @@ function BuyerOnboardingFlowWithAuth({
                   disabled={isSaving || !activeDraft.sourceListingId}
                   className="inline-flex h-11 items-center justify-center rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:bg-primary-200"
                 >
-                  {isSaving ? "Unlocking deal room…" : "Continue to deal room"}
+                  {isSaving
+                    ? "Unlocking deal room…"
+                    : sourceListingStatus?.status === "source_listing_partial"
+                      ? "Save basics and keep recovering"
+                      : sourceListingStatus?.status === "pending_source_listing"
+                        ? "Save basics and finish once ready"
+                        : sourceListingStatus?.status === "source_listing_failed"
+                          ? "Save basics and retry later"
+                          : "Continue to deal room"}
                 </button>
               </div>
             </div>

@@ -6,7 +6,10 @@ interface HeroSectionProps {
 
 export function HeroSection({ children }: HeroSectionProps) {
   return (
-    <section className="relative w-full overflow-hidden bg-[#FCFBFF]">
+    <section
+      className="relative w-full overflow-hidden bg-[#FCFBFF]"
+      data-testid="homepage-hero"
+    >
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         <div className="absolute inset-0 bg-[radial-gradient(1000px_600px_at_20%_0%,#EBF4FF_0%,#FCFBFF_55%,#FFFFFF_100%)]" />
       </div>

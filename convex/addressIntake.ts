@@ -22,6 +22,12 @@ import {
   type CanonicalAddress,
   type ScoredAddressMatchCandidate,
 } from "./lib/addressMatch";
+import {
+  mergeSourceListingReliability,
+  retryableFromFailureMode,
+  type IntakeAttemptStatus,
+  type IntakeFailureMode,
+} from "../src/lib/intake/reliability";
 
 const canonicalAddressInputValidator = v.object({
   street: v.string(),
@@ -201,21 +207,73 @@ function buildSourceListingDoc(args: {
         : undefined,
     sourcePlatform: "manual",
     sourceUrl,
-    rawData: JSON.stringify({
-      canonical,
-      match: {
-        confidence: resolution.confidence,
-        score: resolution.score,
-        bestMatchId: resolution.bestMatch?.id ?? null,
-        ambiguous: resolution.ambiguous,
-        resolutionStatus: resolution.status,
-        fallbackReason:
-          "fallbackReason" in resolution ? resolution.fallbackReason : undefined,
+    rawData: mergeSourceListingReliability(
+      JSON.stringify({
+        canonical,
+        match: {
+          confidence: resolution.confidence,
+          score: resolution.score,
+          bestMatchId: resolution.bestMatch?.id ?? null,
+          ambiguous: resolution.ambiguous,
+          resolutionStatus: resolution.status,
+          fallbackReason:
+            "fallbackReason" in resolution ? resolution.fallbackReason : undefined,
+        },
+      }),
+      {
+        resolutionStatus:
+          resolution.status === "matched"
+            ? "ready"
+            : resolution.status === "review_required"
+              ? "pending"
+              : "failed",
+        failureMode:
+          resolution.status === "matched"
+            ? undefined
+            : (("fallbackReason" in resolution
+                ? resolution.fallbackReason
+                : "no_match") as IntakeFailureMode),
+        retryable:
+          resolution.status === "matched"
+            ? undefined
+            : retryableFromFailureMode(
+                (("fallbackReason" in resolution
+                  ? resolution.fallbackReason
+                  : "no_match") as IntakeFailureMode),
+              ),
+        updatedAt: extractedAt,
       },
-    }),
+    ),
     extractedAt,
     status: resolveSourceListingStatus(resolution),
   };
+}
+
+function attemptStatusFromResolution(
+  resolution: AddressMatchResolution,
+): {
+  status: IntakeAttemptStatus;
+  failureMode?: IntakeFailureMode;
+  retryable?: boolean;
+} {
+  switch (resolution.status) {
+    case "matched":
+      return { status: "ready" };
+    case "review_required":
+      return {
+        status: "partial",
+        failureMode: resolution.fallbackReason as IntakeFailureMode,
+        retryable: retryableFromFailureMode(
+          resolution.fallbackReason as IntakeFailureMode,
+        ),
+      };
+    case "no_match":
+      return {
+        status: "failed",
+        failureMode: "no_match",
+        retryable: true,
+      };
+  }
 }
 
 function buildCreateAddressIntakeResponse(args: {
@@ -327,6 +385,19 @@ export const createAddressIntake = mutation({
     } else {
       intakeId = await ctx.db.insert("sourceListings", sourceListingDoc);
     }
+
+    const attempt = attemptStatusFromResolution(resolution);
+    await ctx.db.insert("intakeAttempts", {
+      sourceListingId: intakeId,
+      sourcePlatform: "manual",
+      intakeChannel: "manual_address",
+      rawInput: canonical.formatted,
+      normalizedInput: sourceUrl,
+      submittedAt: now,
+      status: attempt.status,
+      failureMode: attempt.failureMode,
+      retryable: attempt.retryable,
+    });
 
     // Audit trail.
     await ctx.db.insert("auditLog", {

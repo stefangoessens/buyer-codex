@@ -101,6 +101,9 @@ export interface LaunchEventMap {
     dealRoomId: string;
     propertyId: string;
     accessLevel?: DealRoomAccessLevel;
+    sourceListingId?: string;
+    platform?: ListingPortal;
+    latencyMs?: number;
   };
   agreement_prompted: {
     dealRoomId: string;

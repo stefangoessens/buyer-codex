@@ -13,6 +13,7 @@ export type BuyerOnboardingStage =
 export type BuyerOnboardingPropertyStatus =
   | "captured"
   | "pending_source_listing"
+  | "source_listing_partial"
   | "source_listing_failed"
   | "deal_room_ready";
 
@@ -28,6 +29,7 @@ export interface BuyerOnboardingDraft {
   stage: BuyerOnboardingStage;
   listingUrl: string;
   intakeSource: LinkPastedSource | null;
+  intakeAttemptId: string | null;
   sourceListingId: string | null;
   sourcePlatform: SourcePlatform | null;
   authStatus: "anonymous" | "authenticated";
@@ -64,6 +66,7 @@ export interface BuyerOnboardingBasicsPayload {
 export function createBuyerOnboardingDraft(params: {
   listingUrl: string;
   intakeSource?: LinkPastedSource | null;
+  intakeAttemptId?: string | null;
   sourceListingId?: string | null;
   sourcePlatform?: SourcePlatform | null;
 }): BuyerOnboardingDraft {
@@ -73,6 +76,7 @@ export function createBuyerOnboardingDraft(params: {
     stage: "account",
     listingUrl: params.listingUrl,
     intakeSource: params.intakeSource ?? null,
+    intakeAttemptId: params.intakeAttemptId ?? null,
     sourceListingId: params.sourceListingId ?? null,
     sourcePlatform: params.sourcePlatform ?? null,
     authStatus: "anonymous",
@@ -194,6 +198,7 @@ export function reviveBuyerOnboardingDraft(
       ...createBuyerOnboardingDraft({
         listingUrl: parsed.listingUrl,
         intakeSource: parsed.intakeSource ?? null,
+        intakeAttemptId: parsed.intakeAttemptId ?? null,
         sourceListingId: parsed.sourceListingId ?? null,
         sourcePlatform: parsed.sourcePlatform ?? null,
       }),
@@ -210,6 +215,7 @@ export function reviveBuyerOnboardingDraft(
         preferredAreas: parsed.buyerBasics?.preferredAreas ?? [],
       },
       intakeSource: parsed.intakeSource ?? null,
+      intakeAttemptId: parsed.intakeAttemptId ?? null,
       sourceListingId: parsed.sourceListingId ?? null,
       sourcePlatform: parsed.sourcePlatform ?? null,
       authStatus: parsed.authStatus ?? "anonymous",

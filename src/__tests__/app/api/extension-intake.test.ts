@@ -34,6 +34,7 @@ describe("POST /api/extension/intake", () => {
       listingId: "12345",
       normalizedUrl: "https://www.zillow.com/homedetails/12345_zpid/",
       sourceListingId: "sl_1",
+      attemptId: "att_1",
     });
 
     const response = await POST(
@@ -58,6 +59,7 @@ describe("POST /api/extension/intake", () => {
     expect(data.redirectUrl).toContain("/intake?");
     expect(data.redirectUrl).toContain("result=created");
     expect(data.redirectUrl).toContain("auth=signed_out");
+    expect(data.redirectUrl).toContain("attemptId=att_1");
     expect(trackServerEventMock).toHaveBeenCalledWith(
       "extension_intake_succeeded",
       expect.objectContaining({
@@ -76,6 +78,7 @@ describe("POST /api/extension/intake", () => {
       listingId: "9988",
       normalizedUrl: "https://www.redfin.com/FL/Miami/home/9988",
       sourceListingId: "sl_existing",
+      attemptId: "att_existing",
     });
 
     const response = await POST(
@@ -99,6 +102,7 @@ describe("POST /api/extension/intake", () => {
     });
     expect(data.redirectUrl).toContain("result=duplicate");
     expect(data.redirectUrl).toContain("auth=signed_in");
+    expect(data.redirectUrl).toContain("attemptId=att_existing");
   });
 
   it("returns unsupported-page deterministically", async () => {
@@ -144,6 +148,7 @@ describe("POST /api/extension/intake", () => {
       normalizedUrl:
         "https://www.realtor.com/realestateandhomes-detail/example_M123",
       sourceListingId: "sl_auth",
+      attemptId: "att_auth",
     });
 
     await POST(

@@ -26,6 +26,12 @@ export const PASTE_TO_TEASER_SLO = {
   measurement: "teaser_rendered.latencyMs",
 } as const;
 
+export const PASTE_TO_DOSSIER_SLO = {
+  name: "paste_to_dossier",
+  targetMs: 60_000,
+  measurement: "deal_room_unlocked.latencyMs",
+} as const;
+
 export const PASTE_LINK_REGISTERED_DEAL_ROOM_KPI = {
   id: "product.paste_to_registered_deal_room_under_60s",
   targetWindowSeconds: 60,
@@ -89,6 +95,9 @@ export function trackDealRoomUnlocked(props: {
   dealRoomId: string;
   propertyId: string;
   accessLevel?: DealRoomAccessLevel;
+  sourceListingId?: string;
+  platform?: ListingPortal;
+  latencyMs?: number;
 }) {
   trackPasteLinkStage("deal_room_unlocked", 6, props);
 }
