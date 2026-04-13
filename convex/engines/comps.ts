@@ -21,8 +21,8 @@ export const runCompsEngine = internalAction({
     });
     if (!property) return null;
 
-    const enrichment: any = await ctx.runQuery(
-      internal.enrichment.getForPropertyInternal,
+    const dossier: any = await ctx.runMutation(
+      internal.propertyDossiers.syncForProperty,
       { propertyId: args.propertyId },
     );
     const prompt: any = await ctx.runQuery(
@@ -59,13 +59,15 @@ export const runCompsEngine = internalAction({
       garageSpaces: property.garageSpaces,
     };
 
+    const dossierCompsInput = dossier?.sections?.downstreamInputs?.data?.engineInputs?.comps;
+    const subjectInput = dossierCompsInput?.subject ?? subject;
     const candidates =
       args.candidates && args.candidates.length > 0
         ? args.candidates
-        : enrichment?.engineInputs?.compsCandidates ?? [];
-    const inputSnapshot = JSON.stringify({ subject, candidates });
+        : dossierCompsInput?.candidates ?? [];
+    const inputSnapshot = JSON.stringify({ subject: subjectInput, candidates });
 
-    const result = selectComps({ subject, candidates });
+    const result = selectComps({ subject: subjectInput, candidates });
     const citations = Array.from(
       new Set(
         result.comps.flatMap((comp) =>

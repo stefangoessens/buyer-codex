@@ -1944,6 +1944,29 @@ export default defineSchema({
     .index("by_dealRoomId", ["dealRoomId"]),
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // PROPERTY DOSSIERS (KIN-1021)
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Versioned canonical property-intelligence artifact composed from the
+  // deterministic property record, enrichment caches, market context,
+  // Browser Use runs, and downstream engine inputs/outputs. Payload is stored
+  // as JSON so the section contract can evolve without a Convex migration.
+
+  propertyDossiers: defineTable({
+    propertyId: v.id("properties"),
+    canonicalId: v.string(),
+    compositionVersion: v.string(),
+    generatedAt: v.string(),
+    lastSourceUpdatedAt: v.optional(v.string()),
+    fingerprint: v.string(),
+    replayKey: v.string(),
+    payload: v.string(),
+  })
+    .index("by_propertyId", ["propertyId"])
+    .index("by_propertyId_and_fingerprint", ["propertyId", "fingerprint"])
+    .index("by_generatedAt", ["generatedAt"]),
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // FILE ANALYSIS JOBS (KIN-821)
   // ═══════════════════════════════════════════════════════════════════════════
   //
