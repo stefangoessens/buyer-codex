@@ -36,6 +36,10 @@ export const runCostEngine = internalAction({
 
     const input = {
       purchasePrice,
+      state: property.address?.state,
+      county: property.address?.county,
+      ownerOccupied: property.ownerOccupied,
+      applyHomesteadExemption: property.applyHomesteadExemption,
       taxAnnual: property.taxAnnual,
       taxAssessedValue: property.taxAssessedValue,
       hoaFee: property.hoaFee,
@@ -46,6 +50,9 @@ export const runCostEngine = internalAction({
       stormShutters: property.stormShutters,
       constructionType: property.constructionType,
       floodZone: property.floodZone,
+      waterfrontType: property.waterfrontType,
+      coastDistanceMiles: property.coastDistanceMiles,
+      elevationFeet: property.elevationFeet,
     };
     const inputSnapshot = JSON.stringify(input);
 

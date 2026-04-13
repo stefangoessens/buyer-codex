@@ -133,7 +133,20 @@ function makeCost(totalMonthlyMid: number, totalAnnual: number): CostOutput {
     totalMonthlyMid,
     totalMonthlyHigh: totalMonthlyMid * 1.1,
     totalAnnual,
-    upfrontCosts: { downPayment: 0, closingCosts: 0, total: 0 },
+    totalAnnualLow: totalAnnual * 0.9,
+    totalAnnualHigh: totalAnnual * 1.1,
+    annualRange: {
+      low: totalAnnual * 0.9,
+      mid: totalAnnual,
+      high: totalAnnual * 1.1,
+    },
+    upfrontCosts: {
+      downPayment: 0,
+      closingCosts: 0,
+      total: 0,
+      closingCostsRange: { low: 0, mid: 0, high: 0 },
+      totalRange: { low: 0, mid: 0, high: 0 },
+    },
     assumptions: {
       interestRate: 0.065,
       downPaymentPct: 0.2,
@@ -141,6 +154,9 @@ function makeCost(totalMonthlyMid: number, totalAnnual: number): CostOutput {
       maintenancePct: 0.01,
       pmiRate: 0.005,
       closingCostPct: 0.03,
+      closingCostRangeSpreadPct: 0.15,
+      floridaHomesteadExemptionValue: 50000,
+      floridaHomesteadNonSchoolPortion: 0.7,
     },
     disclaimers: [],
   };
