@@ -50,6 +50,28 @@ describe("track() — funnel category", () => {
   });
 });
 
+describe("track() — dashboard category", () => {
+  it("accepts dashboard_viewed with role and counts", () => {
+    expect(() =>
+      track("dashboard_viewed", {
+        role: "buyer",
+        activeDealCount: 3,
+        pendingTaskCount: 2,
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts dashboard_next_step_clicked with optional dealRoomId", () => {
+    expect(() =>
+      track("dashboard_next_step_clicked", {
+        targetSurface: "offer",
+        sourceModule: "task_list",
+        dealRoomId: "dr_1",
+      }),
+    ).not.toThrow();
+  });
+});
+
 describe("track() — deal_room category", () => {
   it("accepts deal_room_entered with access level", () => {
     expect(() =>
@@ -427,6 +449,14 @@ describe("listEventsByCategory()", () => {
     expect(events.length).toBeGreaterThanOrEqual(7);
   });
 
+  it("returns all dashboard events", () => {
+    const events = listEventsByCategory("dashboard");
+    expect(events).toContain("dashboard_viewed");
+    expect(events).toContain("dashboard_deal_selected");
+    expect(events).toContain("dashboard_next_step_clicked");
+    expect(events).toHaveLength(3);
+  });
+
   it("returns all tour events", () => {
     const events = listEventsByCategory("tour");
     expect(events).toContain("tour_requested");
@@ -467,6 +497,7 @@ describe("EVENT_METADATA coverage", () => {
   it("every EVENT_METADATA entry has a valid category", () => {
     const validCategories = new Set([
       "funnel",
+      "dashboard",
       "deal_room",
       "documents",
       "tour",
@@ -492,6 +523,13 @@ describe("EVENT_METADATA coverage", () => {
     }
   });
 
+  it("every EVENT_METADATA entry has non-empty source and semantics", () => {
+    for (const [name, meta] of Object.entries(EVENT_METADATA)) {
+      expect(meta.source, `event ${name} missing source`).toBeTruthy();
+      expect(meta.semantics, `event ${name} missing semantics`).toBeTruthy();
+    }
+  });
+
   it("every EVENT_METADATA entry has a boolean piiSafe flag", () => {
     for (const [name, meta] of Object.entries(EVENT_METADATA)) {
       expect(
@@ -501,9 +539,9 @@ describe("EVENT_METADATA coverage", () => {
     }
   });
 
-  it("catalog contains at least 40 events across all categories", () => {
+  it("catalog contains at least 50 events across all categories", () => {
     const total = Object.keys(EVENT_METADATA).length;
-    expect(total).toBeGreaterThanOrEqual(40);
+    expect(total).toBeGreaterThanOrEqual(50);
   });
 
   it("known piiSafe: false events are flagged correctly", () => {

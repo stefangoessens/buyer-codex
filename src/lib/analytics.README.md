@@ -1,32 +1,67 @@
 # Analytics Event Catalog — Governance
 
-The full analytics catalog lives in `src/lib/analytics.ts`.
+The comprehensive analytics catalog now lives in `@buyer-codex/shared/analytics-events`.
 
-Launch-critical events are defined once in `@buyer-codex/shared/launch-events` and then inherited into `AnalyticsEventMap`. That shared module also owns the runtime validator, emitter helpers, contract changelog, and the serializable contract snapshot used by downstream consumers/codegen.
+That shared module is the source of truth for:
 
-## Adding a new event
-1. If the event is launch-critical, add it to `@buyer-codex/shared/launch-events` and update the contract changelog there.
-2. Add a key to `AnalyticsEventMap` only for non-launch events. Include a JSDoc comment describing when the event fires.
-3. Add a matching entry in `EVENT_METADATA` with `{ category, owner, whenFired, piiSafe }`.
-4. Use `track("event_name", { ... })` at the call site — TypeScript enforces the shape.
-5. Open a PR with the catalog change and the call site together. The owner guild must approve.
+- the full cross-surface event map
+- the serializable contract snapshot
+- per-event owner, source, when-fired rule, semantics, and PII posture
+- dashboard, deal-room, document, tour, offer, closing, communication, agent-ops, engagement, and system surfaces
 
-## Event naming convention
-- `snake_case` verb_noun: `tour_requested`, `offer_submitted`, `deal_closed`
-- Past tense for events that happened
-- Present tense only for system probes (e.g. `health_check_failed`)
+Launch-critical events remain defined in `@buyer-codex/shared/launch-events` and are inherited into the broader analytics contract so KIN-771 and KIN-911 stay aligned.
 
-## PII rules
-- Mark `piiSafe: false` for any event with free-form strings that might carry user text (error messages, reasons, notes)
-- The `track()` function runs `stripPii` on these defensively before dispatch
-- Never put email, phone, name, address, or any PII field directly into event properties — even on `piiSafe: true` events
+## Contract fields
 
-## iOS coverage
-- iOS events must use the same event names and property shapes (shared via a TypeScript-to-Swift codegen or manual mirror)
-- KIN-826 owns the iOS PostHog SDK integration
+Each event definition in `ANALYTICS_EVENT_CONTRACT` includes:
 
-## Baseline taxonomy
-- Funnel: `link_pasted`, `teaser_viewed`, `registration_started`, `registration_completed`
-- Deal workflow: `deal_room_entered`, `pricing_panel_viewed`, `tour_requested`, `offer_submitted`, `contract_signed`, `deal_closed`
-- Operations workflow: `message_sent`, `message_delivered`, `agent_assigned`, `payout_created`
-- System observability: `error_boundary_hit`, `health_check_failed`, `worker_job_failed`
+- `name`: canonical snake_case event name
+- `category`: reporting surface bucket
+- `props`: typed payload schema
+- `owner`: team or guild responsible for semantics
+- `source`: emitting surface or service, for example `web.dashboard.home` or `backend.offer_pipeline`
+- `whenFired`: exact trigger rule
+- `semantics`: what business fact the event represents
+- `piiSafe`: whether free-form payload scrubbing must run before dispatch
+
+## Usage examples
+
+Client-side:
+
+```ts
+import { track } from "@/lib/analytics";
+
+track("dashboard_viewed", {
+  role: "buyer",
+  activeDealCount: 3,
+  pendingTaskCount: 2,
+});
+```
+
+Server-side:
+
+```ts
+import { trackServerEvent } from "@/lib/analytics.server";
+
+await trackServerEvent("document_parsed", {
+  documentId: "doc_123",
+  parser: "contract-v1",
+  durationMs: 842,
+});
+```
+
+Both helpers preserve the event payload contract and add transport metadata via `analytics_transport` instead of overwriting domain-level payload fields such as `source`.
+
+## Adding or changing an event
+
+1. If the event is launch-critical, update `@buyer-codex/shared/launch-events` first.
+2. Update `@buyer-codex/shared/analytics-events` with the event shape and contract metadata.
+3. Keep the event name in `snake_case` and use a past-tense `verb_noun` form unless it is a probe-style system event.
+4. Add or update tests alongside the contract change.
+5. Land the catalog update atomically with the instrumentation call site in the same PR.
+
+## Governance
+
+- The contract is reviewed in PRs; downstream web, backend, and iOS instrumentation should not invent parallel event names or payload shapes.
+- `piiSafe: false` events are scrubbed before dispatch. Do not place direct email, phone, name, or address fields into event properties.
+- Use the shared contract for planning and codegen instead of re-documenting event semantics ad hoc in individual features.
