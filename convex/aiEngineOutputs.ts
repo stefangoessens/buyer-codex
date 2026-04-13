@@ -2,6 +2,10 @@ import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { determineReviewState, ENGINE_TYPES } from "./lib/engineResult";
 import { getCurrentUser, requireRole } from "./lib/session";
+import {
+  assessEngineOutputGuardrail,
+  defaultApprovedGuardrailState,
+} from "../src/lib/advisory/guardrails";
 
 // ═══ Queries ═══
 
@@ -59,10 +63,24 @@ export const listPendingReview = query({
     const user = await getCurrentUser(ctx);
     if (!user || (user.role !== "broker" && user.role !== "admin")) return [];
 
-    return await ctx.db
+    const rows = await ctx.db
       .query("aiEngineOutputs")
       .withIndex("by_reviewState", (q) => q.eq("reviewState", "pending"))
       .take(args.limit ?? 50);
+
+    return rows.map((row) => {
+      const guardrail = assessEngineOutputGuardrail({
+        engineType: row.engineType,
+        confidence: row.confidence,
+        output: row.output,
+        reviewState: row.reviewState,
+      });
+
+      return {
+        ...row,
+        guardrail,
+      };
+    });
   },
 });
 
@@ -86,7 +104,11 @@ export const createOutput = internalMutation({
     if (!ENGINE_TYPES.includes(args.engineType as (typeof ENGINE_TYPES)[number])) {
       throw new Error(`Invalid engine type: ${args.engineType}. Valid: ${ENGINE_TYPES.join(", ")}`);
     }
-    const reviewState = determineReviewState(args.confidence);
+    const reviewState = determineReviewState({
+      engineType: args.engineType,
+      confidence: args.confidence,
+      output: args.output,
+    });
     return await ctx.db.insert("aiEngineOutputs", {
       propertyId: args.propertyId,
       engineType: args.engineType,
@@ -111,6 +133,20 @@ export const approveOutput = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const user = await requireRole(ctx, "broker");
+    const existing = await ctx.db.get(args.outputId);
+    if (!existing) {
+      throw new Error("AI engine output not found");
+    }
+
+    const guardrail = assessEngineOutputGuardrail({
+      engineType: existing.engineType,
+      confidence: existing.confidence,
+      output: existing.output,
+      reviewState: existing.reviewState,
+    });
+    const buyerFacingStateAfter = defaultApprovedGuardrailState(
+      guardrail.baseState,
+    );
 
     await ctx.db.patch(args.outputId, {
       reviewState: "approved" as const,
@@ -123,6 +159,13 @@ export const approveOutput = mutation({
       action: "ai_output_approved",
       entityType: "aiEngineOutputs",
       entityId: args.outputId,
+      details: JSON.stringify({
+        auditLabel: guardrail.auditLabel,
+        classes: guardrail.classes,
+        approvalPath: guardrail.approvalPath,
+        buyerFacingStateAfter,
+        guardrailStateBefore: guardrail.state,
+      }),
       timestamp: new Date().toISOString(),
     });
 
@@ -139,6 +182,17 @@ export const rejectOutput = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const user = await requireRole(ctx, "broker");
+    const existing = await ctx.db.get(args.outputId);
+    if (!existing) {
+      throw new Error("AI engine output not found");
+    }
+
+    const guardrail = assessEngineOutputGuardrail({
+      engineType: existing.engineType,
+      confidence: existing.confidence,
+      output: existing.output,
+      reviewState: existing.reviewState,
+    });
 
     await ctx.db.patch(args.outputId, {
       reviewState: "rejected" as const,
@@ -151,9 +205,13 @@ export const rejectOutput = mutation({
       action: "ai_output_rejected",
       entityType: "aiEngineOutputs",
       entityId: args.outputId,
-      details: args.reason
-        ? JSON.stringify({ reason: args.reason })
-        : undefined,
+      details: JSON.stringify({
+        reason: args.reason,
+        auditLabel: guardrail.auditLabel,
+        classes: guardrail.classes,
+        approvalPath: guardrail.approvalPath,
+        buyerFacingStateAfter: "blocked",
+      }),
       timestamp: new Date().toISOString(),
     });
 

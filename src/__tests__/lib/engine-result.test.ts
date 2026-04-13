@@ -12,6 +12,35 @@ describe("determineReviewState", () => {
     expect(determineReviewState(0.8)).toBe("approved");
   });
 
+  it("forces pricing-sensitive review when the pricing guardrail trips", () => {
+    expect(
+      determineReviewState({
+        engineType: "pricing",
+        confidence: 0.95,
+        output: JSON.stringify({
+          overallConfidence: 0.95,
+          reviewFallback: {
+            reviewRequired: true,
+            reasons: ["estimate_disagreement"],
+          },
+        }),
+      }),
+    ).toBe("pending");
+  });
+
+  it("forces negotiation scenarios into broker review even when confidence is high", () => {
+    expect(
+      determineReviewState({
+        engineType: "offer",
+        confidence: 0.96,
+        output: JSON.stringify({
+          scenarios: [{ name: "Balanced", price: 615000 }],
+          recommendedIndex: 0,
+        }),
+      }),
+    ).toBe("pending");
+  });
+
   it("marks low confidence for review", () => {
     expect(determineReviewState(0.79)).toBe("pending");
     expect(determineReviewState(0.5)).toBe("pending");

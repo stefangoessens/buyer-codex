@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { getPromptVersionRef } from "../packages/shared/src/prompt-registry";
 import { buildOfferFlowProfile, loadBuyerProfileView } from "./lib/buyerProfile";
+import { assessEngineOutputGuardrail } from "../src/lib/advisory/guardrails";
 
 /**
  * Offer cockpit backend for KIN-791.
@@ -35,12 +36,25 @@ async function loadOfferScenarios(
   const latest = rows[0];
   if (!latest) return null;
   try {
+    const guardrail = assessEngineOutputGuardrail({
+      engineType: latest.engineType,
+      confidence: latest.confidence,
+      output: latest.output,
+      reviewState: latest.reviewState,
+    });
     return {
       output: JSON.parse(latest.output),
       confidence: latest.confidence,
       reviewState: latest.reviewState,
       generatedAt: latest.generatedAt,
       modelId: latest.modelId,
+      guardrail: {
+        state: guardrail.state,
+        classes: guardrail.classes,
+        approvalPath: guardrail.approvalPath,
+        buyerHeadline: guardrail.buyerHeadline,
+        buyerExplanation: guardrail.buyerExplanation,
+      },
     };
   } catch {
     return null;
