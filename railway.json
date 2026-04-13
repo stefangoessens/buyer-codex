@@ -2,6 +2,21 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
+    "watchPatterns": [
+      "/src/**",
+      "/public/**",
+      "/convex/**",
+      "/packages/shared/**",
+      "/package.json",
+      "/pnpm-lock.yaml",
+      "/pnpm-workspace.yaml",
+      "/tsconfig.json",
+      "/next.config.ts",
+      "/postcss.config.mjs",
+      "/eslint.config.mjs",
+      "/instrumentation-client.ts",
+      "/sentry.server.config.ts"
+    ],
     "buildCommand": "pnpm install --frozen-lockfile && pnpm build"
   },
   "deploy": {
@@ -10,6 +25,8 @@
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3,
+    "overlapSeconds": 30,
+    "drainingSeconds": 30,
     "numReplicas": 1
   }
 }

@@ -139,6 +139,10 @@ def test_health() -> None:
     assert data["version"] == "0.0.1"
     assert "release" in data
     assert "environment" in data
+    assert data["project"] == "buyer-codex"
+    assert data["topology"]["surface"] == "extraction"
+    assert data["topology"]["independentDeploy"] is True
+    assert data["topology"]["healthcheckPath"] == "/health"
     assert data["observability"]["structuredLogging"] is True
     assert "x-request-id" in response.headers
     assert data["health"]["requestCount"] >= 1

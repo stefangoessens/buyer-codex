@@ -30,6 +30,14 @@ from .runtime import (
 )
 
 
+def _parse_csv_env(raw_value: str | None, *, fallback: list[str]) -> list[str]:
+    if raw_value is None:
+        return fallback
+
+    values = [value.strip() for value in raw_value.split(",") if value.strip()]
+    return values or fallback
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     yield
@@ -45,7 +53,10 @@ app = FastAPI(
 context = resolve_context(default_service="buyer-codex-extraction", version=app.version)
 health_state = HealthState()
 sentry_enabled = init_sentry(context)
-allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+allowed_origins = _parse_csv_env(
+    os.getenv("CORS_ORIGINS"),
+    fallback=["http://localhost:3000"],
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -120,11 +131,18 @@ async def handle_runtime_error(_: object, exc: ExtractionRuntimeError) -> JSONRe
 async def health():
     return {
         "status": "ok",
+        "project": "buyer-codex",
         "service": context.service,
         "version": context.version,
         "release": context.release,
         "environment": context.environment,
         "deployment": context.deployment,
+        "topology": {
+            "surface": "extraction",
+            "independentDeploy": True,
+            "healthcheckPath": "/health",
+            "allowedOrigins": allowed_origins,
+        },
         "observability": {
             "sentryConfigured": sentry_enabled,
             "structuredLogging": True,

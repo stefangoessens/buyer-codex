@@ -2,8 +2,10 @@ import { env } from "@/lib/env";
 import {
   authProviders,
   authSessionStates,
+  deploymentStageDefinitions,
   dealStatuses,
   readEnv,
+  railwayServiceDefinitions,
   webPublicEnvSpec,
   webServerEnvSpec,
   workspaceSurfaces,
@@ -17,6 +19,15 @@ describe("monorepo bootstrap", () => {
     expect(workspaceSurfaces.mobile.path).toBe("ios/BuyerCodex");
     expect(workspaceSurfaces.workers.path).toBe("python-workers");
     expect(workspaceSurfaces.extractionService.path).toBe("services/extraction");
+    expect(railwayServiceDefinitions.web.configPath).toBe("railway.json");
+    expect(railwayServiceDefinitions.extraction.configPath).toBe(
+      "services/extraction/railway.json",
+    );
+    expect(railwayServiceDefinitions.extraction.buildWatchPatterns).toContain(
+      "/python-workers/**",
+    );
+    expect(deploymentStageDefinitions.preview.persistent).toBe(false);
+    expect(deploymentStageDefinitions.production.promoteFrom).toBe("staging");
   });
 
   it("shares public environment defaults through the config package", () => {

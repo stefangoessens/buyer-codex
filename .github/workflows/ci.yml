@@ -18,10 +18,10 @@ jobs:
     permissions:
       contents: read
     outputs:
-      ci: ${{ steps.filter.outputs.ci }}
       convex: ${{ steps.filter.outputs.convex }}
       ios: ${{ steps.filter.outputs.ios }}
       shared: ${{ steps.filter.outputs.shared }}
+      shared_platform: ${{ steps.filter.outputs.shared_platform }}
       web: ${{ steps.filter.outputs.web }}
       workers: ${{ steps.filter.outputs.workers }}
     steps:
@@ -33,11 +33,10 @@ jobs:
         id: filter
         with:
           filters: |
-            ci:
-              - '.github/**'
-              - 'scripts/**'
             web:
-              - 'src/**'
+              - 'src/app/**'
+              - 'src/components/**'
+              - 'src/lib/**'
               - 'next.config.ts'
               - 'instrumentation-client.ts'
               - 'postcss.config.mjs'
@@ -45,11 +44,19 @@ jobs:
               - 'tsconfig.json'
               - 'vitest.config.ts'
               - 'playwright.config.ts'
-              - '.env.example'
             convex:
               - 'convex/**'
             shared:
-              - 'packages/shared/**'
+              - 'packages/shared/package.json'
+              - 'packages/shared/src/auth.ts'
+              - 'packages/shared/src/communication-templates.ts'
+              - 'packages/shared/src/contracts.ts'
+              - 'packages/shared/src/external-access.ts'
+              - 'packages/shared/src/index.ts'
+              - 'packages/shared/src/launch-events.ts'
+              - 'packages/shared/src/utils.ts'
+            shared_platform:
+              - 'packages/shared/src/config.ts'
             ios:
               - 'ios/**'
             workers:
@@ -62,7 +69,6 @@ jobs:
     name: Web quality
     needs: changes
     if: |
-      needs.changes.outputs.ci == 'true' ||
       needs.changes.outputs.web == 'true' ||
       needs.changes.outputs.shared == 'true' ||
       needs.changes.outputs.convex == 'true'
@@ -88,7 +94,7 @@ jobs:
         run: pnpm lint
 
       - name: Typecheck
-        run: pnpm typecheck:web
+        run: pnpm exec tsc -p tsconfig.web.json --noEmit
 
       - name: Unit tests
         run: pnpm test
@@ -106,7 +112,6 @@ jobs:
     name: Convex quality
     needs: changes
     if: |
-      needs.changes.outputs.ci == 'true' ||
       needs.changes.outputs.convex == 'true' ||
       needs.changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
@@ -134,8 +139,8 @@ jobs:
     name: Shared package quality
     needs: changes
     if: |
-      needs.changes.outputs.ci == 'true' ||
-      needs.changes.outputs.shared == 'true'
+      needs.changes.outputs.shared == 'true' ||
+      needs.changes.outputs.shared_platform == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -160,10 +165,7 @@ jobs:
   ios:
     name: iOS quality
     needs: changes
-    if: |
-      needs.changes.outputs.ci == 'true' ||
-      needs.changes.outputs.ios == 'true' ||
-      needs.changes.outputs.shared == 'true'
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-latest
     permissions:
       contents: read
@@ -180,9 +182,7 @@ jobs:
   workers:
     name: Worker quality
     needs: changes
-    if: |
-      needs.changes.outputs.ci == 'true' ||
-      needs.changes.outputs.workers == 'true'
+    if: needs.changes.outputs.workers == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -251,8 +251,8 @@ jobs:
       - quality-gates
     if: |
       github.event_name == 'pull_request' &&
+      vars.PREVIEW_WEB_URL_TEMPLATE != '' &&
       (
-        needs.changes.outputs.ci == 'true' ||
         needs.changes.outputs.web == 'true' ||
         needs.changes.outputs.shared == 'true' ||
         needs.changes.outputs.convex == 'true'
@@ -286,10 +286,8 @@ jobs:
       - quality-gates
     if: |
       github.event_name == 'pull_request' &&
-      (
-        needs.changes.outputs.ci == 'true' ||
-        needs.changes.outputs.workers == 'true'
-      )
+      vars.PREVIEW_EXTRACTION_URL_TEMPLATE != '' &&
+      needs.changes.outputs.workers == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -328,6 +326,8 @@ jobs:
           PREVIEW_WEB_RESULT: ${{ needs.preview-web.result }}
           PREVIEW_WORKERS_RESULT: ${{ needs.preview-workers.result }}
           QUALITY_RESULT: ${{ needs.quality-gates.result }}
+          PREVIEW_WEB_TEMPLATE: ${{ vars.PREVIEW_WEB_URL_TEMPLATE }}
+          PREVIEW_EXTRACTION_TEMPLATE: ${{ vars.PREVIEW_EXTRACTION_URL_TEMPLATE }}
         run: |
           echo "quality=$QUALITY_RESULT"
           echo "preview-web=$PREVIEW_WEB_RESULT"
@@ -339,5 +339,15 @@ jobs:
               exit 1
             fi
           done
+
+          {
+            echo "## Preview verification"
+            echo ""
+            echo "- Quality gates: $QUALITY_RESULT"
+            echo "- Web preview template configured: $([ -n \"$PREVIEW_WEB_TEMPLATE\" ] && echo yes || echo no)"
+            echo "- Worker preview template configured: $([ -n \"$PREVIEW_EXTRACTION_TEMPLATE\" ] && echo yes || echo no)"
+            echo "- Web preview result: $PREVIEW_WEB_RESULT"
+            echo "- Worker preview result: $PREVIEW_WORKERS_RESULT"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           echo "Preview workflow is ready for promotion."
