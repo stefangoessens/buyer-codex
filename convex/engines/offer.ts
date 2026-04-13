@@ -7,15 +7,31 @@ import { api, internal } from "../_generated/api";
 export const runOfferEngine = internalAction({
   args: {
     propertyId: v.id("properties"),
+    promptVersion: v.string(),
     buyerMaxBudget: v.optional(v.number()),
     competingOffers: v.optional(v.number()),
   },
   returns: v.union(v.id("aiEngineOutputs"), v.null()),
   handler: async (ctx, args) => {
+    await ctx.runMutation(internal.promptRegistry.syncCatalogPrompts, {
+      activateMissing: true,
+    });
+
     const property: any = await ctx.runQuery(internal.properties.getInternal, {
       propertyId: args.propertyId,
     });
     if (!property || !property.listPrice) return null;
+    const prompt: any = await ctx.runQuery(
+      internal.promptRegistry.getByVersion,
+      {
+        engineType: "offer",
+        promptKey: "default",
+        version: args.promptVersion,
+      },
+    );
+    if (!prompt) {
+      throw new Error(`Unknown offer prompt version: ${args.promptVersion}`);
+    }
 
     const { generateOfferScenarios } = await import(
       "../../src/lib/ai/engines/offer"
@@ -63,16 +79,27 @@ export const runOfferEngine = internalAction({
       daysOnMarket: property.daysOnMarket,
       competingOffers: args.competingOffers,
     });
+    const inputSnapshot = JSON.stringify({
+      listPrice: property.listPrice,
+      fairValue,
+      leverageScore,
+      buyerMaxBudget: args.buyerMaxBudget,
+      daysOnMarket: property.daysOnMarket,
+      competingOffers: args.competingOffers,
+    });
 
     const outputId: any = await ctx.runMutation(
       internal.aiEngineOutputs.createOutput,
       {
         propertyId: args.propertyId,
         engineType: "offer",
+        promptKey: "default",
+        promptVersion: args.promptVersion,
+        inputSnapshot,
         confidence: 0.75,
         citations: ["pricing_engine", "leverage_engine"],
         output: JSON.stringify(result),
-        modelId: "deterministic-v1",
+        modelId: prompt.model,
       },
     );
 

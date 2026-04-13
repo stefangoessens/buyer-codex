@@ -76,7 +76,7 @@ export const FIXTURE_SETS: Record<EngineType, Fixture[]> = {
   leverage: [], // placeholder
   offer: [], // placeholder
   cost: [], // placeholder
-  docs: [], // placeholder
+  doc_parser: [], // placeholder
   case_synthesis: [], // placeholder
 };
 

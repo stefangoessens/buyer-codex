@@ -38,7 +38,7 @@ describe("loadFixtures", () => {
       "leverage",
       "offer",
       "cost",
-      "docs",
+      "doc_parser",
       "case_synthesis",
     ];
     for (const engine of empties) {
@@ -83,7 +83,7 @@ describe("availableFixtureEngines", () => {
     expect(engines).not.toContain("leverage");
     expect(engines).not.toContain("offer");
     expect(engines).not.toContain("cost");
-    expect(engines).not.toContain("docs");
+    expect(engines).not.toContain("doc_parser");
     expect(engines).not.toContain("case_synthesis");
   });
 
@@ -106,7 +106,7 @@ describe("FIXTURE_SETS registry", () => {
         "leverage",
         "offer",
         "cost",
-        "docs",
+        "doc_parser",
         "case_synthesis",
       ]),
     );

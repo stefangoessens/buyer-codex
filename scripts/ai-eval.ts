@@ -36,6 +36,7 @@ import {
   type EvalRunResult,
   type Fixture,
 } from "../src/lib/ai/eval";
+import { getPromptVersionRef } from "../packages/shared/src/prompt-registry";
 
 /**
  * Deterministic pass-through engine: returns fixture.expected unchanged.
@@ -54,16 +55,15 @@ function makePassthroughEngine<TInput, TOutput>(
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const SCORERS: Record<EngineType, ScoringFunction<any>> = {
+const SCORERS = {
   pricing: scorePricing,
   comps: scoreComps,
   leverage: scoreLeverage,
   offer: scoreOffer,
   cost: scoreCost,
-  docs: scoreDocs,
+  doc_parser: scoreDocs,
   case_synthesis: scoreCaseSynthesis,
-};
+} as Record<EngineType, ScoringFunction<unknown>>;
 
 function printHumanReport(result: EvalRunResult): void {
   console.log("=== AI Eval Report ===");
@@ -162,9 +162,12 @@ async function main(): Promise<void> {
 
   // run mode
   const engineTypeRaw = args[0];
-  const promptVersion =
-    args.slice(1).find((a) => !a.startsWith("--")) ?? "latest";
   const engineType = engineTypeRaw as EngineType;
+  const promptVersion =
+    args.slice(1).find((a) => !a.startsWith("--")) ??
+    getPromptVersionRef(
+      engineType === "doc_parser" ? "doc_parser" : engineType,
+    ).version;
   const fixtures = loadFixtures(engineType) as Fixture<unknown, unknown>[];
   const scorer = SCORERS[engineType];
   const engine = makePassthroughEngine(fixtures);

@@ -12,6 +12,7 @@
     "./contracts": "./src/contracts.ts",
     "./external-access": "./src/external-access.ts",
     "./launch-events": "./src/launch-events.ts",
+    "./prompt-registry": "./src/prompt-registry.ts",
     "./utils": "./src/utils.ts"
   },
   "scripts": {

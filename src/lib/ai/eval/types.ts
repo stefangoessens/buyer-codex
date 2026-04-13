@@ -39,7 +39,7 @@ export type EngineType =
   | "leverage"
   | "offer"
   | "cost"
-  | "docs"
+  | "doc_parser"
   | "case_synthesis";
 
 /** Result of scoring one fixture against engine output. */
