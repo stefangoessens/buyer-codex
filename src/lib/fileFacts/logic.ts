@@ -11,6 +11,7 @@ import type {
   BrokerFactView,
   BuyerFactView,
   FileFact,
+  FileFactWriteInput,
   FileFactReviewStatus,
   FileFactValidation,
   FileFactValidationError,
@@ -156,6 +157,52 @@ export function validateFact(fact: FileFact): FileFactValidation {
   }
 
   return errors.length === 0 ? { ok: true } : { ok: false, errors };
+}
+
+export type FileFactMutation =
+  | { ok: true; fact: FileFact }
+  | { ok: false; errors: FileFactValidationError[] };
+
+/**
+ * Apply a full-content update to a fact. Any substantive edit resets the
+ * record to `needsReview` and clears prior review metadata so buyer-facing
+ * reads never keep surfacing a broker-approved value after mutation.
+ */
+export function applyFactUpdate(
+  fact: FileFact,
+  updates: FileFactWriteInput,
+  updatedAt: string
+): FileFactMutation {
+  const nextFact: FileFact = {
+    ...fact,
+    ...updates,
+    reviewStatus: "needsReview",
+    reviewedBy: undefined,
+    reviewedAt: undefined,
+    updatedAt,
+  };
+
+  const validation = validateFact(nextFact);
+  return validation.ok ? { ok: true, fact: nextFact } : validation;
+}
+
+/**
+ * Mark a fact superseded when a newer fact replaces it on the same slug.
+ * This is separate from the broker review transition matrix: a stale fact
+ * can become historical even if it was never explicitly approved/rejected.
+ */
+export function markFactSuperseded(
+  fact: FileFact,
+  updatedAt: string,
+  reviewedBy?: string
+): FileFact {
+  return {
+    ...fact,
+    reviewStatus: "superseded",
+    reviewedBy,
+    reviewedAt: updatedAt,
+    updatedAt,
+  };
 }
 
 // MARK: - ISO date parser

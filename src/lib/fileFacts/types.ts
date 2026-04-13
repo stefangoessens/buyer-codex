@@ -84,7 +84,7 @@ export interface FileFact {
   propertyId?: string;
   /** Optional deal room context. */
   dealRoomId?: string;
-  /** Optional analysis run id so the fact can be traced to its source. */
+  /** Optional file-analysis job id so the fact can be traced to its source. */
   analysisRunId?: string;
   /** Engine confidence 0..1 (null for facts entered manually by broker). */
   confidence?: number;
@@ -100,6 +100,22 @@ export interface FileFact {
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * Mutable/write fields for a fact record. Shared by create and update
+ * flows so the pure logic can validate the same shape both paths use.
+ */
+export type FileFactWriteInput = Pick<
+  FileFact,
+  | "factSlug"
+  | "value"
+  | "storageId"
+  | "propertyId"
+  | "dealRoomId"
+  | "analysisRunId"
+  | "confidence"
+  | "internalOnly"
+>;
 
 // MARK: - Validation errors
 
