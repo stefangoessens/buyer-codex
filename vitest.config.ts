@@ -24,11 +24,13 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    include: ["src/__tests__/**/*.test.ts", "src/__tests__/**/*.test.tsx"],
     setupFiles: ["./src/test/setup.ts"],
     exclude: ["**/node_modules/**", "**/e2e/**"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "json-summary"],
+      reporter: ["text", "json-summary", "lcov"],
+      reportsDirectory: "./coverage/vitest",
       include: ["src/lib/**/*.ts", "src/lib/**/*.tsx"],
       exclude: ["src/test/**", "src/__tests__/**"],
       thresholds: {

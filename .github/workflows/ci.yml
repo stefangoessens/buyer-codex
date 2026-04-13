@@ -96,8 +96,8 @@ jobs:
       - name: Typecheck
         run: pnpm exec tsc -p tsconfig.web.json --noEmit
 
-      - name: Unit tests
-        run: pnpm test
+      - name: Unit tests with coverage gate
+        run: pnpm test:coverage
 
       - name: Build
         run: pnpm build:web
@@ -162,6 +162,34 @@ jobs:
       - name: Typecheck shared package
         run: pnpm --dir packages/shared typecheck
 
+  ai:
+    name: AI eval harness
+    needs: changes
+    if: |
+      needs.changes.outputs.ci == 'true' ||
+      needs.changes.outputs.web == 'true' ||
+      needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Eval pricing seed fixtures
+        run: pnpm eval pricing latest
+
   ios:
     name: iOS quality
     needs: changes
@@ -207,6 +235,40 @@ jobs:
           pip install -e ".[dev]"
           python -m pytest -q
 
+  e2e:
+    name: Web smoke e2e
+    needs:
+      - changes
+      - web
+    if: |
+      needs.changes.outputs.ci == 'true' ||
+      needs.changes.outputs.web == 'true' ||
+      needs.changes.outputs.shared == 'true' ||
+      needs.changes.outputs.convex == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright smoke suite
+        run: pnpm test:e2e
+
   quality-gates:
     name: Quality gates
     needs:
@@ -214,8 +276,10 @@ jobs:
       - web
       - convex
       - shared
+      - ai
       - ios
       - workers
+      - e2e
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -226,16 +290,20 @@ jobs:
           WEB_RESULT: ${{ needs.web.result }}
           CONVEX_RESULT: ${{ needs.convex.result }}
           SHARED_RESULT: ${{ needs.shared.result }}
+          AI_RESULT: ${{ needs.ai.result }}
           IOS_RESULT: ${{ needs.ios.result }}
           WORKERS_RESULT: ${{ needs.workers.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
         run: |
           echo "web=$WEB_RESULT"
           echo "convex=$CONVEX_RESULT"
           echo "shared=$SHARED_RESULT"
+          echo "ai=$AI_RESULT"
           echo "ios=$IOS_RESULT"
           echo "workers=$WORKERS_RESULT"
+          echo "e2e=$E2E_RESULT"
 
-          for result in "$WEB_RESULT" "$CONVEX_RESULT" "$SHARED_RESULT" "$IOS_RESULT" "$WORKERS_RESULT"; do
+          for result in "$WEB_RESULT" "$CONVEX_RESULT" "$SHARED_RESULT" "$AI_RESULT" "$IOS_RESULT" "$WORKERS_RESULT" "$E2E_RESULT"; do
             if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
               echo "::error::A required quality gate failed."
               exit 1

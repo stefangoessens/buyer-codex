@@ -1,0 +1,432 @@
+{
+  "version": 1,
+  "portals": {
+    "zillow": [
+      {
+        "fixture": "zillow_condo_miami.html",
+        "sourceUrl": "https://www.zillow.com/homedetails/482-Bayshore-Ct-UNIT-1204-Miami-FL-33131/10000001_zpid/",
+        "signals": {
+          "jsonLd": true,
+          "apollo": true,
+          "redux": false,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressFormatted": "482 Bayshore Ct, Unit 1204, Miami, FL 33131",
+          "city": "Miami",
+          "state": "FL",
+          "postalCode": "33131",
+          "priceUsd": 675000,
+          "beds": 2.0,
+          "baths": 2.0,
+          "bathsFull": 2,
+          "bathsHalf": 0,
+          "livingAreaSqft": 1080,
+          "yearBuilt": 2018,
+          "propertyType": "condo",
+          "propertyTypeDisplay": "Condo"
+        },
+        "webParser": {
+          "primaryStrategy": "apollo-cache"
+        }
+      },
+      {
+        "fixture": "zillow_sfh_boca_raton.html",
+        "sourceUrl": "https://www.zillow.com/homedetails/7421-Mirabella-Way-Boca-Raton-FL-33433/20000002_zpid/",
+        "signals": {
+          "jsonLd": true,
+          "apollo": true,
+          "redux": false,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressFormatted": "7421 Mirabella Way, Boca Raton, FL 33433",
+          "city": "Boca Raton",
+          "state": "FL",
+          "postalCode": "33433",
+          "priceUsd": 1250000,
+          "beds": 4.0,
+          "baths": 3.0,
+          "bathsFull": 3,
+          "bathsHalf": 0,
+          "livingAreaSqft": 2800,
+          "yearBuilt": 2005,
+          "propertyType": "single_family",
+          "propertyTypeDisplay": "Single Family"
+        },
+        "webParser": {
+          "primaryStrategy": "apollo-cache"
+        }
+      },
+      {
+        "fixture": "zillow_townhome_fort_lauderdale.html",
+        "sourceUrl": "https://www.zillow.com/homedetails/1150-Riverwalk-Ln-Fort-Lauderdale-FL-33301/30000003_zpid/",
+        "signals": {
+          "jsonLd": false,
+          "apollo": false,
+          "redux": false,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressFormatted": "1150 Riverwalk Ln, Fort Lauderdale, FL 33301",
+          "city": "Fort Lauderdale",
+          "state": "FL",
+          "postalCode": "33301",
+          "priceUsd": 540000,
+          "beds": 3.0,
+          "baths": 2.5,
+          "bathsFull": 2,
+          "bathsHalf": 1,
+          "livingAreaSqft": 1750,
+          "yearBuilt": 2015,
+          "propertyType": "townhouse",
+          "propertyTypeDisplay": "Townhouse"
+        },
+        "webParser": {
+          "primaryStrategy": "html-text"
+        }
+      },
+      {
+        "fixture": "zillow_new_construction_doral.html",
+        "sourceUrl": "https://www.zillow.com/homedetails/9088-Palmera-Isle-Blvd-Doral-FL-33172/40000004_zpid/",
+        "signals": {
+          "jsonLd": true,
+          "apollo": true,
+          "redux": false,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressFormatted": "9088 Palmera Isle Blvd, Doral, FL 33172",
+          "city": "Doral",
+          "state": "FL",
+          "postalCode": "33172",
+          "priceUsd": 1450000,
+          "beds": 5.0,
+          "baths": 4.0,
+          "bathsFull": 4,
+          "bathsHalf": 0,
+          "livingAreaSqft": 3400,
+          "yearBuilt": 2026,
+          "propertyType": "new_construction",
+          "propertyTypeDisplay": "New Construction"
+        },
+        "webParser": {
+          "primaryStrategy": "apollo-cache"
+        }
+      },
+      {
+        "fixture": "zillow_sfh_homestead.html",
+        "sourceUrl": "https://www.zillow.com/homedetails/2644-SW-145th-Pl-Homestead-FL-33032/50000005_zpid/",
+        "signals": {
+          "jsonLd": false,
+          "apollo": true,
+          "redux": false,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressFormatted": "2644 SW 145th Pl, Homestead, FL 33032",
+          "city": "Homestead",
+          "state": "FL",
+          "postalCode": "33032",
+          "priceUsd": 395000,
+          "beds": 3.0,
+          "baths": 2.0,
+          "bathsFull": 2,
+          "bathsHalf": 0,
+          "livingAreaSqft": 1440,
+          "yearBuilt": 1998,
+          "propertyType": "single_family",
+          "propertyTypeDisplay": "Single Family"
+        },
+        "webParser": {
+          "primaryStrategy": "apollo-cache"
+        }
+      }
+    ],
+    "redfin": [
+      {
+        "fixture": "redfin_condo_miami_beach.html",
+        "sourceUrl": "https://www.redfin.com/FL/Miami-Beach/1420-Ocean-Dr-33139/unit-402/home/20000001",
+        "signals": {
+          "jsonLd": true,
+          "apollo": false,
+          "redux": true,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressFormatted": "1420 Ocean Dr, Unit 402, Miami Beach, FL 33139",
+          "city": "Miami Beach",
+          "state": "FL",
+          "postalCode": "33139",
+          "priceUsd": 725000,
+          "beds": 2.0,
+          "baths": 2.0,
+          "bathsFull": 2,
+          "bathsHalf": 0,
+          "livingAreaSqft": 1150,
+          "yearBuilt": 2016,
+          "propertyType": "condo",
+          "propertyTypeDisplay": "Condo"
+        },
+        "webParser": {
+          "primaryStrategy": "json-ld"
+        }
+      },
+      {
+        "fixture": "redfin_sfh_weston.html",
+        "sourceUrl": "https://www.redfin.com/FL/Weston/2885-Lakeside-Pl-33326/home/20000002",
+        "signals": {
+          "jsonLd": true,
+          "apollo": false,
+          "redux": true,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressFormatted": "2885 Lakeside Pl, Weston, FL 33326",
+          "city": "Weston",
+          "state": "FL",
+          "postalCode": "33326",
+          "priceUsd": 1400000,
+          "beds": 5.0,
+          "baths": 4.0,
+          "bathsFull": 4,
+          "bathsHalf": 0,
+          "livingAreaSqft": 3400,
+          "yearBuilt": 2010,
+          "propertyType": "single_family",
+          "propertyTypeDisplay": "Single Family"
+        },
+        "webParser": {
+          "primaryStrategy": "json-ld"
+        }
+      },
+      {
+        "fixture": "redfin_townhome_delray.html",
+        "sourceUrl": "https://www.redfin.com/FL/Delray-Beach/710-Palm-Trail-33444/home/20000003",
+        "signals": {
+          "jsonLd": false,
+          "apollo": false,
+          "redux": false,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressFormatted": "710 Palm Trl, Delray Beach, FL 33444",
+          "city": "Delray Beach",
+          "state": "FL",
+          "postalCode": "33444",
+          "priceUsd": 620000,
+          "beds": 3.0,
+          "baths": 2.5,
+          "bathsFull": 2,
+          "bathsHalf": 1,
+          "livingAreaSqft": 1850,
+          "yearBuilt": 2018,
+          "propertyType": "townhouse",
+          "propertyTypeDisplay": "Townhouse"
+        },
+        "webParser": {
+          "primaryStrategy": "html-text"
+        }
+      },
+      {
+        "fixture": "redfin_new_construction_parkland.html",
+        "sourceUrl": "https://www.redfin.com/FL/Parkland/14500-Heron-Bay-Blvd-33076/home/20000004",
+        "signals": {
+          "jsonLd": true,
+          "apollo": false,
+          "redux": true,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressFormatted": "14500 Heron Bay Blvd, Parkland, FL 33076",
+          "city": "Parkland",
+          "state": "FL",
+          "postalCode": "33076",
+          "priceUsd": 1850000,
+          "beds": 6.0,
+          "baths": 5.0,
+          "bathsFull": 5,
+          "bathsHalf": 0,
+          "livingAreaSqft": 4200,
+          "yearBuilt": 2026,
+          "propertyType": "new_construction",
+          "propertyTypeDisplay": "New Construction"
+        },
+        "webParser": {
+          "primaryStrategy": "json-ld"
+        }
+      },
+      {
+        "fixture": "redfin_sfh_cutler_bay.html",
+        "sourceUrl": "https://www.redfin.com/FL/Cutler-Bay/19850-Old-Cutler-Rd-33189/home/20000005",
+        "signals": {
+          "jsonLd": false,
+          "apollo": false,
+          "redux": true,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressFormatted": "19850 Old Cutler Rd, Cutler Bay, FL 33189",
+          "city": "Cutler Bay",
+          "state": "FL",
+          "postalCode": "33189",
+          "priceUsd": 485000,
+          "beds": 4.0,
+          "baths": 3.0,
+          "bathsFull": 3,
+          "bathsHalf": 0,
+          "livingAreaSqft": 1680,
+          "yearBuilt": 2000,
+          "propertyType": "single_family",
+          "propertyTypeDisplay": "Single Family"
+        },
+        "webParser": {
+          "primaryStrategy": "redux-state"
+        }
+      }
+    ],
+    "realtor": [
+      {
+        "fixture": "realtor_condo_hollywood.html",
+        "sourceUrl": "https://www.realtor.com/realestateandhomes-detail/2450-Oceanfront-Blvd-Apt-503_Hollywood_FL_33019_M30001-12345",
+        "signals": {
+          "jsonLd": true,
+          "apollo": false,
+          "redux": false,
+          "nextData": true,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressLine1": "2450 Oceanfront Blvd Apt 503",
+          "addressFormatted": "2450 Oceanfront Blvd Apt 503, Hollywood, FL 33019",
+          "city": "Hollywood",
+          "state": "FL",
+          "postalCode": "33019",
+          "priceUsd": 550000,
+          "beds": 2.0,
+          "baths": 2.0,
+          "livingAreaSqft": 950,
+          "yearBuilt": 2014,
+          "propertyType": "condo",
+          "daysOnMarket": 14,
+          "hoaMonthlyUsd": 440
+        }
+      },
+      {
+        "fixture": "realtor_sfh_pembroke_pines.html",
+        "sourceUrl": "https://www.realtor.com/realestateandhomes-detail/18220-NW-23rd-St_Pembroke-Pines_FL_33029_M40002-67890",
+        "signals": {
+          "jsonLd": true,
+          "apollo": false,
+          "redux": false,
+          "nextData": true,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressLine1": "18220 NW 23rd St",
+          "addressFormatted": "18220 NW 23rd St, Pembroke Pines, FL 33029",
+          "city": "Pembroke Pines",
+          "state": "FL",
+          "postalCode": "33029",
+          "priceUsd": 850000,
+          "beds": 4.0,
+          "baths": 3.0,
+          "livingAreaSqft": 2450,
+          "yearBuilt": 2008,
+          "propertyType": "single_family",
+          "daysOnMarket": 0,
+          "hoaMonthlyUsd": 0,
+          "lotSizeSqft": 10890
+        }
+      },
+      {
+        "fixture": "realtor_townhome_sunrise.html",
+        "sourceUrl": "https://www.realtor.com/realestateandhomes-detail/9840-Sawgrass-Point-Dr_Sunrise_FL_33323_M50003-24680",
+        "signals": {
+          "jsonLd": false,
+          "apollo": false,
+          "redux": false,
+          "nextData": false,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressLine1": "9840 Sawgrass Point Dr",
+          "addressFormatted": "9840 Sawgrass Point Dr, Sunrise, FL 33323",
+          "city": "Sunrise",
+          "state": "FL",
+          "postalCode": "33323",
+          "priceUsd": 475000,
+          "beds": 3.0,
+          "baths": 2.5,
+          "livingAreaSqft": 1620,
+          "yearBuilt": 2013,
+          "propertyType": "townhouse",
+          "daysOnMarket": 22,
+          "hoaMonthlyUsd": 295
+        }
+      },
+      {
+        "fixture": "realtor_sfh_kendall.html",
+        "sourceUrl": "https://www.realtor.com/realestateandhomes-detail/14322-SW-112th-St_Miami_FL_33196_M60004-11223",
+        "signals": {
+          "jsonLd": false,
+          "apollo": false,
+          "redux": false,
+          "nextData": true,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressLine1": "14322 SW 112th St",
+          "addressFormatted": "14322 SW 112th St, Miami, FL 33196",
+          "city": "Miami",
+          "state": "FL",
+          "postalCode": "33196",
+          "priceUsd": 615000,
+          "beds": 4.0,
+          "baths": 2.0,
+          "livingAreaSqft": 1980,
+          "yearBuilt": 2002,
+          "propertyType": "single_family",
+          "daysOnMarket": 18,
+          "lotSizeSqft": 8250
+        }
+      },
+      {
+        "fixture": "realtor_new_construction_palm_beach_gardens.html",
+        "sourceUrl": "https://www.realtor.com/realestateandhomes-detail/7411-Avenir-Grove-Way_Palm-Beach-Gardens_FL_33418_M70005-99887",
+        "signals": {
+          "jsonLd": true,
+          "apollo": false,
+          "redux": false,
+          "nextData": true,
+          "htmlFallback": true
+        },
+        "canonical": {
+          "addressLine1": "7411 Avenir Grove Way",
+          "addressFormatted": "7411 Avenir Grove Way, Palm Beach Gardens, FL 33418",
+          "city": "Palm Beach Gardens",
+          "state": "FL",
+          "postalCode": "33418",
+          "priceUsd": 2100000,
+          "beds": 5.0,
+          "baths": 5.0,
+          "livingAreaSqft": 4100,
+          "yearBuilt": 2026,
+          "propertyType": "new_construction",
+          "daysOnMarket": 3,
+          "hoaMonthlyUsd": 625
+        }
+      }
+    ]
+  }
+}

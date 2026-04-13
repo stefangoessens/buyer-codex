@@ -8,11 +8,11 @@ real and we assert on the :class:`CanonicalProperty` output.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
+from fixtures.parser_cases import load_portal_expectations, read_portal_fixture
 from common.parser_errors import MalformedHTMLError, SchemaShiftError
 from common.property import CanonicalProperty, PropertyPhoto
 from parsers.zillow import (
@@ -30,12 +30,9 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 
-_FIXTURE_DIR = Path(__file__).parent.parent / "fixtures" / "html" / "zillow"
-
-
 def _load(name: str) -> str:
     """Read a Zillow fixture by filename."""
-    return (_FIXTURE_DIR / name).read_text(encoding="utf-8")
+    return read_portal_fixture("zillow", name)
 
 
 # Expected values for each fixture. These match the values the fixtures were
@@ -43,68 +40,7 @@ def _load(name: str) -> str:
 # the fixture exposes (JSON-LD, Apollo state, or plain HTML).
 #
 # Keys intentionally mirror the CanonicalProperty field names.
-_EXPECTED: Mapping[str, Mapping[str, object]] = {
-    "zillow_condo_miami.html": {
-        "source_url": "https://www.zillow.com/homedetails/482-Bayshore-Ct-UNIT-1204-Miami-FL-33131/10000001_zpid/",
-        "city": "Miami",
-        "state": "FL",
-        "postal_code": "33131",
-        "price_usd": 675_000,
-        "beds": 2.0,
-        "baths": 2.0,
-        "living_area_sqft": 1080,
-        "year_built": 2018,
-        "property_type": "condo",
-    },
-    "zillow_sfh_boca_raton.html": {
-        "source_url": "https://www.zillow.com/homedetails/7421-Mirabella-Way-Boca-Raton-FL-33433/20000002_zpid/",
-        "city": "Boca Raton",
-        "state": "FL",
-        "postal_code": "33433",
-        "price_usd": 1_250_000,
-        "beds": 4.0,
-        "baths": 3.0,
-        "living_area_sqft": 2800,
-        "year_built": 2005,
-        "property_type": "single_family",
-    },
-    "zillow_new_construction_doral.html": {
-        "source_url": "https://www.zillow.com/homedetails/9088-Palmera-Isle-Blvd-Doral-FL-33172/40000004_zpid/",
-        "city": "Doral",
-        "state": "FL",
-        "postal_code": "33172",
-        "price_usd": 1_450_000,
-        "beds": 5.0,
-        "baths": 4.0,
-        "living_area_sqft": 3400,
-        "year_built": 2026,
-        "property_type": "new_construction",
-    },
-    "zillow_sfh_homestead.html": {
-        "source_url": "https://www.zillow.com/homedetails/2644-SW-145th-Pl-Homestead-FL-33032/50000005_zpid/",
-        "city": "Homestead",
-        "state": "FL",
-        "postal_code": "33032",
-        "price_usd": 395_000,
-        "beds": 3.0,
-        "baths": 2.0,
-        "living_area_sqft": 1440,
-        "year_built": 1998,
-        "property_type": "single_family",
-    },
-    "zillow_townhome_fort_lauderdale.html": {
-        "source_url": "https://www.zillow.com/homedetails/1150-Riverwalk-Ln-Fort-Lauderdale-FL-33301/30000003_zpid/",
-        "city": "Fort Lauderdale",
-        "state": "FL",
-        "postal_code": "33301",
-        "price_usd": 540_000,
-        "beds": 3.0,
-        "baths": 2.5,
-        "living_area_sqft": 1750,
-        "year_built": 2015,
-        "property_type": "townhouse",
-    },
-}
+_EXPECTED: Mapping[str, Mapping[str, object]] = load_portal_expectations("zillow")
 
 
 class TestHappyPath:
