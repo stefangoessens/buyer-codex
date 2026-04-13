@@ -4,4 +4,5 @@ export * from "./config";
 export * from "./contracts";
 export * from "./external-access";
 export * from "./launch-events";
+export * from "./prompt-registry";
 export * from "./utils";
