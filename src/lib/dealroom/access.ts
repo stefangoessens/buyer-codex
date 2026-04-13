@@ -20,6 +20,14 @@ export const REGISTERED_FIELDS = [
   "sourcePlatform", "extractedAt", "updatedAt",
 ] as const;
 
+export function hasFullDealRoomAccess(accessLevel: AccessLevel): boolean {
+  return accessLevel === "registered" || accessLevel === "full";
+}
+
+export function hasInternalDealRoomAccess(accessLevel: AccessLevel): boolean {
+  return accessLevel === "full";
+}
+
 /**
  * Filter property data by access level.
  * Returns only the fields permitted for the given access level.
@@ -28,12 +36,17 @@ export function filterByAccessLevel<T extends Record<string, unknown>>(
   data: T,
   accessLevel: AccessLevel
 ): Partial<T> {
-  if (accessLevel === "full" || accessLevel === "registered") {
+  if (hasFullDealRoomAccess(accessLevel)) {
     return data;
   }
 
   // Anonymous — teaser fields only
   const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key.startsWith("_")) {
+      filtered[key] = value;
+    }
+  }
   for (const field of TEASER_FIELDS) {
     if (field in data) {
       filtered[field] = data[field];
@@ -52,9 +65,11 @@ export function resolveAccessLevel(
   isBrokerOrAdmin: boolean
 ): AccessLevel {
   if (isBrokerOrAdmin) return "full";
-  if (isOwner && isAuthenticated) return dealRoomAccessLevel;
-  if (isAuthenticated) return "registered";
-  return "anonymous";
+  if (!isAuthenticated) return "anonymous";
+  if (isOwner && hasInternalDealRoomAccess(dealRoomAccessLevel)) {
+    return "full";
+  }
+  return "registered";
 }
 
 /**
@@ -66,9 +81,9 @@ export function canPerformAction(
 ): boolean {
   switch (action) {
     case "view_teaser": return true;
-    case "view_full": return accessLevel === "registered" || accessLevel === "full";
-    case "request_tour": return accessLevel === "registered" || accessLevel === "full";
-    case "start_offer": return accessLevel === "full";
-    case "sign_agreement": return accessLevel === "full";
+    case "view_full": return hasFullDealRoomAccess(accessLevel);
+    case "request_tour": return hasFullDealRoomAccess(accessLevel);
+    case "start_offer": return hasFullDealRoomAccess(accessLevel);
+    case "sign_agreement": return hasFullDealRoomAccess(accessLevel);
   }
 }
