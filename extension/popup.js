@@ -108,9 +108,25 @@ async function main() {
         buyerCodexBaseUrl: "https://buyer-codex.app",
       });
       if (response?.ok) {
-        statusEl.textContent = "Opened in buyer-codex.";
+        if (response.result === "duplicate") {
+          statusEl.textContent =
+            response.authState === "signed_in"
+              ? "Already saved. Opening your buyer-codex dashboard."
+              : "Already saved. Opening buyer-codex so you can continue.";
+        } else if (response.authState === "signed_out") {
+          statusEl.textContent =
+            "Saved to buyer-codex. Opening the site so you can continue.";
+        } else {
+          statusEl.textContent =
+            "Saved to buyer-codex. Opening your dashboard.";
+        }
       } else {
-        statusEl.textContent = "Failed to open. Try again.";
+        if (response?.code === "unsupported_url") {
+          statusEl.textContent =
+            "This page is not a supported Zillow, Redfin, or Realtor.com listing.";
+        } else {
+          statusEl.textContent = "Failed to open buyer-codex. Try again.";
+        }
         saveBtn.disabled = false;
         saveBtn.textContent = "Save to buyer-codex";
       }
