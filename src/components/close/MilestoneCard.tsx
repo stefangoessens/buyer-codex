@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type {
   CloseDashboardMilestone,
+  TrackState,
   Urgency,
 } from "@/lib/dealroom/close-dashboard-types";
 import { WORKSTREAM_LABELS } from "@/lib/dealroom/close-dashboard-types";
@@ -36,39 +37,10 @@ const urgencyStyles: Record<Urgency, { label: string; className: string }> = {
   },
 };
 
-const partyLabels: Record<CloseDashboardMilestone["responsibleParty"], string> = {
-  buyer: "You",
-  seller: "Seller",
-  lender: "Lender",
-  broker: "Broker",
-  title_company: "Title co.",
-  inspector: "Inspector",
-  hoa: "HOA",
-  unknown: "TBD",
+const trackStyles: Record<TrackState, string> = {
+  on_track: "border-success-200 bg-success-50 text-success-700",
+  off_track: "border-error-200 bg-error-50 text-error-700",
 };
-
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-});
-
-function formatDue(milestone: CloseDashboardMilestone): string {
-  if (milestone.status === "completed") {
-    return milestone.completedAt
-      ? `Completed ${dateFormatter.format(new Date(milestone.completedAt))}`
-      : "Completed";
-  }
-  const parsed = new Date(`${milestone.dueDate}T00:00:00Z`);
-  const dateText = Number.isNaN(parsed.getTime())
-    ? milestone.dueDate
-    : dateFormatter.format(parsed);
-  if (milestone.daysUntilDue < 0) {
-    const d = Math.abs(milestone.daysUntilDue);
-    return `${dateText} · ${d} day${d === 1 ? "" : "s"} overdue`;
-  }
-  if (milestone.daysUntilDue === 0) return `${dateText} · today`;
-  return `${dateText} · in ${milestone.daysUntilDue} day${milestone.daysUntilDue === 1 ? "" : "s"}`;
-}
 
 export function MilestoneCard({ milestone, emphasize }: MilestoneCardProps) {
   const urgency = urgencyStyles[milestone.urgency];
@@ -88,15 +60,23 @@ export function MilestoneCard({ milestone, emphasize }: MilestoneCardProps) {
               {milestone.name}
             </p>
             <p className="mt-1 text-xs text-neutral-500">
-              {formatDue(milestone)}
+              {milestone.buyerSummary}
             </p>
           </div>
-          <Badge
-            variant="outline"
-            className={cn("font-medium", urgency.className)}
-          >
-            {urgency.label}
-          </Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge
+              variant="outline"
+              className={cn("font-medium", urgency.className)}
+            >
+              {milestone.urgencyLabel || urgency.label}
+            </Badge>
+            <Badge
+              variant="outline"
+              className={cn("font-medium", trackStyles[milestone.trackState])}
+            >
+              {milestone.trackLabel}
+            </Badge>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge
@@ -114,7 +94,7 @@ export function MilestoneCard({ milestone, emphasize }: MilestoneCardProps) {
                 : "bg-white text-neutral-600",
             )}
           >
-            {partyLabels[milestone.responsibleParty]}
+            {milestone.ownerLabel}
           </Badge>
         </div>
       </CardContent>
