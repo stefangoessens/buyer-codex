@@ -32,6 +32,8 @@
  * presented to the buyer as final.
  */
 
+import { getPromptVersionRef } from "../../../../packages/shared/src/prompt-registry";
+
 // ───────────────────────────────────────────────────────────────────────────
 // Types
 // ───────────────────────────────────────────────────────────────────────────
@@ -75,6 +77,17 @@ export interface DocCitation {
   lineEnd?: number;
   /** Raw snippet the finding was extracted from. */
   snippet?: string;
+}
+
+export interface DocumentPageInput {
+  pageNumber: number;
+  text: string;
+}
+
+export interface PageClassification {
+  pageNumber: number;
+  docType: DocType;
+  confidence: number;
 }
 
 /** One structured finding emitted by a risk rule. */
@@ -141,11 +154,39 @@ export interface DocAnalysisResult {
   overallConfidence: number;
   requiresBrokerReview: boolean;
   plainEnglishSummary: string;
+  buyerFacts: string[];
+  pageClassifications: PageClassification[];
+  promptKey: string;
+  promptVersion: string;
   engineVersion: string;
 }
 
 /** Builder version — bump on any rule/output-shape change. */
 export const DOC_PARSER_VERSION = "1.0.0";
+const DOC_PARSER_PROMPT_REF = getPromptVersionRef("doc_parser", "default");
+
+type ExtractedFactKey =
+  | "roofAgeYears"
+  | "roofReplacementYear"
+  | "floodZone"
+  | "permitsDisclosed"
+  | "unpermittedWorkMentioned"
+  | "hoaReserveBalance"
+  | "hoaAnnualBudget"
+  | "hoaReserveStudyDate"
+  | "buildingYearBuilt"
+  | "buildingStories"
+  | "milestoneInspectionDate"
+  | "sirsCompletedDate"
+  | "majorDefectCount"
+  | "recommendedRepairsCount"
+  | "titleExceptions"
+  | "lienCount";
+
+type FactExtraction = {
+  facts: Partial<ExtractedFacts>;
+  citations: Partial<Record<ExtractedFactKey, DocCitation>>;
+};
 
 // ───────────────────────────────────────────────────────────────────────────
 // Page-level classifier
@@ -227,6 +268,19 @@ export function classifyDocument(text: string): {
   };
 }
 
+export function classifyDocumentPages(
+  pages: DocumentPageInput[],
+): PageClassification[] {
+  return pages.map((page) => {
+    const result = classifyDocument(page.text);
+    return {
+      pageNumber: page.pageNumber,
+      docType: result.docType,
+      confidence: result.confidence,
+    };
+  });
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Florida risk rules
 // ───────────────────────────────────────────────────────────────────────────
@@ -250,37 +304,42 @@ const SIRS_AGE_THRESHOLD_YEARS = 30;
 export function applyFlRiskRules(
   facts: ExtractedFacts,
   today: string,
+  factCitations: Partial<Record<ExtractedFactKey, DocCitation>> = {},
 ): DocFinding[] {
   const findings: DocFinding[] = [];
 
   // ─── Roof age
-  const roofFinding = checkRoofAge(facts, today);
+  const roofFinding = checkRoofAge(facts, today, factCitations);
   if (roofFinding) findings.push(roofFinding);
 
   // ─── HOA reserves
-  const reservesFinding = checkHoaReserves(facts);
+  const reservesFinding = checkHoaReserves(facts, factCitations);
   if (reservesFinding) findings.push(reservesFinding);
 
   // ─── SIRS / milestone inspection
-  const sirsFinding = checkSirsStatus(facts, today);
+  const sirsFinding = checkSirsStatus(facts, today, factCitations);
   if (sirsFinding) findings.push(sirsFinding);
 
   // ─── Flood zone
-  const floodFinding = checkFloodZone(facts);
+  const floodFinding = checkFloodZone(facts, factCitations);
   if (floodFinding) findings.push(floodFinding);
 
   // ─── Permit irregularities
-  const permitFinding = checkPermits(facts);
+  const permitFinding = checkPermits(facts, factCitations);
   if (permitFinding) findings.push(permitFinding);
 
   // ─── Title liens / encumbrances
-  const lienFinding = checkLiens(facts);
+  const lienFinding = checkLiens(facts, factCitations);
   if (lienFinding) findings.push(lienFinding);
 
   return findings;
 }
 
-function checkRoofAge(facts: ExtractedFacts, today: string): DocFinding | null {
+function checkRoofAge(
+  facts: ExtractedFacts,
+  today: string,
+  factCitations: Partial<Record<ExtractedFactKey, DocCitation>>,
+): DocFinding | null {
   let ageYears = facts.roofAgeYears;
 
   // Derive from replacement year if not stated directly
@@ -319,12 +378,17 @@ function checkRoofAge(facts: ExtractedFacts, today: string): DocFinding | null {
     label,
     summary,
     confidence: 0.9,
+    citation:
+      factCitations.roofAgeYears ?? factCitations.roofReplacementYear,
     requiresReview,
     observedData: { roofAgeYears: ageYears },
   };
 }
 
-function checkHoaReserves(facts: ExtractedFacts): DocFinding | null {
+function checkHoaReserves(
+  facts: ExtractedFacts,
+  factCitations: Partial<Record<ExtractedFactKey, DocCitation>>,
+): DocFinding | null {
   if (
     typeof facts.hoaReserveBalance !== "number" ||
     typeof facts.hoaAnnualBudget !== "number" ||
@@ -346,6 +410,8 @@ function checkHoaReserves(facts: ExtractedFacts): DocFinding | null {
       ? `HOA reserves of $${facts.hoaReserveBalance.toLocaleString()} are only ${Math.round(ratio * 100)}% of the $${facts.hoaAnnualBudget.toLocaleString()} annual budget. Under-funded reserves are a leading cause of future special assessments.`
       : `HOA reserves of $${facts.hoaReserveBalance.toLocaleString()} cover ${Math.round(ratio * 100)}% of the annual budget — above the ${Math.round(HOA_RESERVE_ADEQUATE_RATIO * 100)}% minimum benchmark.`,
     confidence: 0.85,
+    citation:
+      factCitations.hoaReserveBalance ?? factCitations.hoaAnnualBudget,
     requiresReview: inadequate,
     observedData: {
       hoaReserveBalance: facts.hoaReserveBalance,
@@ -358,6 +424,7 @@ function checkHoaReserves(facts: ExtractedFacts): DocFinding | null {
 function checkSirsStatus(
   facts: ExtractedFacts,
   today: string,
+  factCitations: Partial<Record<ExtractedFactKey, DocCitation>>,
 ): DocFinding | null {
   const stories = facts.buildingStories;
   const built = facts.buildingYearBuilt;
@@ -376,6 +443,8 @@ function checkSirsStatus(
       label: "SIRS requirement not applicable",
       summary: `Building is ${stories} stories, ${ageYears} years old — below Florida SIRS requirement thresholds.`,
       confidence: 0.95,
+      citation:
+        factCitations.buildingStories ?? factCitations.buildingYearBuilt,
       requiresReview: false,
       observedData: { stories, buildingYearBuilt: built, ageYears },
     };
@@ -392,6 +461,10 @@ function checkSirsStatus(
       label: "SIRS and milestone inspection completed",
       summary: `Building meets Florida SIRS thresholds (${stories} stories, ${ageYears} years old) and has completed both milestone inspection and SIRS.`,
       confidence: 0.9,
+      citation:
+        factCitations.sirsCompletedDate ??
+        factCitations.milestoneInspectionDate ??
+        factCitations.buildingStories,
       requiresReview: false,
       observedData: {
         stories,
@@ -408,6 +481,11 @@ function checkSirsStatus(
     label: "Missing SIRS / milestone inspection on a qualifying building",
     summary: `Building is ${stories} stories and ${ageYears} years old — Florida law (FS 718.112) requires a milestone inspection and structural integrity reserve study. ${!hasMilestone ? "Milestone inspection is missing. " : ""}${!hasSirs ? "SIRS is missing. " : ""}These findings can trigger immediate special assessments.`,
     confidence: 0.9,
+    citation:
+      factCitations.milestoneInspectionDate ??
+      factCitations.sirsCompletedDate ??
+      factCitations.buildingStories ??
+      factCitations.buildingYearBuilt,
     requiresReview: true,
     observedData: {
       stories,
@@ -419,7 +497,10 @@ function checkSirsStatus(
   };
 }
 
-function checkFloodZone(facts: ExtractedFacts): DocFinding | null {
+function checkFloodZone(
+  facts: ExtractedFacts,
+  factCitations: Partial<Record<ExtractedFactKey, DocCitation>>,
+): DocFinding | null {
   if (!facts.floodZone) return null;
 
   const zone = facts.floodZone.toUpperCase().trim();
@@ -433,6 +514,7 @@ function checkFloodZone(facts: ExtractedFacts): DocFinding | null {
       label: `Flood zone ${zone} — flood insurance required`,
       summary: `Property is in FEMA flood zone ${zone}, which requires flood insurance for federally-backed mortgages. Verify binding quotes before closing and budget for annual premiums.`,
       confidence: 0.95,
+      citation: factCitations.floodZone,
       requiresReview: true,
       observedData: { floodZone: zone },
     };
@@ -445,6 +527,7 @@ function checkFloodZone(facts: ExtractedFacts): DocFinding | null {
       label: `Flood zone ${zone} — moderate/minimal risk`,
       summary: `Property is in FEMA flood zone ${zone}, which is considered moderate-to-minimal flood risk. Flood insurance is optional but recommended for Florida coastal properties.`,
       confidence: 0.9,
+      citation: factCitations.floodZone,
       requiresReview: false,
       observedData: { floodZone: zone },
     };
@@ -456,12 +539,16 @@ function checkFloodZone(facts: ExtractedFacts): DocFinding | null {
     label: `Flood zone ${zone} — verification needed`,
     summary: `Property is in FEMA flood zone ${zone}. Confirm flood insurance requirements with your lender.`,
     confidence: 0.5,
+    citation: factCitations.floodZone,
     requiresReview: true,
     observedData: { floodZone: zone },
   };
 }
 
-function checkPermits(facts: ExtractedFacts): DocFinding | null {
+function checkPermits(
+  facts: ExtractedFacts,
+  factCitations: Partial<Record<ExtractedFactKey, DocCitation>>,
+): DocFinding | null {
   if (!facts.unpermittedWorkMentioned && facts.permitsDisclosed !== "no") {
     return null;
   }
@@ -472,6 +559,8 @@ function checkPermits(facts: ExtractedFacts): DocFinding | null {
     label: "Unpermitted work disclosed",
     summary: `Seller disclosure or inspection report mentions unpermitted work. Unpermitted additions can void insurance claims, trigger code enforcement, and require retroactive permits at the buyer's cost. Verify with the county building department before closing.`,
     confidence: 0.8,
+    citation:
+      factCitations.unpermittedWorkMentioned ?? factCitations.permitsDisclosed,
     requiresReview: true,
     observedData: {
       unpermittedWorkMentioned: facts.unpermittedWorkMentioned ?? false,
@@ -480,7 +569,10 @@ function checkPermits(facts: ExtractedFacts): DocFinding | null {
   };
 }
 
-function checkLiens(facts: ExtractedFacts): DocFinding | null {
+function checkLiens(
+  facts: ExtractedFacts,
+  factCitations: Partial<Record<ExtractedFactKey, DocCitation>>,
+): DocFinding | null {
   if (typeof facts.lienCount !== "number" || facts.lienCount <= 0) {
     return null;
   }
@@ -491,6 +583,7 @@ function checkLiens(facts: ExtractedFacts): DocFinding | null {
     label: `${facts.lienCount} lien(s) on title`,
     summary: `Title commitment shows ${facts.lienCount} lien(s) or encumbrance(s). These must be cleared before closing. Request the Schedule B exceptions from the title company and confirm the clearance plan.`,
     confidence: 0.95,
+    citation: factCitations.lienCount ?? factCitations.titleExceptions,
     requiresReview: true,
     observedData: {
       lienCount: facts.lienCount,
@@ -560,8 +653,408 @@ export function analyzeDocument(args: {
     overallConfidence: Number(overallConfidence.toFixed(2)),
     requiresBrokerReview,
     plainEnglishSummary,
+    buyerFacts: buildBuyerFacts(findings, plainEnglishSummary),
+    pageClassifications: [{ pageNumber: 1, docType, confidence: classifierConfidence }],
+    promptKey: DOC_PARSER_PROMPT_REF.promptKey,
+    promptVersion: DOC_PARSER_PROMPT_REF.version,
     engineVersion: DOC_PARSER_VERSION,
   };
+}
+
+export function analyzeDocumentPages(args: {
+  pages: DocumentPageInput[];
+  today: string;
+}): DocAnalysisResult {
+  const pageClassifications = classifyDocumentPages(args.pages);
+  const combinedText = args.pages.map((page) => page.text).join("\n\n");
+  const dominant = selectDominantDocType(pageClassifications, combinedText);
+  const extraction = extractFactsFromPages(args.pages, dominant.docType);
+
+  const facts: ExtractedFacts = {
+    docType: dominant.docType,
+    classifierConfidence: dominant.confidence,
+    ...extraction.facts,
+  };
+
+  const findings = applyFlRiskRules(facts, args.today, extraction.citations);
+  const overallSeverity = findings.reduce<FindingSeverity>(
+    (current, finding) =>
+      severityRank(finding.severity) > severityRank(current)
+        ? finding.severity
+        : current,
+    "info",
+  );
+  const overallConfidence =
+    findings.length === 0
+      ? dominant.confidence
+      : Math.min(dominant.confidence, ...findings.map((finding) => finding.confidence));
+  const plainEnglishSummary = buildSummary(
+    dominant.docType,
+    findings,
+    overallSeverity,
+  );
+
+  return {
+    docType: dominant.docType,
+    facts,
+    findings,
+    overallSeverity,
+    overallConfidence: Number(overallConfidence.toFixed(2)),
+    requiresBrokerReview: findings.some((finding) => finding.requiresReview),
+    plainEnglishSummary,
+    buyerFacts: buildBuyerFacts(findings, plainEnglishSummary),
+    pageClassifications,
+    promptKey: DOC_PARSER_PROMPT_REF.promptKey,
+    promptVersion: DOC_PARSER_PROMPT_REF.version,
+    engineVersion: DOC_PARSER_VERSION,
+  };
+}
+
+function selectDominantDocType(
+  pageClassifications: PageClassification[],
+  combinedText: string,
+): { docType: DocType; confidence: number } {
+  if (pageClassifications.length === 0) {
+    return classifyDocument(combinedText);
+  }
+
+  const scoreByType = new Map<DocType, number>();
+  const confidenceByType = new Map<DocType, number[]>();
+  for (const page of pageClassifications) {
+    scoreByType.set(
+      page.docType,
+      (scoreByType.get(page.docType) ?? 0) + page.confidence,
+    );
+    const bucket = confidenceByType.get(page.docType) ?? [];
+    bucket.push(page.confidence);
+    confidenceByType.set(page.docType, bucket);
+  }
+
+  let bestType: DocType = "other";
+  let bestScore = -1;
+  for (const [docType, score] of scoreByType.entries()) {
+    if (score > bestScore && docType !== "other") {
+      bestType = docType;
+      bestScore = score;
+    }
+  }
+
+  if (bestType === "other") {
+    return classifyDocument(combinedText);
+  }
+
+  const confidences = confidenceByType.get(bestType) ?? [0.3];
+  const avgConfidence =
+    confidences.reduce((sum, value) => sum + value, 0) / confidences.length;
+  return {
+    docType: bestType,
+    confidence: Number(avgConfidence.toFixed(2)),
+  };
+}
+
+function extractFactsFromPages(
+  pages: DocumentPageInput[],
+  docType: DocType,
+): FactExtraction {
+  switch (docType) {
+    case "seller_disclosure":
+      return extractSellerDisclosureFacts(pages);
+    case "hoa_document":
+      return extractHoaFacts(pages);
+    case "inspection_report":
+      return extractInspectionFacts(pages);
+    case "title_commitment":
+      return extractTitleFacts(pages);
+    case "survey":
+      return extractSurveyFacts(pages);
+    default:
+      return { facts: {}, citations: {} };
+  }
+}
+
+function extractSellerDisclosureFacts(
+  pages: DocumentPageInput[],
+): FactExtraction {
+  const roofAge = findNumberWithCitation(
+    pages,
+    /roof(?: age| is| was)?[^0-9]{0,20}(\d{1,2})\s*(?:years?|yrs?)\b/i,
+  );
+  const roofReplacementYear = findNumberWithCitation(
+    pages,
+    /roof(?: replacement year| replaced(?: in)?)?[^0-9]{0,20}(20\d{2}|19\d{2})\b/i,
+  );
+  const floodZone = findStringWithCitation(
+    pages,
+    /flood zone[^a-z0-9]{0,8}([A-Z][A-Z0-9]{0,4})\b/i,
+  );
+  const permits = findStringWithCitation(
+    pages,
+    /permits?(?: disclosed)?[^a-z]{0,8}(yes|no|unknown)\b/i,
+  );
+  const unpermitted = findBooleanWithCitation(
+    pages,
+    /unpermitted|without permits?/i,
+  );
+
+  return {
+    facts: {
+      roofAgeYears: roofAge?.value,
+      roofReplacementYear: roofReplacementYear?.value,
+      floodZone: floodZone?.value,
+      permitsDisclosed:
+        permits?.value === "yes" ||
+        permits?.value === "no" ||
+        permits?.value === "unknown"
+          ? permits.value
+          : undefined,
+      unpermittedWorkMentioned: unpermitted?.value,
+    },
+    citations: {
+      roofAgeYears: roofAge?.citation,
+      roofReplacementYear: roofReplacementYear?.citation,
+      floodZone: floodZone?.citation,
+      permitsDisclosed: permits?.citation,
+      unpermittedWorkMentioned: unpermitted?.citation,
+    },
+  };
+}
+
+function extractHoaFacts(pages: DocumentPageInput[]): FactExtraction {
+  const reserveBalance = findCurrencyWithCitation(
+    pages,
+    /reserve balance[^0-9]{0,10}\$?\s*([\d,]+)/i,
+  );
+  const annualBudget = findCurrencyWithCitation(
+    pages,
+    /annual budget[^0-9]{0,10}\$?\s*([\d,]+)/i,
+  );
+  const reserveStudyDate = findStringWithCitation(
+    pages,
+    /reserve study(?: completed)?[^0-9A-Za-z]{0,8}([A-Za-z]{3,9}\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{4})/i,
+  );
+  const buildingStories = findNumberWithCitation(
+    pages,
+    /(?:building is|tower is|structure is)?[^0-9]{0,10}(\d+)\s*(?:stories?|story)\b/i,
+  );
+  const yearBuilt = findNumberWithCitation(
+    pages,
+    /(?:built|year built)[^0-9]{0,10}(20\d{2}|19\d{2})\b/i,
+  );
+  const milestoneInspectionDate = findStringWithCitation(
+    pages,
+    /milestone inspection(?: completed| date)?[^0-9A-Za-z]{0,8}([A-Za-z]{3,9}\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2})/i,
+  );
+  const sirsCompletedDate = findStringWithCitation(
+    pages,
+    /sirs(?: completed| date)?[^0-9A-Za-z]{0,8}([A-Za-z]{3,9}\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2})/i,
+  );
+
+  return {
+    facts: {
+      hoaReserveBalance: reserveBalance?.value,
+      hoaAnnualBudget: annualBudget?.value,
+      hoaReserveStudyDate: reserveStudyDate?.value,
+      buildingStories: buildingStories?.value,
+      buildingYearBuilt: yearBuilt?.value,
+      milestoneInspectionDate: milestoneInspectionDate?.value,
+      sirsCompletedDate: sirsCompletedDate?.value,
+    },
+    citations: {
+      hoaReserveBalance: reserveBalance?.citation,
+      hoaAnnualBudget: annualBudget?.citation,
+      hoaReserveStudyDate: reserveStudyDate?.citation,
+      buildingStories: buildingStories?.citation,
+      buildingYearBuilt: yearBuilt?.citation,
+      milestoneInspectionDate: milestoneInspectionDate?.citation,
+      sirsCompletedDate: sirsCompletedDate?.citation,
+    },
+  };
+}
+
+function extractInspectionFacts(pages: DocumentPageInput[]): FactExtraction {
+  const defectCount = findNumberWithCitation(
+    pages,
+    /defects noted[^0-9]{0,10}(\d+)\b/i,
+  );
+  const repairsCount = findNumberWithCitation(
+    pages,
+    /recommended repairs[^0-9]{0,10}(\d+)\b/i,
+  );
+  const unpermitted = findBooleanWithCitation(
+    pages,
+    /unpermitted|without permits?/i,
+  );
+
+  return {
+    facts: {
+      majorDefectCount: defectCount?.value,
+      recommendedRepairsCount: repairsCount?.value,
+      unpermittedWorkMentioned: unpermitted?.value,
+    },
+    citations: {
+      majorDefectCount: defectCount?.citation,
+      recommendedRepairsCount: repairsCount?.citation,
+      unpermittedWorkMentioned: unpermitted?.citation,
+    },
+  };
+}
+
+function extractTitleFacts(pages: DocumentPageInput[]): FactExtraction {
+  const exceptions = findTitleExceptions(pages);
+  return {
+    facts: {
+      titleExceptions: exceptions.values,
+      lienCount: exceptions.values.filter((value) =>
+        /lien|encumbrance/i.test(value),
+      ).length,
+    },
+    citations: {
+      titleExceptions: exceptions.citation,
+      lienCount: exceptions.citation,
+    },
+  };
+}
+
+function extractSurveyFacts(pages: DocumentPageInput[]): FactExtraction {
+  const floodZone = findStringWithCitation(
+    pages,
+    /flood zone[^a-z0-9]{0,8}([A-Z][A-Z0-9]{0,4})\b/i,
+  );
+  return {
+    facts: {
+      floodZone: floodZone?.value,
+    },
+    citations: {
+      floodZone: floodZone?.citation,
+    },
+  };
+}
+
+function buildBuyerFacts(
+  findings: DocFinding[],
+  plainEnglishSummary: string,
+): string[] {
+  const facts = findings
+    .map((finding) => finding.label || finding.summary)
+    .filter((value): value is string => Boolean(value))
+    .slice(0, 3);
+  return facts.length > 0 ? facts : [plainEnglishSummary];
+}
+
+function severityRank(severity: FindingSeverity): number {
+  switch (severity) {
+    case "info":
+      return 0;
+    case "low":
+      return 1;
+    case "medium":
+      return 2;
+    case "high":
+      return 3;
+    case "critical":
+      return 4;
+  }
+}
+
+function findNumberWithCitation(
+  pages: DocumentPageInput[],
+  regex: RegExp,
+): { value: number; citation: DocCitation } | null {
+  const match = findMatchWithCitation(pages, regex);
+  if (!match) return null;
+  const value = Number.parseInt(match.value.replaceAll(",", ""), 10);
+  if (!Number.isFinite(value)) return null;
+  return {
+    value,
+    citation: match.citation,
+  };
+}
+
+function findCurrencyWithCitation(
+  pages: DocumentPageInput[],
+  regex: RegExp,
+): { value: number; citation: DocCitation } | null {
+  const match = findMatchWithCitation(pages, regex);
+  if (!match) return null;
+  const value = Number.parseInt(match.value.replaceAll(",", ""), 10);
+  if (!Number.isFinite(value)) return null;
+  return {
+    value,
+    citation: match.citation,
+  };
+}
+
+function findStringWithCitation(
+  pages: DocumentPageInput[],
+  regex: RegExp,
+): { value: string; citation: DocCitation } | null {
+  const match = findMatchWithCitation(pages, regex);
+  if (!match) return null;
+  return {
+    value: match.value.trim(),
+    citation: match.citation,
+  };
+}
+
+function findBooleanWithCitation(
+  pages: DocumentPageInput[],
+  regex: RegExp,
+): { value: true; citation: DocCitation } | null {
+  const match = findMatchWithCitation(pages, regex);
+  if (!match) return null;
+  return {
+    value: true,
+    citation: match.citation,
+  };
+}
+
+function findTitleExceptions(
+  pages: DocumentPageInput[],
+): { values: string[]; citation?: DocCitation } {
+  const values: string[] = [];
+  let citation: DocCitation | undefined;
+
+  for (const page of pages) {
+    const lines = page.text.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index]?.trim() ?? "";
+      if (!/^(?:\d+[\).]|[-*])\s+/.test(line)) continue;
+      if (!/lien|encumbrance|exception|easement/i.test(line)) continue;
+      values.push(line.replace(/^(?:\d+[\).]|[-*])\s+/, "").trim());
+      citation ??= {
+        pageNumber: page.pageNumber,
+        lineStart: index + 1,
+        lineEnd: index + 1,
+        snippet: line,
+      };
+    }
+  }
+
+  return { values, citation };
+}
+
+function findMatchWithCitation(
+  pages: DocumentPageInput[],
+  regex: RegExp,
+): { value: string; citation: DocCitation } | null {
+  for (const page of pages) {
+    const lines = page.text.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] ?? "";
+      const match = line.match(regex);
+      if (!match?.[1]) continue;
+      return {
+        value: match[1],
+        citation: {
+          pageNumber: page.pageNumber,
+          lineStart: index + 1,
+          lineEnd: index + 1,
+          snippet: line.trim(),
+        },
+      };
+    }
+  }
+  return null;
 }
 
 function buildSummary(

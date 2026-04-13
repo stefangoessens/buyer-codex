@@ -17,6 +17,7 @@ export type DocumentReviewState = "pending" | "approved" | "rejected";
 export type DocumentType =
   | "seller_disclosure"
   | "hoa_doc"
+  | "hoa_document"
   | "inspection_report"
   | "title_commitment"
   | "survey"
@@ -147,6 +148,7 @@ function buildHeadline(
   switch (analysis.documentType) {
     case "seller_disclosure": return "Seller disclosure analyzed";
     case "hoa_doc": return "HOA document analyzed";
+    case "hoa_document": return "HOA document analyzed";
     case "inspection_report": return "Inspection report analyzed";
     case "title_commitment": return "Title commitment analyzed";
     case "survey": return "Survey analyzed";
@@ -160,11 +162,39 @@ function buildHeadline(
 function extractBuyerSafeFacts(analysis: RawFileAnalysis): string[] {
   if (!analysis.factsPayload) return [];
   try {
-    const parsed = JSON.parse(analysis.factsPayload) as { buyerFacts?: unknown };
-    if (!Array.isArray(parsed.buyerFacts)) return [];
-    return parsed.buyerFacts
-      .filter((f): f is string => typeof f === "string")
-      .slice(0, 3);
+    const parsed = JSON.parse(analysis.factsPayload) as {
+      buyerFacts?: unknown;
+      findings?: unknown;
+      plainEnglishSummary?: unknown;
+    };
+    if (Array.isArray(parsed.buyerFacts)) {
+      return parsed.buyerFacts
+        .filter((f): f is string => typeof f === "string")
+        .slice(0, 3);
+    }
+
+    if (Array.isArray(parsed.findings)) {
+      const derived = parsed.findings
+        .flatMap((finding) => {
+          if (!finding || typeof finding !== "object") return [];
+          const label = "label" in finding ? finding.label : undefined;
+          const summary = "summary" in finding ? finding.summary : undefined;
+          return [label, summary].filter(
+            (value): value is string => typeof value === "string" && value.length > 0,
+          );
+        })
+        .slice(0, 3);
+      if (derived.length > 0) return derived;
+    }
+
+    if (
+      typeof parsed.plainEnglishSummary === "string" &&
+      parsed.plainEnglishSummary.length > 0
+    ) {
+      return [parsed.plainEnglishSummary];
+    }
+
+    return [];
   } catch {
     return [];
   }
