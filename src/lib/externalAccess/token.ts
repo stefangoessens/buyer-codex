@@ -1,0 +1,18 @@
+export {
+  computeExpiry,
+  constantTimeEqual,
+  createExternalAccessSession,
+  generateToken,
+  hashToken,
+  isExternalActionAllowed,
+  isTokenDenialReason as isDenialReason,
+  validateToken,
+  type CreateExternalAccessSessionArgs,
+  type ExternalAccessAction,
+  type ExternalAccessSession,
+  type ExternalAccessSessionPermissions,
+  type TokenDenialReason,
+  type TokenRecord,
+  type TokenValidationResult,
+  type ValidateTokenArgs,
+} from "../../../packages/shared/src/external-access";

@@ -1,0 +1,71 @@
+/* ==========================================================================
+   buyer-v2 Design Tokens — CSS Custom Properties
+   All color values extracted via getComputedStyle from live reference sites.
+   PayFit (payfit.com) = aesthetic source
+   Hosman (hosman.co) = structural source
+   RealAdvisor (realadvisor.ch) = supplementary data patterns
+   ========================================================================== */
+
+:root {
+  --color-brand-primary: #052D5B;
+  --color-brand-primary-light: #0F6FDE;
+  --color-brand-primary-dark: #030E1D;
+  --color-brand-accent: #00C4AC;
+  --color-brand-accent-light: #CCF5EF;
+  --color-brand-accent-dark: #009B87;
+  --color-brand-secondary: #3A2899;
+  --color-brand-secondary-light: #FBFAFF;
+  --color-brand-secondary-dark: #21175A;
+
+  --color-primary-50: #E5F1FF;
+  --color-primary-100: #C7E1FF;
+  --color-primary-200: #78B6FC;
+  --color-primary-300: #4A94E8;
+  --color-primary-400: #0F6FDE;
+  --color-primary-500: #0D62C4;
+  --color-primary-600: #0B5BB8;
+  --color-primary-700: #052D5B;
+  --color-primary-800: #030E1D;
+  --color-primary-900: #030E1D;
+
+  --color-accent-50: #E6FBF8;
+  --color-accent-100: #CCF5EF;
+  --color-accent-200: #99EBE0;
+  --color-accent-300: #66E1D0;
+  --color-accent-400: #33D4C1;
+  --color-accent-500: #00C4AC;
+  --color-accent-600: #009B87;
+  --color-accent-700: #007A6B;
+  --color-accent-800: #005A4F;
+  --color-accent-900: #003A33;
+
+  --color-neutral-50: #F8F9FC;
+  --color-neutral-100: #F5F6F9;
+  --color-neutral-200: #ECEFF4;
+  --color-neutral-300: #E0E5EB;
+  --color-neutral-400: #626F7E;
+  --color-neutral-500: #556272;
+  --color-neutral-600: #364153;
+  --color-neutral-700: #1E1A37;
+  --color-neutral-800: #030E1D;
+  --color-neutral-900: #030E1D;
+  --color-neutral-950: #030E1D;
+
+  --color-success-500: #10BC4C;
+  --color-warning-500: #FFB60A;
+  --color-error-500: #EF4444;
+  --color-info-500: #0F6FDE;
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  --radius-full: 9999px;
+
+  --container-max: 1248px;
+  --nav-height: 80px;
+}
