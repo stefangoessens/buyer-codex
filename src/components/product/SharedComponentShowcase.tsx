@@ -73,9 +73,11 @@ export function SharedComponentShowcase() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_0.95fr]">
         <PropertyCard
           href="/dashboard"
-          eyebrow="Analysis"
+          eyebrow="Buyer-safe case"
+          status="pending"
+          statusLabel="Offer prep"
           address="123 Gulf Stream Ave"
-          detail="Property details loading"
+          detail="Opening range and leverage notes are ready for review."
           price={965000}
           beds={4}
           baths={3.5}

@@ -16,7 +16,7 @@ export default async function DealRoomOverviewPage({
   const { dealRoomId } = await params;
 
   return (
-    <div className="mx-auto w-full max-w-7xl">
+    <div className="w-full">
       <PropertyCaseOverview dealRoomId={dealRoomId as Id<"dealRooms">} />
     </div>
   );

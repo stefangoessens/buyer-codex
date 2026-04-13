@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AppSidebar, AppTopNav } from "@/components/dealroom/AppSidebar";
 import { appSurfaceDefinitions } from "@/lib/app-shell";
 
 export const runtime = "nodejs";
@@ -11,9 +12,14 @@ export default function DealRoomLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Deal room header with property context will be added later */}
-      <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
+    <div className="flex min-h-screen bg-neutral-50">
+      <AppSidebar />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AppTopNav />
+        <main className="flex-1 overflow-x-hidden px-4 py-5 md:px-8 md:py-8">
+          <div className="mx-auto w-full max-w-6xl">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

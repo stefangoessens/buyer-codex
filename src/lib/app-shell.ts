@@ -33,7 +33,7 @@ export const appSurfaceDefinitions = {
   },
   dealRoom: {
     routeGroup: "(dealroom)",
-    rootPaths: ["/property"],
+    rootPaths: ["/dealroom", "/property"],
     access: "gated",
     runtime: "nodejs",
     dynamic: "force-dynamic",

@@ -1,7 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { isConfigured } from "@/lib/env";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  BuyerDashboardSurface,
+} from "./BuyerDashboardSurface";
+import { previewBuyerDashboardState } from "./preview-data";
 
 /**
  * Client-only wrapper for BuyerDashboard. The inner component uses
@@ -42,5 +47,9 @@ interface BuyerDashboardClientProps {
 }
 
 export function BuyerDashboardClient({ now }: BuyerDashboardClientProps) {
+  if (!isConfigured.convex()) {
+    return <BuyerDashboardSurface now={now} state={previewBuyerDashboardState} />;
+  }
+
   return <BuyerDashboardInner now={now} />;
 }
