@@ -11,11 +11,13 @@ const DEDUPE_WINDOW_MS = 60_000
 
 type ListingResponseDoc = Doc<"listingResponses">
 type ExternalTokenDoc = Doc<"externalAccessTokens">
+type ListingResponseAccessAction = Exclude<ExternalAccessAction, "view_offer">
 
 export interface ListingResponseAccessContext {
   kind: "external_access"
   tokenId: Id<"externalAccessTokens">
   resource: ExternalAccessResource
+  action: ListingResponseAccessAction
   dealRoomId: Id<"dealRooms">
   offerId?: Id<"offers">
   role: ExternalTokenDoc["role"]
@@ -61,6 +63,7 @@ export type AuthorizeListingResponseSubmissionResult =
       ok: true
       token: ExternalTokenDoc
       session: ExternalAccessSession
+      action: ListingResponseAccessAction
       accessContext: ListingResponseAccessContext
     }
   | {
@@ -76,6 +79,7 @@ export type AuthorizeListingResponseSubmissionResult =
     }
 
 export function buildListingResponseAccessContext(args: {
+  action: ListingResponseAccessAction
   token: ExternalTokenDoc
   session: ExternalAccessSession
 }): ListingResponseAccessContext {
@@ -83,11 +87,28 @@ export function buildListingResponseAccessContext(args: {
     kind: "external_access",
     tokenId: args.token._id,
     resource: args.session.scope.resource,
+    action: args.action,
     dealRoomId: args.session.scope.dealRoomId as Id<"dealRooms">,
     offerId: args.session.scope.offerId as Id<"offers"> | undefined,
     role: args.token.role,
     allowedActions: [...args.session.scope.allowedActions],
     expiresAt: args.session.scope.expiresAt,
+  }
+}
+
+export function getListingResponseAccessAction(
+  responseType: ListingResponseDoc["responseType"],
+): ListingResponseAccessAction {
+  switch (responseType) {
+    case "offer_acknowledged":
+    case "generic_acknowledged":
+      return "acknowledge_receipt"
+    case "compensation_confirmed":
+    case "compensation_disputed":
+      return "confirm_compensation"
+    case "offer_countered":
+    case "offer_rejected":
+      return "submit_response"
   }
 }
 
@@ -119,6 +140,9 @@ export function buildListingResponseReviewModel(
       kind: response.accessKind ?? "external_access",
       tokenId: response.tokenId,
       resource: response.accessResource ?? "offer",
+      action:
+        response.accessAction ??
+        getListingResponseAccessAction(response.responseType),
       dealRoomId: response.dealRoomId,
       offerId: response.offerId,
       role: response.counterpartyRole,
@@ -167,10 +191,11 @@ export function authorizeListingResponseSubmission(args: {
     submittedAt: string
   }>
 }): AuthorizeListingResponseSubmissionResult {
+  const action = getListingResponseAccessAction(args.responseType)
   const authorized = authorizeExternalAccessSession({
     token: args.token,
     hashedToken: args.hashedToken,
-    intendedAction: "submit_response",
+    intendedAction: action,
     intendedDealRoomId: args.dealRoomId,
     intendedOfferId: args.offerId,
     now: args.now,
@@ -205,7 +230,9 @@ export function authorizeListingResponseSubmission(args: {
     ok: true,
     token: authorized.token,
     session: authorized.session,
+    action,
     accessContext: buildListingResponseAccessContext({
+      action,
       token: authorized.token,
       session: authorized.session,
     }),

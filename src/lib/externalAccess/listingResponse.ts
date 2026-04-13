@@ -20,6 +20,8 @@
  * via the shared read model; buyers never see raw listing-side notes.
  */
 
+import type { ExternalAccessAction } from "./types";
+
 // ───────────────────────────────────────────────────────────────────────────
 // Response types
 // ───────────────────────────────────────────────────────────────────────────
@@ -56,6 +58,29 @@ export const LISTING_RESPONSE_REVIEW_STATUSES = [
 
 export type ListingResponseReviewStatus =
   (typeof LISTING_RESPONSE_REVIEW_STATUSES)[number];
+
+export type ListingResponseAccessAction = Extract<
+  ExternalAccessAction,
+  "submit_response" | "confirm_compensation" | "acknowledge_receipt"
+>;
+
+const LISTING_RESPONSE_ACCESS_ACTIONS: Record<
+  ListingResponseType,
+  ListingResponseAccessAction
+> = {
+  offer_acknowledged: "acknowledge_receipt",
+  offer_countered: "submit_response",
+  offer_rejected: "submit_response",
+  compensation_confirmed: "confirm_compensation",
+  compensation_disputed: "confirm_compensation",
+  generic_acknowledged: "acknowledge_receipt",
+};
+
+export function getListingResponseAccessAction(
+  responseType: ListingResponseType,
+): ListingResponseAccessAction {
+  return LISTING_RESPONSE_ACCESS_ACTIONS[responseType];
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Payload shape

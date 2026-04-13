@@ -3,6 +3,7 @@ import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import {
   authorizeListingResponseSubmission,
   buildListingResponseReviewModel,
+  getListingResponseAccessAction,
 } from "../../../../convex/lib/listingResponses";
 
 const NOW = "2028-05-01T12:00:00.000Z";
@@ -17,7 +18,7 @@ function makeToken(
     dealRoomId: "dr_1" as Id<"dealRooms">,
     offerId: "off_1" as Id<"offers">,
     role: "listing_agent",
-    allowedActions: ["view_offer", "submit_response"],
+    allowedActions: ["view_offer", "acknowledge_receipt"],
     expiresAt: "2028-05-02T12:00:00.000Z",
     revokedAt: undefined,
     revokedBy: undefined,
@@ -54,6 +55,7 @@ function makeResponse(
     disputeReason: undefined,
     accessKind: "external_access",
     accessResource: "offer",
+    accessAction: "submit_response",
     accessAllowedActions: ["view_offer", "submit_response"],
     accessExpiresAt: "2028-05-02T12:00:00.000Z",
     reviewStatus: "unreviewed",
@@ -79,12 +81,33 @@ describe("authorizeListingResponseSubmission", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.session.permissions.canSubmitResponse).toBe(true);
+      expect(result.session.permissions.canAcknowledgeReceipt).toBe(true);
       expect(result.accessContext.kind).toBe("external_access");
+      expect(result.accessContext.action).toBe("acknowledge_receipt");
       expect(result.accessContext.allowedActions).toEqual([
         "view_offer",
-        "submit_response",
+        "acknowledge_receipt",
       ]);
+    }
+  });
+
+  it("uses confirm_compensation for compensation responses", () => {
+    const result = authorizeListingResponseSubmission({
+      token: makeToken({
+        allowedActions: ["view_offer", "confirm_compensation"],
+      }),
+      hashedToken: "hash_1",
+      dealRoomId: "dr_1" as Id<"dealRooms">,
+      offerId: "off_1" as Id<"offers">,
+      responseType: "compensation_confirmed",
+      now: NOW,
+      existingResponses: [],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.action).toBe("confirm_compensation");
+      expect(result.session.permissions.canConfirmCompensation).toBe(true);
     }
   });
 
@@ -113,7 +136,7 @@ describe("authorizeListingResponseSubmission", () => {
       hashedToken: "hash_1",
       dealRoomId: "dr_1" as Id<"dealRooms">,
       offerId: "off_1" as Id<"offers">,
-      responseType: "offer_acknowledged",
+      responseType: "compensation_confirmed",
       now: NOW,
       existingResponses: [],
     });
@@ -158,6 +181,7 @@ describe("buildListingResponseReviewModel", () => {
       kind: "external_access",
       tokenId: "token_1",
       resource: "offer",
+      action: "submit_response",
       dealRoomId: "dr_1",
       offerId: "off_1",
       role: "listing_agent",
@@ -172,5 +196,18 @@ describe("buildListingResponseReviewModel", () => {
       sellerCreditsRequested: 10_000,
     });
     expect(model.review.status).toBe("unreviewed");
+  });
+
+  it("derives the response action for legacy rows without a stored access action", () => {
+    const model = buildListingResponseReviewModel(
+      makeResponse({
+        accessAction: undefined,
+        responseType: "compensation_disputed",
+      }),
+    );
+
+    expect(model.accessContext.action).toBe(
+      getListingResponseAccessAction("compensation_disputed"),
+    );
   });
 });
