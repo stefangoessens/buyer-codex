@@ -29,3 +29,4 @@ Design direction is also managed through Linear. For design-related work:
 - Do not invent work that conflicts with the active Linear backlog.
 - If local code and Linear differ, call out the mismatch and resolve it explicitly.
 - If a task is ambiguous, inspect the relevant Linear issue and its parent epic before making assumptions.
+- Repository, branch, and project operations use `buyer-codex`. Some recovered application code may still use `buyer-v2` as a product/runtime identifier; do not treat that alone as cross-repo contamination.
