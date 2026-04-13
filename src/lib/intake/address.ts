@@ -1,5 +1,5 @@
 /**
- * Manual address entry normalization and match confidence (KIN-775).
+ * Manual address entry normalization and match confidence (KIN-898).
  *
  * Pure TypeScript. Used by web, internal tools, and iOS intake surfaces.
  * No Convex, no network calls, no geocoding API — that's a future-scope
@@ -45,20 +45,57 @@ export interface AddressMatchCandidate {
   score?: number; // optional external score 0-1
 }
 
+export interface ScoredAddressMatchCandidate extends AddressMatchCandidate {
+  score: number;
+}
+
 export interface AddressMatchResult {
   confidence: MatchConfidence;
   /** 0-1 — numerical score for the best candidate. */
   score: number;
   /** The best matching candidate, or null if none. */
-  bestMatch: AddressMatchCandidate | null;
+  bestMatch: ScoredAddressMatchCandidate | null;
   /** All candidates that scored above the minimum threshold, sorted desc. */
-  candidates: Array<AddressMatchCandidate & { score: number }>;
+  candidates: ScoredAddressMatchCandidate[];
   /**
    * If true, multiple candidates scored similarly high and the caller
    * should prompt the user to disambiguate.
    */
   ambiguous: boolean;
 }
+
+export type AddressMatchFallbackReason =
+  | "ambiguous_match"
+  | "low_confidence_match"
+  | "no_match";
+
+export type AddressMatchResolution =
+  | {
+      status: "matched";
+      confidence: "exact" | "high";
+      score: number;
+      bestMatch: ScoredAddressMatchCandidate;
+      candidates: ScoredAddressMatchCandidate[];
+      ambiguous: false;
+    }
+  | {
+      status: "review_required";
+      fallbackReason: "ambiguous_match" | "low_confidence_match";
+      confidence: "high" | "medium" | "low";
+      score: number;
+      bestMatch: ScoredAddressMatchCandidate;
+      candidates: ScoredAddressMatchCandidate[];
+      ambiguous: boolean;
+    }
+  | {
+      status: "no_match";
+      fallbackReason: "no_match";
+      confidence: "none";
+      score: number;
+      bestMatch: ScoredAddressMatchCandidate | null;
+      candidates: ScoredAddressMatchCandidate[];
+      ambiguous: false;
+    };
 
 /**
  * US state abbreviations keyed by normalized full name. Normalization
@@ -161,6 +198,19 @@ export const STREET_SUFFIX_MAP: Readonly<Record<string, string>> = Object.freeze
 });
 
 const ZIP_REGEX = /^\d{5}(-\d{4})?$/;
+const STREET_SUFFIX_KEYS: ReadonlySet<string> = new Set(
+  Object.keys(STREET_SUFFIX_MAP),
+);
+const POST_DIRECTIONAL_TOKENS: ReadonlySet<string> = new Set([
+  "N",
+  "S",
+  "E",
+  "W",
+  "NE",
+  "NW",
+  "SE",
+  "SW",
+]);
 
 /** Normalize whitespace: collapse runs and trim. */
 function cleanWhitespace(value: string): string {
@@ -196,6 +246,22 @@ function normalizeState(value: string): string {
 /** Normalize a zip string: strip whitespace and any trailing junk. */
 function normalizeZip(value: string): string {
   return value.replace(/\s+/g, "").trim();
+}
+
+function isStreetSuffixToken(value: string): boolean {
+  const cleaned = value.replace(/\./g, "").toUpperCase();
+  return STREET_SUFFIX_KEYS.has(cleaned);
+}
+
+function isUnitMarkerToken(value: string): boolean {
+  return /^(?:Unit|Apt|Apartment|Suite|Ste|#)$/i.test(
+    value.replace(/[.,]/g, ""),
+  );
+}
+
+function isPostDirectionalToken(value: string): boolean {
+  const cleaned = value.replace(/\./g, "").toUpperCase();
+  return POST_DIRECTIONAL_TOKENS.has(cleaned);
 }
 
 /**
@@ -301,29 +367,80 @@ function parseRawAddress(raw: string): {
   withoutState = withoutState.replace(/,$/, "").trim();
   if (!withoutState) return null;
 
-  // Step 3: peel the city off. If there's a comma, the last comma-part
-  // is the city. Otherwise, assume the last word is the city and
-  // everything before it is the street.
-  let city: string;
-  let streetJoined: string;
-  if (withoutState.includes(",")) {
-    const parts = withoutState
-      .split(",")
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0);
-    city = parts[parts.length - 1];
-    streetJoined = parts.slice(0, -1).join(", ");
-  } else {
-    const words = withoutState.split(/\s+/).filter(Boolean);
-    if (words.length < 2) return null;
-    city = words[words.length - 1];
-    streetJoined = words.slice(0, -1).join(" ");
-  }
-
+  // Step 3: split the remaining "<street> <city>" string. Comma-delimited
+  // inputs are straightforward. For comma-free inputs, prefer the last known
+  // street suffix as the boundary so multi-word cities like "Miami Beach" and
+  // "Fort Lauderdale" survive intact.
+  const split = splitStreetAndCity(withoutState);
+  if (!split) return null;
+  const { city, streetJoined } = split;
   if (!streetJoined) return null;
 
   const { street, unit } = extractUnit(streetJoined);
   return { street, unit, city, state, zip };
+}
+
+function splitStreetAndCity(
+  value: string,
+): { streetJoined: string; city: string } | null {
+  if (value.includes(",")) {
+    const parts = value
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+    if (parts.length < 2) return null;
+    return {
+      city: parts[parts.length - 1],
+      streetJoined: parts.slice(0, -1).join(", "),
+    };
+  }
+
+  const words = value.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return null;
+
+  let suffixIndex = -1;
+  for (let i = 1; i < words.length - 1; i += 1) {
+    if (isStreetSuffixToken(words[i])) {
+      suffixIndex = i;
+    }
+  }
+
+  if (suffixIndex !== -1) {
+    let streetEnd = suffixIndex;
+    let cursor = suffixIndex + 1;
+
+    if (
+      cursor < words.length - 1 &&
+      isPostDirectionalToken(words[cursor])
+    ) {
+      streetEnd = cursor;
+      cursor += 1;
+    }
+
+    if (
+      cursor + 1 < words.length &&
+      isUnitMarkerToken(words[cursor]) &&
+      cursor + 1 < words.length - 1
+    ) {
+      streetEnd = cursor + 1;
+    } else if (
+      cursor < words.length - 1 &&
+      words[cursor].startsWith("#")
+    ) {
+      streetEnd = cursor;
+    }
+
+    const streetJoined = words.slice(0, streetEnd + 1).join(" ");
+    const city = words.slice(streetEnd + 1).join(" ");
+    if (streetJoined && city) {
+      return { streetJoined, city };
+    }
+  }
+
+  return {
+    city: words[words.length - 1],
+    streetJoined: words.slice(0, -1).join(" "),
+  };
 }
 
 /**
@@ -609,12 +726,58 @@ export function matchAddress(
   return {
     confidence,
     score: best.score,
-    bestMatch: {
-      id: best.id,
-      canonical: best.canonical,
-      score: best.score,
-    },
+    bestMatch: best,
     candidates: aboveFloor,
     ambiguous,
+  };
+}
+
+/**
+ * Collapse scored candidates into an explicit intake resolution state.
+ * Exact/high non-ambiguous matches can auto-merge; anything else must
+ * fall back into a review-required or no-match path.
+ */
+export function resolveAddressMatch(
+  result: AddressMatchResult,
+): AddressMatchResolution {
+  if (
+    result.bestMatch &&
+    !result.ambiguous &&
+    (result.confidence === "exact" || result.confidence === "high")
+  ) {
+    return {
+      status: "matched",
+      confidence: result.confidence,
+      score: result.score,
+      bestMatch: result.bestMatch,
+      candidates: result.candidates,
+      ambiguous: false,
+    };
+  }
+
+  if (result.bestMatch && result.confidence !== "none") {
+    const reviewConfidence =
+      result.confidence === "exact" ? "high" : result.confidence;
+    return {
+      status: "review_required",
+      fallbackReason: result.ambiguous
+        ? "ambiguous_match"
+        : "low_confidence_match",
+      confidence: reviewConfidence,
+      score: result.score,
+      bestMatch: result.bestMatch,
+      candidates: result.candidates,
+      ambiguous: result.ambiguous,
+    };
+  }
+
+  return {
+    status: "no_match",
+    fallbackReason: "no_match",
+    confidence: "none",
+    score: result.score,
+    bestMatch: result.bestMatch,
+    candidates: result.candidates,
+    ambiguous: false,
   };
 }
