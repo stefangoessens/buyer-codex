@@ -49,6 +49,13 @@ export type ResponsibleParty =
   | "hoa"
   | "unknown";
 
+export type CloseDashboardBucket =
+  | "needs_attention"
+  | "waiting_on_others"
+  | "on_track";
+
+export type TrackState = "on_track" | "off_track";
+
 export interface CloseDashboardMilestone {
   id: string;
   name: string;
@@ -57,8 +64,14 @@ export interface CloseDashboardMilestone {
   status: MilestoneStatus;
   completedAt?: string;
   responsibleParty: ResponsibleParty;
+  ownerLabel: string;
   daysUntilDue: number;
   urgency: Urgency;
+  urgencyLabel: string;
+  dashboardBucket: CloseDashboardBucket;
+  trackState: TrackState;
+  trackLabel: string;
+  buyerSummary: string;
 }
 
 export interface WorkstreamGroup {
@@ -72,6 +85,8 @@ export interface WorkstreamGroup {
 
 export interface UrgencyGroup {
   urgency: Urgency;
+  label: string;
+  count: number;
   milestones: CloseDashboardMilestone[];
 }
 
@@ -81,6 +96,9 @@ export interface NextStepSummary {
   action?: string;
   dueDate?: string;
   urgency: Urgency;
+  urgencyLabel: string;
+  trackState: TrackState;
+  trackLabel: string;
 }
 
 export interface CloseDashboardData {
@@ -93,9 +111,12 @@ export interface CloseDashboardData {
   completedMilestones: number;
   overdueMilestones: number;
   onTrackPct: number; // 0-1
+  overallState: TrackState;
+  overallStateLabel: string;
   needsAttention: CloseDashboardMilestone[];
   waitingOnOthers: CloseDashboardMilestone[];
   onTrack: CloseDashboardMilestone[];
+  byUrgency: UrgencyGroup[];
   byWorkstream: WorkstreamGroup[];
   nextStep: NextStepSummary;
   weeklyPlan: WeeklyPlan;
@@ -105,6 +126,9 @@ export interface CloseDashboardData {
 export interface WeeklyPlanItem {
   milestone: CloseDashboardMilestone;
   kind: "action" | "deadline" | "waiting";
+  ownerLabel: string;
+  trackState: TrackState;
+  trackLabel: string;
   reason: string;
 }
 
@@ -150,4 +174,20 @@ export const URGENCY_LABELS: Record<Urgency, string> = {
   next_week: "Next week",
   later: "Later",
   completed: "Completed",
+};
+
+export const RESPONSIBLE_PARTY_LABELS: Record<ResponsibleParty, string> = {
+  buyer: "You",
+  seller: "Seller",
+  lender: "Lender",
+  broker: "Broker",
+  title_company: "Title co.",
+  inspector: "Inspector",
+  hoa: "HOA",
+  unknown: "TBD",
+};
+
+export const TRACK_STATE_LABELS: Record<TrackState, string> = {
+  on_track: "On track",
+  off_track: "Off track",
 };

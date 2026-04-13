@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Card, CardContent } from "@/components/ui/card";
 import type { CloseDashboardData } from "@/lib/dealroom/close-dashboard-types";
+import { cn } from "@/lib/utils";
 import { DashboardSection } from "./DashboardSection";
 import { MilestoneCard } from "./MilestoneCard";
 import { NextStepCard } from "./NextStepCard";
@@ -42,16 +43,32 @@ export function CloseDashboard({ dealRoomId }: CloseDashboardProps) {
   }
 
   const progressPct = Math.round(data.onTrackPct * 100);
+  const overallStateClass =
+    data.overallState === "off_track"
+      ? "border-error-200 bg-error-50 text-error-700"
+      : "border-success-200 bg-success-50 text-success-700";
 
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <p className="text-xs uppercase tracking-wide text-neutral-500">
-          Close dashboard
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold text-neutral-900">
-          {data.propertyAddress}
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-neutral-500">
+              Close dashboard
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold text-neutral-900">
+              {data.propertyAddress}
+            </h1>
+          </div>
+          <span
+            className={cn(
+              "inline-flex rounded-full border px-3 py-1 text-xs font-medium",
+              overallStateClass,
+            )}
+          >
+            {data.overallStateLabel}
+          </span>
+        </div>
         <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-neutral-500">
           <span>
             {data.completedMilestones} of {data.totalMilestones} milestones
@@ -68,6 +85,18 @@ export function CloseDashboard({ dealRoomId }: CloseDashboardProps) {
             </>
           )}
         </div>
+        {data.byUrgency.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {data.byUrgency.map((group) => (
+              <span
+                key={group.urgency}
+                className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-medium text-neutral-700"
+              >
+                {group.count} {group.label.toLowerCase()}
+              </span>
+            ))}
+          </div>
+        )}
       </header>
 
       <NextStepCard

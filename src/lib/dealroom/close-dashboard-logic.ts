@@ -7,18 +7,25 @@
  */
 
 import type {
+  CloseDashboardBucket,
   CloseDashboardData,
   CloseDashboardMilestone,
   MilestoneStatus,
   NextStepSummary,
   ResponsibleParty,
+  TrackState,
   Urgency,
   WeeklyPlan,
   WeeklyPlanItem,
   Workstream,
   WorkstreamGroup,
 } from "./close-dashboard-types";
-import { WORKSTREAM_ORDER } from "./close-dashboard-types";
+import {
+  RESPONSIBLE_PARTY_LABELS,
+  TRACK_STATE_LABELS,
+  URGENCY_LABELS,
+  WORKSTREAM_ORDER,
+} from "./close-dashboard-types";
 
 export interface RawMilestone {
   _id: string;
@@ -100,21 +107,126 @@ export function inferResponsibleParty(
   return PARTY_BY_WORKSTREAM[milestone.workstream] ?? "unknown";
 }
 
+const dueDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
+
+const URGENCY_ORDER: readonly Urgency[] = [
+  "overdue",
+  "this_week",
+  "next_week",
+  "later",
+  "completed",
+];
+
+function sentenceOwnerLabel(label: string): string {
+  if (label === "You") return "you";
+  if (label === "HOA") return "HOA";
+  return label.toLowerCase();
+}
+
+function formatMilestoneDate(iso: string): string {
+  const parsed = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return iso;
+  return dueDateFormatter.format(parsed);
+}
+
+function buildBuyerSummary(
+  milestone: Pick<
+    CloseDashboardMilestone,
+    | "completedAt"
+    | "daysUntilDue"
+    | "dueDate"
+    | "ownerLabel"
+    | "responsibleParty"
+    | "status"
+    | "urgency"
+  >,
+): string {
+  if (milestone.status === "completed") {
+    return milestone.completedAt
+      ? `Completed ${formatMilestoneDate(milestone.completedAt)}`
+      : "Completed";
+  }
+
+  const dateText = formatMilestoneDate(milestone.dueDate);
+  if (milestone.daysUntilDue < 0) {
+    const days = Math.abs(milestone.daysUntilDue);
+    return `${dateText} · ${days} day${days === 1 ? "" : "s"} overdue`;
+  }
+
+  if (milestone.responsibleParty !== "buyer") {
+    return `${dateText} · waiting on ${sentenceOwnerLabel(milestone.ownerLabel)}`;
+  }
+
+  if (milestone.daysUntilDue === 0) {
+    return `${dateText} · due today`;
+  }
+
+  return `${dateText} · in ${milestone.daysUntilDue} day${milestone.daysUntilDue === 1 ? "" : "s"}`;
+}
+
+function getTrackState(
+  milestone: Pick<CloseDashboardMilestone, "status" | "urgency">,
+): TrackState {
+  if (milestone.status === "completed") return "on_track";
+  return milestone.urgency === "overdue" ? "off_track" : "on_track";
+}
+
+function getDashboardBucket(
+  milestone: Pick<
+    CloseDashboardMilestone,
+    "responsibleParty" | "status" | "trackState" | "urgency"
+  >,
+): CloseDashboardBucket {
+  if (milestone.status === "completed") return "on_track";
+  if (milestone.trackState === "off_track") return "needs_attention";
+  if (
+    milestone.urgency === "this_week" &&
+    milestone.responsibleParty === "buyer"
+  ) {
+    return "needs_attention";
+  }
+  if (milestone.responsibleParty !== "buyer") return "waiting_on_others";
+  return "on_track";
+}
+
 export function toCloseDashboardMilestone(
   raw: RawMilestone,
   now: string,
 ): CloseDashboardMilestone {
   const days = daysBetween(now, raw.dueDate);
-  return {
+  const urgency = classifyUrgency(raw, days);
+  const responsibleParty = inferResponsibleParty(raw);
+  const ownerLabel = RESPONSIBLE_PARTY_LABELS[responsibleParty];
+  const trackState = getTrackState({ status: raw.status, urgency });
+  const dashboardBucket = getDashboardBucket({
+    responsibleParty,
+    status: raw.status,
+    trackState,
+    urgency,
+  });
+  const milestoneBase = {
     id: raw._id,
     name: raw.name,
     workstream: raw.workstream,
     dueDate: raw.dueDate,
     status: raw.status,
     completedAt: raw.completedAt,
-    responsibleParty: inferResponsibleParty(raw),
+    responsibleParty,
+    ownerLabel,
     daysUntilDue: days,
-    urgency: classifyUrgency(raw, days),
+    urgency,
+    urgencyLabel: URGENCY_LABELS[urgency],
+    dashboardBucket,
+    trackState,
+    trackLabel: TRACK_STATE_LABELS[trackState],
+  } satisfies Omit<CloseDashboardMilestone, "buyerSummary">;
+
+  return {
+    ...milestoneBase,
+    buyerSummary: buildBuyerSummary(milestoneBase),
   };
 }
 
@@ -132,9 +244,9 @@ export function groupByWorkstream(
     const list = byStream.get(workstream);
     if (!list || list.length === 0) continue;
     list.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-    const pending = list.filter((m) => m.status === "pending").length;
-    const overdue = list.filter((m) => m.status === "overdue").length;
     const completed = list.filter((m) => m.status === "completed").length;
+    const overdue = list.filter((m) => m.urgency === "overdue").length;
+    const pending = Math.max(0, list.length - completed - overdue);
     const nextDue =
       list.find((m) => m.status !== "completed")?.dueDate ?? null;
     groups.push({
@@ -149,28 +261,43 @@ export function groupByWorkstream(
   return groups;
 }
 
-function isNeedsAttention(m: CloseDashboardMilestone): boolean {
-  if (m.status === "completed") return false;
-  if (m.urgency === "overdue") return true;
-  if (m.urgency === "this_week" && m.responsibleParty === "buyer") return true;
-  return false;
-}
+export function groupByUrgency(
+  milestones: CloseDashboardMilestone[],
+): Array<{
+  urgency: Urgency;
+  label: string;
+  count: number;
+  milestones: CloseDashboardMilestone[];
+}> {
+  const byUrgency = new Map<Urgency, CloseDashboardMilestone[]>();
+  for (const milestone of milestones) {
+    const list = byUrgency.get(milestone.urgency) ?? [];
+    list.push(milestone);
+    byUrgency.set(milestone.urgency, list);
+  }
 
-function isWaitingOnOthers(m: CloseDashboardMilestone): boolean {
-  if (m.status === "completed") return false;
-  return m.responsibleParty !== "buyer" && m.status !== "overdue";
-}
-
-function isOnTrack(m: CloseDashboardMilestone): boolean {
-  if (m.status === "completed") return true;
-  return !isNeedsAttention(m) && !isWaitingOnOthers(m);
+  return URGENCY_ORDER.flatMap((urgency) => {
+    const list = byUrgency.get(urgency);
+    if (!list || list.length === 0) return [];
+    const milestonesForUrgency = list
+      .slice()
+      .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+    return [
+      {
+        urgency,
+        label: URGENCY_LABELS[urgency],
+        count: milestonesForUrgency.length,
+        milestones: milestonesForUrgency,
+      },
+    ];
+  });
 }
 
 export function buildNextStep(
   milestones: CloseDashboardMilestone[],
 ): NextStepSummary {
   const overdue = milestones
-    .filter((m) => m.urgency === "overdue")
+    .filter((m) => m.trackState === "off_track")
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
   if (overdue.length > 0) {
     const m = overdue[0];
@@ -179,11 +306,14 @@ export function buildNextStep(
       body: `This milestone was due ${Math.abs(m.daysUntilDue)} day${Math.abs(m.daysUntilDue) === 1 ? "" : "s"} ago. Resolve it to keep the close on track.`,
       action: "Review and resolve",
       dueDate: m.dueDate,
-      urgency: "overdue",
+      urgency: m.urgency,
+      urgencyLabel: m.urgencyLabel,
+      trackState: m.trackState,
+      trackLabel: m.trackLabel,
     };
   }
   const thisWeekBuyer = milestones
-    .filter((m) => isNeedsAttention(m))
+    .filter((m) => m.dashboardBucket === "needs_attention")
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
   if (thisWeekBuyer.length > 0) {
     const m = thisWeekBuyer[0];
@@ -195,7 +325,10 @@ export function buildNextStep(
           : `Due in ${m.daysUntilDue} day${m.daysUntilDue === 1 ? "" : "s"}.`,
       action: "Start now",
       dueDate: m.dueDate,
-      urgency: "this_week",
+      urgency: m.urgency,
+      urgencyLabel: m.urgencyLabel,
+      trackState: m.trackState,
+      trackLabel: m.trackLabel,
     };
   }
   const upcoming = milestones
@@ -205,15 +338,21 @@ export function buildNextStep(
     const m = upcoming[0];
     return {
       headline: `Next up: ${m.name}`,
-      body: `Due in ${m.daysUntilDue} days — waiting on ${m.responsibleParty.replace(/_/g, " ")}.`,
+      body: `Due in ${m.daysUntilDue} days — waiting on ${sentenceOwnerLabel(m.ownerLabel)}.`,
       dueDate: m.dueDate,
       urgency: m.urgency,
+      urgencyLabel: m.urgencyLabel,
+      trackState: m.trackState,
+      trackLabel: m.trackLabel,
     };
   }
   return {
     headline: "You're all caught up",
     body: "Every milestone is resolved. Congrats!",
     urgency: "completed",
+    urgencyLabel: URGENCY_LABELS.completed,
+    trackState: "on_track",
+    trackLabel: TRACK_STATE_LABELS.on_track,
   };
 }
 
@@ -233,6 +372,9 @@ export function buildWeeklyPlan(
     .map((m) => ({
       milestone: m,
       kind: "action",
+      ownerLabel: m.ownerLabel,
+      trackState: m.trackState,
+      trackLabel: m.trackLabel,
       reason: `You own this${m.daysUntilDue === 0 ? " — due today" : ""}.`,
     }));
 
@@ -241,6 +383,9 @@ export function buildWeeklyPlan(
     .map((m) => ({
       milestone: m,
       kind: "deadline",
+      ownerLabel: m.ownerLabel,
+      trackState: m.trackState,
+      trackLabel: m.trackLabel,
       reason: `Due ${m.dueDate}`,
     }));
 
@@ -254,7 +399,10 @@ export function buildWeeklyPlan(
     .map((m) => ({
       milestone: m,
       kind: "waiting",
-      reason: `Waiting on ${m.responsibleParty.replace(/_/g, " ")}`,
+      ownerLabel: m.ownerLabel,
+      trackState: m.trackState,
+      trackLabel: m.trackLabel,
+      reason: `Waiting on ${sentenceOwnerLabel(m.ownerLabel)}`,
     }));
 
   const headline = actionsThisWeek.length > 0
@@ -291,22 +439,23 @@ export function buildCloseDashboard(
   );
 
   const needsAttention = milestones
-    .filter(isNeedsAttention)
+    .filter((m) => m.dashboardBucket === "needs_attention")
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
   const waitingOnOthers = milestones
-    .filter(isWaitingOnOthers)
+    .filter((m) => m.dashboardBucket === "waiting_on_others")
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
   const onTrack = milestones
-    .filter(isOnTrack)
+    .filter((m) => m.dashboardBucket === "on_track")
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
 
+  const byUrgency = groupByUrgency(milestones);
   const byWorkstream = groupByWorkstream(milestones);
   const nextStep = buildNextStep(milestones);
   const weeklyPlan = buildWeeklyPlan(milestones, now);
 
-  const pending = milestones.filter((m) => m.status === "pending").length;
   const completed = milestones.filter((m) => m.status === "completed").length;
-  const overdue = milestones.filter((m) => m.status === "overdue").length;
+  const overdue = milestones.filter((m) => m.urgency === "overdue").length;
+  const pending = Math.max(0, milestones.length - completed - overdue);
   const onTrackPct =
     milestones.length > 0
       ? (completed + Math.max(0, onTrack.length - completed)) /
@@ -316,6 +465,7 @@ export function buildCloseDashboard(
   const daysToClose = input.closeDate
     ? Math.max(0, daysBetween(now, input.closeDate))
     : null;
+  const overallState: TrackState = overdue > 0 ? "off_track" : "on_track";
 
   return {
     dealRoomId: input.dealRoomId,
@@ -327,9 +477,12 @@ export function buildCloseDashboard(
     completedMilestones: completed,
     overdueMilestones: overdue,
     onTrackPct: Math.min(1, Math.max(0, onTrackPct)),
+    overallState,
+    overallStateLabel: TRACK_STATE_LABELS[overallState],
     needsAttention,
     waitingOnOthers,
     onTrack,
+    byUrgency,
     byWorkstream,
     nextStep,
     weeklyPlan,
@@ -380,7 +533,7 @@ export function buildIcsForMilestone(
     `DTSTART;VALUE=DATE:${dtStart}`,
     `DTEND;VALUE=DATE:${dtEnd}`,
     `SUMMARY:${milestone.name}`,
-    `DESCRIPTION:Closing milestone (${milestone.workstream}). Responsible: ${milestone.responsibleParty}.`,
+    `DESCRIPTION:Closing milestone (${milestone.workstream}). Responsible: ${milestone.ownerLabel}.`,
     "END:VEVENT",
     "END:VCALENDAR",
   ];

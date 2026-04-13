@@ -17,6 +17,11 @@ const urgencyClasses: Record<NextStepSummary["urgency"], string> = {
   completed: "border-success-200 bg-success-50 text-success-700",
 };
 
+const trackClasses: Record<NextStepSummary["trackState"], string> = {
+  on_track: "border-success-200 bg-success-50 text-success-700",
+  off_track: "border-error-200 bg-error-50 text-error-700",
+};
+
 export function NextStepCard({
   summary,
   propertyAddress,
@@ -46,10 +51,18 @@ export function NextStepCard({
           <span
             className={cn(
               "inline-flex rounded-full border px-3 py-1 text-xs font-medium",
+              trackClasses[summary.trackState],
+            )}
+          >
+            {summary.trackLabel}
+          </span>
+          <span
+            className={cn(
+              "inline-flex rounded-full border px-3 py-1 text-xs font-medium",
               urgencyClasses[summary.urgency],
             )}
           >
-            {summary.urgency.replace(/_/g, " ")}
+            {summary.urgencyLabel}
           </span>
           {daysToClose !== null && (
             <div className="rounded-xl bg-neutral-50 px-4 py-3 text-right">

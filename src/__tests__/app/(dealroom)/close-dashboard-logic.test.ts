@@ -7,6 +7,7 @@ import {
   buildWeeklyPlan,
   classifyUrgency,
   daysBetween,
+  groupByUrgency,
   groupByWorkstream,
   inferResponsibleParty,
   toCloseDashboardMilestone,
@@ -98,6 +99,24 @@ describe("inferResponsibleParty", () => {
   });
 });
 
+describe("toCloseDashboardMilestone", () => {
+  it("projects explicit owner, buyer summary, and waiting bucket", () => {
+    const milestone = toCloseDashboardMilestone(
+      raw("1", "Appraisal completion", "appraisal", "2026-04-15"),
+      NOW,
+    );
+
+    expect(milestone).toMatchObject({
+      ownerLabel: "Lender",
+      urgencyLabel: "This week",
+      dashboardBucket: "waiting_on_others",
+      trackState: "on_track",
+      trackLabel: "On track",
+    });
+    expect(milestone.buyerSummary).toContain("waiting on lender");
+  });
+});
+
 describe("groupByWorkstream", () => {
   it("groups milestones by workstream and sorts by due date", () => {
     const milestones: CloseDashboardMilestone[] = [
@@ -118,6 +137,24 @@ describe("groupByWorkstream", () => {
   });
 });
 
+describe("groupByUrgency", () => {
+  it("groups milestones by urgency and exposes explicit counts", () => {
+    const milestones: CloseDashboardMilestone[] = [
+      toCloseDashboardMilestone(raw("1", "Sign escrow", "escrow", "2026-04-10"), NOW),
+      toCloseDashboardMilestone(raw("2", "Buyer reviews HOA docs", "hoa", "2026-04-14"), NOW),
+      toCloseDashboardMilestone(raw("3", "Title clearance", "title", "2026-04-20"), NOW),
+    ];
+
+    const groups = groupByUrgency(milestones);
+    expect(groups.map((group) => [group.urgency, group.count])).toEqual([
+      ["overdue", 1],
+      ["this_week", 1],
+      ["next_week", 1],
+    ]);
+    expect(groups[0].label).toBe("Overdue");
+  });
+});
+
 describe("buildNextStep", () => {
   it("prioritizes overdue milestones", () => {
     const milestones = [
@@ -126,6 +163,7 @@ describe("buildNextStep", () => {
     ];
     const step = buildNextStep(milestones);
     expect(step.urgency).toBe("overdue");
+    expect(step.trackState).toBe("off_track");
     expect(step.headline).toContain("Sign disclosures");
   });
 
@@ -169,6 +207,8 @@ describe("buildWeeklyPlan", () => {
     const plan = buildWeeklyPlan(milestones, NOW);
     expect(plan.actionsThisWeek).toHaveLength(1);
     expect(plan.actionsThisWeek[0].milestone.id).toBe("1");
+    expect(plan.actionsThisWeek[0].ownerLabel).toBe("You");
+    expect(plan.deadlinesThisWeek[1].ownerLabel).toBe("Lender");
     expect(plan.deadlinesThisWeek).toHaveLength(2);
   });
 
@@ -181,6 +221,23 @@ describe("buildWeeklyPlan", () => {
       NOW,
     );
     expect(plan.headline).toContain("2 actions");
+  });
+
+  it("makes waiting-on-someone-else state explicit in the weekly plan", () => {
+    const plan = buildWeeklyPlan(
+      [
+        toCloseDashboardMilestone(raw("1", "Appraisal completion", "appraisal", "2026-04-15"), NOW),
+      ],
+      NOW,
+    );
+
+    expect(plan.blockedOnOthers).toHaveLength(1);
+    expect(plan.blockedOnOthers[0]).toMatchObject({
+      ownerLabel: "Lender",
+      trackState: "on_track",
+      trackLabel: "On track",
+      reason: "Waiting on lender",
+    });
   });
 });
 
@@ -202,9 +259,34 @@ describe("buildCloseDashboard", () => {
     expect(dashboard.completedMilestones).toBe(1);
     expect(dashboard.needsAttention.length).toBeGreaterThan(0);
     expect(dashboard.waitingOnOthers.length).toBeGreaterThan(0);
+    expect(dashboard.overallState).toBe("on_track");
+    expect(dashboard.byUrgency.map((group) => group.urgency)).toEqual([
+      "this_week",
+      "next_week",
+      "completed",
+    ]);
     expect(dashboard.byWorkstream.length).toBe(4);
     expect(dashboard.daysToClose).toBe(13);
     expect(dashboard.nextStep.headline).toBeTruthy();
+  });
+
+  it("marks overdue partner-owned work as off-track attention", () => {
+    const dashboard = buildCloseDashboard({
+      dealRoomId: "dr1",
+      propertyAddress: "123 Main St, Miami, FL 33101",
+      closeDate: "2026-04-25",
+      milestones: [
+        raw("1", "Title clearance", "title", "2026-04-10"),
+      ],
+      now: NOW,
+    });
+
+    expect(dashboard.overallState).toBe("off_track");
+    expect(dashboard.needsAttention[0]).toMatchObject({
+      ownerLabel: "Title co.",
+      dashboardBucket: "needs_attention",
+      trackState: "off_track",
+    });
   });
 
   it("handles an empty milestone list gracefully", () => {
@@ -217,6 +299,7 @@ describe("buildCloseDashboard", () => {
     });
     expect(dashboard.totalMilestones).toBe(0);
     expect(dashboard.nextStep.urgency).toBe("completed");
+    expect(dashboard.overallState).toBe("on_track");
     expect(dashboard.weeklyPlan.actionsThisWeek).toHaveLength(0);
   });
 });
