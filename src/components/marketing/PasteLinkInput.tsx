@@ -82,8 +82,8 @@ export function PasteLinkInput({
         disabled={!canSubmit}
         className={`shrink-0 font-medium text-white shadow-sm transition-colors duration-[var(--duration-fast)] ${
           isHero
-            ? "h-[60px] w-full rounded-[12px] bg-primary-400 px-5 text-base hover:bg-primary-500 disabled:bg-primary-200"
-            : "h-11 rounded-[12px] bg-primary-400 px-4 text-sm hover:bg-primary-500 disabled:bg-primary-200"
+            ? "h-[60px] w-full rounded-[12px] bg-primary-500 px-5 text-base hover:bg-primary-600 disabled:bg-primary-200"
+            : "h-11 rounded-[12px] bg-primary-500 px-4 text-sm hover:bg-primary-600 disabled:bg-primary-200"
         }`}
       >
         {isHero ? "Get free analysis" : "Analyze"}

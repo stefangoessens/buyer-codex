@@ -37,7 +37,7 @@ struct DealTrackerShell: View {
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: dealService.state)
+        .animation(.easeInOut(duration: BrandTheme.Motion.surfaceDuration), value: dealService.state)
         .sheet(isPresented: $isShowingPreferences) {
             PreferencesView()
         }
@@ -158,7 +158,7 @@ struct DealTrackerShell: View {
             } label: {
                 Image(systemName: "person.circle")
                     .font(.system(size: 20))
-                    .foregroundStyle(Color(hex: 0x1B2B65))
+                    .foregroundStyle(BrandTheme.SemanticColor.actionPrimary)
             }
             .accessibilityLabel("Account menu")
         }
@@ -167,21 +167,21 @@ struct DealTrackerShell: View {
     // MARK: - Loading
 
     private var loadingView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: BrandTheme.Spacing.stackDefault) {
             Image(systemName: "house.fill")
                 .font(.system(size: 56, weight: .regular))
-                .foregroundStyle(Color(hex: 0x1B2B65))
+                .foregroundStyle(BrandTheme.SemanticColor.actionPrimary)
 
             ProgressView()
                 .controlSize(.large)
-                .tint(Color(hex: 0x1B2B65))
+                .tint(BrandTheme.SemanticColor.actionPrimary)
 
             Text("Loading your deal…")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.secondary)
+                .font(.brand(BrandTheme.Typography.body))
+                .foregroundStyle(BrandTheme.SemanticColor.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(BrandTheme.SemanticColor.surfaceCanvas)
     }
 
     // MARK: - Active Deal (Tabs)
@@ -211,42 +211,42 @@ struct DealTrackerShell: View {
                 Label("Timeline", systemImage: "clock.arrow.circlepath")
             }
         }
-        .tint(Color(hex: 0x1B2B65))
+        .tint(BrandTheme.SemanticColor.actionPrimary)
     }
 
     // MARK: - Error
 
     private func errorView(message: String) -> some View {
-        VStack(spacing: 20) {
+        VStack(spacing: BrandTheme.Spacing.cardPaddingDense) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 56, weight: .regular))
-                .foregroundStyle(Color(hex: 0xFF6B4A))
+                .foregroundStyle(BrandTheme.SemanticColor.statusError)
 
-            VStack(spacing: 8) {
+            VStack(spacing: BrandTheme.Spacing.inlineTight) {
                 Text("Something Went Wrong")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(Color(hex: 0x1B2B65))
+                    .font(.brand(BrandTheme.Typography.heading))
+                    .foregroundStyle(BrandTheme.SemanticColor.textPrimary)
 
                 Text(message)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
+                    .font(.brand(BrandTheme.Typography.body))
+                    .foregroundStyle(BrandTheme.SemanticColor.textSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                    .padding(.horizontal, BrandTheme.Spacing.stackLoose)
             }
 
             Button {
                 Task { await dealService.refresh() }
             } label: {
                 Text("Try Again")
-                    .fontWeight(.semibold)
+                    .font(.brand(BrandTheme.Typography.body))
                     .frame(maxWidth: 220)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, BrandTheme.Spacing.controlY)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color(hex: 0xFF6B4A))
-            .padding(.top, 8)
+            .tint(BrandTheme.SemanticColor.actionPrimary)
+            .padding(.top, BrandTheme.Spacing.inlineTight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(BrandTheme.SemanticColor.surfaceCanvas)
     }
 }

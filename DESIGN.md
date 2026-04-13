@@ -4,6 +4,8 @@ This file is the implementation-facing design source of truth for buyer-codex.
 
 It is not a mood board. It exists so another agent can build a homepage hero, trust section, pricing/calculator section, property card, or authenticated shell without reopening the reference sites.
 
+Implementation note: the canonical token contract lives in `packages/shared/src/theme.ts` and is mirrored into `design-references/tokens.ts`, `design-references/tokens.css`, and `ios/BuyerCodex/Sources/Design/BrandTheme.swift` via `pnpm tokens:sync`. This document captures rationale and surface mapping; the generated token artifacts are the exact implementation values.
+
 ## 1. Decision Hierarchy
 
 - **Aesthetic winner:** PayFit
@@ -17,6 +19,8 @@ When references conflict:
 2. Use **PayFit** for spacing rhythm, type confidence, card/button polish, and motion restraint.
 3. Use **shadcn `b2D0wqNxS`** for dashboard shell, left-nav rhythm, card density, and app scaffolding.
 4. Use **RealAdvisor** only for data-specific motifs such as compact numeric badges and optional list-plus-map composition.
+
+**PayFit still defines the base atmosphere:** deep trust blues, cool teal action accents, restrained violet secondary depth, generous whitespace, crisp type confidence, smooth micro-interactions, and polished component surfaces. The overall feeling should remain modern European SaaS: professional without feeling corporate, friendly without feeling juvenile.
 
 ## 2. Screenshot Provenance
 
@@ -45,6 +49,8 @@ When references conflict:
 | Dashboard shell | shadcn `b2D0wqNxS` family | PayFit calmness | Hosman landing-page composition in app space |
 | Left nav | shadcn `b2D0wqNxS` family | PayFit spacing discipline | Top-nav-only app shells, icon-only expanded nav |
 | Section spacing rhythm | PayFit | Hosman sequencing | Tight SaaS spacing, dense portal packing |
+
+Implement these choices through semantic aliases rather than source-named tokens. Components should depend on intent-level tokens such as `background`, `foreground`, `surface`, `border`, `primary`, `muted`, and `shadow`, while the shared theme contract owns the underlying scales.
 
 ## 5. Surface Rules
 
