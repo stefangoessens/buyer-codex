@@ -66,12 +66,6 @@ protocol TokenSyncBackend: Sendable {
     func cleanup(deviceId: String?, token: String?) async throws
 }
 
-// MARK: - AccessTokenProvider
-
-/// Returns the current access token for authenticating backend calls,
-/// or nil if the user is signed out / session is unrecoverable.
-typealias AccessTokenProvider = @Sendable () async -> String?
-
 // MARK: - ConvexTokenSyncBackend
 
 final class ConvexTokenSyncBackend: TokenSyncBackend, Sendable {

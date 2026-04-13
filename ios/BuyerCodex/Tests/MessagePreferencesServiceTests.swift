@@ -45,8 +45,12 @@ final class MockMessagePreferencesBackend: MessagePreferencesBackend, @unchecked
 
 // MARK: - Test fixtures
 
-private struct StubError: Error, Equatable {
+private struct StubError: LocalizedError, Equatable {
     let message: String
+
+    var errorDescription: String? {
+        message
+    }
 }
 
 private actor ContinuationStore {

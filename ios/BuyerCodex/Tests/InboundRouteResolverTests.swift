@@ -354,6 +354,7 @@ struct InboundRouteResolverTests {
     @Test("resolve → .resolved when user is signed in")
     func testResolveSignedIn() async throws {
         let provider = StubAuthProvider()
+        let tokenStore = InMemoryAuthTokenStore()
         provider.authenticateResult = .success(
             AuthTokens(
                 accessToken: "a",
@@ -362,7 +363,7 @@ struct InboundRouteResolverTests {
             )
         )
         provider.validateResult = .success(makeUser())
-        let authService = AuthService(provider: provider)
+        let authService = AuthService(provider: provider, tokenStore: tokenStore)
         try await authService.signIn(email: "buyer@example.com", password: "pw")
         // Precondition
         guard case .signedIn = authService.state else {
@@ -385,7 +386,10 @@ struct InboundRouteResolverTests {
     @Test("resolve → .signInRequired(pending) when user is signed out")
     func testResolveSignedOut() async {
         let provider = StubAuthProvider()
-        let authService = AuthService(provider: provider)
+        let authService = AuthService(
+            provider: provider,
+            tokenStore: InMemoryAuthTokenStore()
+        )
         await authService.initialize() // empty keychain → .signedOut
         guard case .signedOut = authService.state else {
             Issue.record("Pre-condition failed: expected .signedOut")
@@ -407,6 +411,7 @@ struct InboundRouteResolverTests {
     @Test("resolve → .sessionExpired(pending) when auth state is .expired")
     func testResolveExpired() async throws {
         let provider = StubAuthProvider()
+        let tokenStore = InMemoryAuthTokenStore()
         provider.authenticateResult = .success(
             AuthTokens(
                 accessToken: "a",
@@ -415,7 +420,7 @@ struct InboundRouteResolverTests {
             )
         )
         provider.validateResult = .success(makeUser())
-        let authService = AuthService(provider: provider)
+        let authService = AuthService(provider: provider, tokenStore: tokenStore)
         try await authService.signIn(email: "buyer@example.com", password: "pw")
         authService.handleTokenExpired()
         guard case .expired = authService.state else {
@@ -443,6 +448,7 @@ struct InboundRouteResolverTests {
         // .invalidTarget so the caller falls back to home — never return
         // .resolved for something we couldn't parse.
         let provider = StubAuthProvider()
+        let tokenStore = InMemoryAuthTokenStore()
         provider.authenticateResult = .success(
             AuthTokens(
                 accessToken: "a",
@@ -451,7 +457,7 @@ struct InboundRouteResolverTests {
             )
         )
         provider.validateResult = .success(makeUser())
-        let authService = AuthService(provider: provider)
+        let authService = AuthService(provider: provider, tokenStore: tokenStore)
         try await authService.signIn(email: "buyer@example.com", password: "pw")
 
         let resolver = InboundRouteResolver(authService: authService)
@@ -475,7 +481,10 @@ struct InboundRouteResolverTests {
         // Callers should hold the pending route and re-resolve once
         // auth finishes restoring.
         let provider = StubAuthProvider()
-        let authService = AuthService(provider: provider)
+        let authService = AuthService(
+            provider: provider,
+            tokenStore: InMemoryAuthTokenStore()
+        )
         guard case .restoring = authService.state else {
             Issue.record("Pre-condition failed: expected .restoring")
             return

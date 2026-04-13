@@ -158,7 +158,11 @@ struct ConvexMessagePreferencesBackendTests {
     func testMissingTokenThrows() async throws {
         let backend = ConvexMessagePreferencesBackend(
             baseURL: URL(string: "https://test.local")!,
-            tokenProvider: { nil }
+            authSession: AuthSessionContext(
+                accessToken: { nil },
+                authState: { .signedOut },
+                handleExpiredSession: {}
+            )
         )
 
         await #expect(throws: MessagePreferencesError.self) {
@@ -179,7 +183,20 @@ struct ConvexMessagePreferencesBackendTests {
     func testEmptyTokenThrows() async {
         let backend = ConvexMessagePreferencesBackend(
             baseURL: URL(string: "https://test.local")!,
-            tokenProvider: { "" }
+            authSession: AuthSessionContext(
+                accessToken: { "" },
+                authState: {
+                    .signedIn(
+                        user: AuthUser(
+                            id: "user_1",
+                            email: "buyer@example.com",
+                            name: "Buyer One",
+                            role: .buyer
+                        )
+                    )
+                },
+                handleExpiredSession: {}
+            )
         )
 
         do {
