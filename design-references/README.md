@@ -7,12 +7,14 @@ Reference materials for the buyer-codex design system.
 - `tokens.css` — CSS custom properties for all design tokens
 - `tokens.ts` — TypeScript constants mirroring CSS tokens
 - `component-catalog.md` — Harvested component patterns with usage notes
+- `shadcn-b2D0wqNxS/dashboard-shell-contract.md` — Explicit buyer dashboard shell contract, reference captures, and annotated zone maps
 
 ## Reference Sites
 
 - [PayFit](https://payfit.com/) — Primary aesthetic (color, type, spacing, motion)
 - [Hosman](https://www.hosman.co/) — Primary structure (page architecture, conversion flows)
 - [RealAdvisor](https://realadvisor.ch/en/find-agent) — Supplementary (data viz, scores)
+- [shadcn preset b2D0wqNxS](https://ui.shadcn.com/create?item=preview&preset=b2D0wqNxS) — Authenticated shell scaffold, left-rail rhythm, and dashboard card density reference
 
 ## North Star
 
