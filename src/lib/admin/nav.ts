@@ -70,6 +70,14 @@ export const STATIC_NAV_ITEMS: readonly NavItem[] = [
     description: "Funnel KPIs, deal room engagement, conversion metrics",
   },
   {
+    slug: "intelligence",
+    label: "Intelligence monitor",
+    href: "/intelligence",
+    section: "metrics",
+    allowedRoles: ["broker", "admin"],
+    description: "Extraction health, dossier completeness, drift, and freshness",
+  },
+  {
     slug: "overrides",
     label: "Manual overrides",
     href: "/overrides",
