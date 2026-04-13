@@ -17,20 +17,20 @@ const sizeClasses = {
 function getScoreTone(score: number) {
   if (score >= 7) {
     return {
-      soft: "border-success-100 bg-success-50 text-success-700",
+      soft: "border-white/75 bg-white/88 text-success-700 shadow-sm backdrop-blur",
       solid: "border-success-600 bg-success-600 text-white",
       outline: "border-success-300 bg-white text-success-700",
     };
   }
   if (score >= 5) {
     return {
-      soft: "border-warning-100 bg-warning-50 text-warning-700",
+      soft: "border-white/75 bg-white/88 text-warning-700 shadow-sm backdrop-blur",
       solid: "border-warning-500 bg-warning-500 text-white",
       outline: "border-warning-300 bg-white text-warning-700",
     };
   }
   return {
-    soft: "border-error-100 bg-error-50 text-error-700",
+    soft: "border-white/75 bg-white/88 text-error-700 shadow-sm backdrop-blur",
     solid: "border-error-500 bg-error-500 text-white",
     outline: "border-error-300 bg-white text-error-700",
   };

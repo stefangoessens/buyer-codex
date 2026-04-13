@@ -17,15 +17,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { isConfigured } from "@/lib/env";
 import type { PropertyCaseOverviewSurface } from "@/lib/dealroom/property-case-overview";
 import { trackDealRoomUnlocked } from "@/lib/intake/pasteLinkFunnel";
 import { cn } from "@/lib/utils";
+import { previewPropertyCaseOverview } from "./preview-data";
 
 interface PropertyCaseOverviewProps {
   dealRoomId: Id<"dealRooms">;
 }
 
 export function PropertyCaseOverview({
+  dealRoomId,
+}: PropertyCaseOverviewProps) {
+  if (!isConfigured.convex()) {
+    return <PropertyCaseOverviewBody overview={previewPropertyCaseOverview} />;
+  }
+
+  return <LivePropertyCaseOverview dealRoomId={dealRoomId} />;
+}
+
+function LivePropertyCaseOverview({
   dealRoomId,
 }: PropertyCaseOverviewProps) {
   const trackedDealRoomId = useRef<string | null>(null);
@@ -59,11 +71,19 @@ export function PropertyCaseOverview({
     );
   }
 
+  return <PropertyCaseOverviewBody overview={overview} />;
+}
+
+function PropertyCaseOverviewBody({
+  overview,
+}: {
+  overview: PropertyCaseOverviewSurface;
+}) {
   return (
-    <div className="flex flex-col gap-6">
-      <section className="overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-sm">
+    <div className="flex flex-col gap-8">
+      <section className="overflow-hidden rounded-[32px] border border-neutral-200/80 bg-white shadow-[0_18px_40px_-34px_rgba(3,14,29,0.1)]">
         <div className="grid gap-0 lg:grid-cols-[1.4fr_0.9fr]">
-          <div className="relative min-h-[320px] overflow-hidden bg-neutral-950 px-6 py-6 text-white sm:px-8 lg:px-10">
+          <div className="relative min-h-[340px] overflow-hidden bg-neutral-950 px-6 py-6 text-white sm:px-8 lg:px-10">
             {overview.photoUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -121,7 +141,7 @@ export function PropertyCaseOverview({
             </div>
           </div>
 
-          <div className="flex flex-col justify-between gap-6 bg-neutral-50 px-6 py-6 sm:px-8 lg:px-9">
+          <div className="flex flex-col justify-between gap-6 bg-white px-6 py-6 sm:px-8 lg:px-9">
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-neutral-500">
                 Coverage
@@ -156,7 +176,10 @@ export function PropertyCaseOverview({
       {overview.keyTakeaways.length > 0 && (
         <section className="grid gap-4 xl:grid-cols-3">
           {overview.keyTakeaways.map((takeaway) => (
-            <Card key={`${takeaway.title}-${takeaway.body}`} className="border-neutral-200 bg-white">
+            <Card
+              key={`${takeaway.title}-${takeaway.body}`}
+              className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]"
+            >
               <CardHeader className="gap-3 pb-0">
                 <CardDescription className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
                   {takeaway.title}
@@ -171,7 +194,7 @@ export function PropertyCaseOverview({
       )}
 
       <div className="grid gap-6 xl:grid-cols-[1.55fr_0.95fr]">
-        <Card className="border-neutral-200 bg-white">
+        <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
           <CardHeader>
             <CardTitle>Comparative claims</CardTitle>
             <CardDescription>
@@ -184,7 +207,7 @@ export function PropertyCaseOverview({
               overview.claims.map((claim) => (
                 <article
                   key={claim.id}
-                  className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4"
+                  className="rounded-[22px] border border-neutral-200/80 bg-neutral-50/78 p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-2">
@@ -233,7 +256,7 @@ export function PropertyCaseOverview({
         </Card>
 
         <div className="flex flex-col gap-6">
-          <Card className="border-neutral-200 bg-white">
+          <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
             <CardHeader>
               <CardTitle>Recommended action</CardTitle>
               <CardDescription>
@@ -243,7 +266,7 @@ export function PropertyCaseOverview({
             <CardContent>
               {overview.action ? (
                 <div className="space-y-5">
-                  <div className="rounded-2xl bg-neutral-950 p-5 text-white">
+                  <div className="rounded-[22px] bg-neutral-950 p-5 text-white shadow-[0_28px_56px_-38px_rgba(3,14,29,0.45)]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">
                       Suggested opener
                     </p>
@@ -309,7 +332,7 @@ export function PropertyCaseOverview({
             </CardContent>
           </Card>
 
-          <Card className="border-neutral-200 bg-white">
+          <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
             <CardHeader>
               <CardTitle>Missing or uncertain signals</CardTitle>
               <CardDescription>
@@ -357,7 +380,7 @@ export function PropertyCaseOverview({
           </Card>
 
           {overview.variant === "internal" && (
-            <Card className="border-neutral-200 bg-neutral-950 text-white">
+            <Card className="rounded-[24px] border-neutral-900/80 bg-neutral-950 text-white shadow-[0_30px_68px_-46px_rgba(3,14,29,0.55)]">
               <CardHeader>
                 <CardTitle>Internal cache details</CardTitle>
                 <CardDescription className="text-white/65">
@@ -412,7 +435,7 @@ export function PropertyCaseOverview({
         </div>
       </div>
 
-      <Card className="border-neutral-200 bg-white">
+      <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
         <CardHeader>
           <CardTitle>Source coverage</CardTitle>
           <CardDescription>
@@ -425,7 +448,7 @@ export function PropertyCaseOverview({
               <article
                 key={source.citationId}
                 id={source.anchorId}
-                className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 scroll-mt-28"
+                className="rounded-[22px] border border-neutral-200/80 bg-neutral-50/78 p-4 scroll-mt-28"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>

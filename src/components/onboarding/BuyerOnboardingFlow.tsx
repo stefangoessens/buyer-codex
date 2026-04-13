@@ -185,61 +185,91 @@ function BuyerOnboardingFlowAuthDisabled({
   }, [teaserSource]);
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-16">
-      <section className="space-y-3">
-        <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">
-          {portalLabel} intake
-        </p>
-        <h1 className="text-3xl font-semibold text-neutral-900">
-          {summaryTitle ??
-            `Create your buyer account to unlock this ${portalLabel} deal room.`}
-        </h1>
-        <p className="max-w-2xl text-sm leading-6 text-neutral-600">
-          {summaryBody ??
-            `We captured the listing link. Register once, tell us your buyer basics, and we’ll open the first deal room with this property already attached.`}
-        </p>
-        <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-600">
-          <span className="font-medium text-neutral-900">Listing:</span>{" "}
-          <span className="break-all">{listingUrl}</span>
+    <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-16">
+      <section className="rounded-[28px] border border-neutral-200/80 bg-white px-6 py-6 shadow-[0_18px_40px_-34px_rgba(3,14,29,0.08)] sm:px-8 sm:py-8">
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary-700">
+              {portalLabel} intake
+            </p>
+            <h1 className="max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-neutral-900 sm:text-[2.5rem] sm:leading-[1.04]">
+              {summaryTitle ??
+                `Create your buyer account to unlock this ${portalLabel} deal room.`}
+            </h1>
+            <p className="max-w-3xl text-sm leading-6 text-neutral-600 sm:text-base">
+              {summaryBody ??
+                `We captured the listing link. Register once, tell us your buyer basics, and we’ll open the first deal room with this property already attached.`}
+            </p>
+          </div>
+
+          <div className="rounded-[22px] border border-neutral-200/80 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+            <span className="font-medium text-neutral-900">Listing:</span>{" "}
+            <span className="break-all">{listingUrl}</span>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            {STEP_LABELS.map((step, index) => (
+              <div
+                key={step.key}
+                className={`rounded-[20px] border px-4 py-3 text-sm ${
+                  step.key === "account"
+                    ? "border-primary-200 bg-primary-50/45"
+                    : "border-neutral-200/80 bg-white"
+                }`}
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                  Step {index + 1}
+                </p>
+                <p className="mt-1 font-medium text-neutral-900">{step.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        {STEP_LABELS.map((step, index) => (
-          <div
-            key={step.key}
-            className={`rounded-xl border px-4 py-3 text-sm ${
-              step.key === "account"
-                ? "border-primary-300 bg-primary-50"
-                : "border-neutral-200 bg-white"
-            }`}
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-              Step {index + 1}
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_16px_36px_-30px_rgba(3,14,29,0.09)]">
+          <CardContent className="space-y-5 p-6">
+            <div>
+              <h2 className="text-xl font-semibold tracking-[-0.03em] text-neutral-900">
+                Step 1: Create your account
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                Auth is disabled in this environment, so the live registration
+                step cannot complete here. The entry shell still reflects the
+                intended intake flow and listing handoff.
+              </p>
+            </div>
+
+            <div className="rounded-[18px] border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800">
+              Auth is not configured in this environment, so the registration
+              step cannot complete.
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_16px_36px_-30px_rgba(3,14,29,0.09)]">
+          <CardContent className="space-y-4 p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary-700">
+              What unlocks next
             </p>
-            <p className="mt-1 font-medium text-neutral-900">{step.label}</p>
-          </div>
-        ))}
+            <div className="space-y-3">
+              {[
+                "Create the buyer account and preserve this listing context.",
+                "Capture budget, timing, and preferred areas once instead of repeating them in every deal room.",
+                "Attach the first property automatically so the dashboard opens with a live case instead of a blank shell.",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="rounded-[18px] border border-neutral-200/80 bg-neutral-50 px-4 py-3 text-sm leading-6 text-neutral-600"
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
-
-      <Card className="border-neutral-200 bg-white shadow-sm">
-        <CardContent className="space-y-4 p-6">
-          <div>
-            <h2 className="text-xl font-semibold text-neutral-900">
-              Step 1: Create your account
-            </h2>
-            <p className="mt-1 text-sm text-neutral-500">
-              Auth is disabled in this environment, so the live registration step
-              cannot complete here.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800">
-            Auth is not configured in this environment, so the registration step
-            cannot complete.
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

@@ -22,10 +22,10 @@ const trendConfig = {
 } as const;
 
 const toneClasses = {
-  default: "border-neutral-200 bg-white",
-  primary: "border-primary-200 bg-primary-50/45",
-  warning: "border-warning-200 bg-warning-50/65",
-  error: "border-error-200 bg-error-50/60",
+  default: "border-neutral-200/80 bg-white",
+  primary: "border-primary-100 bg-white",
+  warning: "border-warning-100 bg-white",
+  error: "border-error-100 bg-white",
 } as const;
 
 export function KPICard({
@@ -41,14 +41,19 @@ export function KPICard({
     (trend?.percentage != null ? `${trend.percentage}%` : undefined);
 
   return (
-    <Card className={cn("gap-3", toneClasses[tone])}>
+    <Card
+      className={cn(
+        "gap-3 rounded-[22px] shadow-[0_12px_28px_-24px_rgba(3,14,29,0.08)]",
+        toneClasses[tone],
+      )}
+    >
       <CardContent className={cn(density === "compact" ? "p-4" : "p-6")}>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-neutral-500">
           {label}
         </p>
         <p
           className={cn(
-            "mt-2 font-semibold tracking-[-0.03em] text-neutral-900",
+            "mt-2 font-semibold tracking-[-0.04em] text-neutral-900",
             density === "compact" ? "text-2xl" : "text-3xl",
           )}
         >
@@ -56,10 +61,7 @@ export function KPICard({
         </p>
         {trend && trendLabel ? (
           <p
-            className={cn(
-              "mt-2 text-sm font-medium",
-              trendConfig[trend.direction].className,
-            )}
+            className={cn("mt-2 text-sm font-medium", trendConfig[trend.direction].className)}
           >
             {trendConfig[trend.direction].symbol} {trendLabel}
           </p>

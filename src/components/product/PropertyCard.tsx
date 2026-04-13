@@ -77,7 +77,7 @@ export function PropertyCard({
   href,
 }: PropertyCardProps) {
   const content = (
-    <Card className="overflow-hidden p-0">
+    <Card className="overflow-hidden rounded-[24px] border-neutral-200/80 bg-white p-0 shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
       <div className="relative aspect-video bg-neutral-100">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -94,31 +94,32 @@ export function PropertyCard({
             Photo unavailable
           </div>
         )}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-neutral-950/22 via-neutral-950/6 to-transparent" />
         {score != null && (
           <div className="absolute top-3 right-3">
             <ScoreBadge score={score} maxScore={10} size="sm" />
           </div>
         )}
       </div>
-      <CardContent className="space-y-3 p-4">
+      <CardContent className="space-y-3.5 p-4">
         <div className="space-y-1.5">
           {eyebrow ? (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
               {eyebrow}
             </p>
           ) : null}
-          <p className="line-clamp-2 text-sm font-semibold text-neutral-900">
+          <p className="line-clamp-2 text-base font-semibold tracking-[-0.03em] text-neutral-900">
             {address}
           </p>
           {(city || detail) ? (
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm leading-6 text-neutral-500">
               {city}
               {city && detail ? " · " : ""}
               {detail}
             </p>
           ) : null}
         </div>
-        <p className="text-xl font-bold text-primary-700">
+        <p className="text-[28px] font-semibold tracking-[-0.05em] text-neutral-900">
           {formatPrice(price)}
         </p>
         <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-600">
