@@ -1,3 +1,4 @@
+import React from "react";
 import { SurfaceState } from "@/components/product/SurfaceState";
 
 export function EmptyDashboardState() {
