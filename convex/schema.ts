@@ -377,6 +377,60 @@ export default defineSchema({
     .index("by_agentId_and_status", ["agentId", "status"])
     .index("by_buyerId", ["buyerId"]),
 
+  // ═══ POST-TOUR OBSERVATIONS (KIN-869) ═══
+  //
+  // Structured buyer and broker observations captured after a showing.
+  // The schema explicitly separates buyer-visible notes from internal-only
+  // notes/signals so downstream workflows can consume typed fields without
+  // parsing freeform text or risking leakage of staff-only commentary.
+  tourPostObservations: defineTable({
+    tourId: v.id("tours"),
+    tourRequestId: v.id("tourRequests"),
+    propertyId: v.id("properties"),
+    buyerId: v.id("users"),
+    submittedById: v.id("users"),
+    submittedByRole: v.union(
+      v.literal("buyer"),
+      v.literal("broker"),
+      v.literal("admin"),
+    ),
+    sentiment: v.union(
+      v.literal("positive"),
+      v.literal("mixed"),
+      v.literal("negative"),
+    ),
+    concerns: v.array(v.string()),
+    offerReadiness: v.union(
+      v.literal("not_ready"),
+      v.literal("considering"),
+      v.literal("ready_soon"),
+      v.literal("ready_now"),
+    ),
+    buyerVisibleNote: v.optional(v.string()),
+    internalNote: v.optional(v.string()),
+    pricingSignal: v.optional(
+      v.union(
+        v.literal("below_expectations"),
+        v.literal("at_expectations"),
+        v.literal("above_expectations"),
+      ),
+    ),
+    leverageSignal: v.optional(
+      v.union(
+        v.literal("strong"),
+        v.literal("neutral"),
+        v.literal("weak"),
+      ),
+    ),
+    actionItems: v.optional(v.array(v.string())),
+    createdAt: v.string(),
+  })
+    .index("by_tourId", ["tourId"])
+    .index("by_tourRequestId", ["tourRequestId"])
+    .index("by_propertyId", ["propertyId"])
+    .index("by_buyerId", ["buyerId"])
+    .index("by_tourId_and_createdAt", ["tourId", "createdAt"]),
+
   // ═══════════════════════════════════════════════════════════════════════════
   // OFFERS & COUNTER-OFFERS
   // ═══════════════════════════════════════════════════════════════════════════
