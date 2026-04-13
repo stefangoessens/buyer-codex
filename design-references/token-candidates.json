@@ -1,0 +1,127 @@
+{
+  "status": "accepted-payfit-hosman-shadcn-core",
+  "capturedAt": "2026-04-13",
+  "scope": {
+    "requiredReferences": [
+      "payfit",
+      "hosman",
+      "shadcn-b2D0wqNxS"
+    ],
+    "supplementaryDeferred": [
+      "realadvisor"
+    ],
+    "note": "RealAdvisor remained Cloudflare-blocked and is excluded from the accepted token baseline for KIN-946."
+  },
+  "adopted": {
+    "color": {
+      "page": "rgb(252, 251, 255)",
+      "surface": "oklch(1 0 0)",
+      "surfaceRing": "oklch(0.922 0 0)",
+      "ink": "rgb(33, 23, 90)",
+      "inkStrong": "oklch(0.16172 0.03703 253.15)",
+      "text": "rgb(30, 26, 55)",
+      "textMuted": "oklch(0.49112 0.03033 253.74)",
+      "primary": "rgb(80, 118, 246)",
+      "primaryStrong": "oklch(0.5563 0.18803 256.77)",
+      "primaryForeground": "oklch(0.97 0.014 254.604)",
+      "success": "#10BC4C",
+      "warning": "#F59E0B",
+      "error": "#EF4444"
+    },
+    "typography": {
+      "fontFamily": {
+        "sans": "Geist, \"SF Pro Text\", \"SF Pro Display\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "mono": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, monospace"
+      },
+      "fontSize": {
+        "body": "16px",
+        "label": "14px",
+        "cardTitle": "20px",
+        "sectionTitle": "44px",
+        "heroTitle": "56px"
+      },
+      "lineHeight": {
+        "body": "1.5",
+        "heading": "1.2",
+        "hero": "1.18"
+      },
+      "fontWeight": {
+        "regular": 400,
+        "medium": 500,
+        "semibold": 600,
+        "bold": 700
+      }
+    },
+    "spacing": {
+      "1": "4px",
+      "2": "8px",
+      "3": "12px",
+      "4": "16px",
+      "5": "20px",
+      "6": "24px",
+      "8": "32px",
+      "10": "40px",
+      "12": "48px",
+      "16": "64px",
+      "20": "80px",
+      "24": "96px"
+    },
+    "radius": {
+      "sm": "12px",
+      "md": "16px",
+      "lg": "24px",
+      "xl": "26px",
+      "pill": "9999px"
+    },
+    "shadow": {
+      "marketingCard": "0 0 15px 0 rgba(0, 0, 0, 0.07)",
+      "appCard": "0 0 0 1px oklab(0.145 0 0 / 0.05), 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)"
+    },
+    "motion": {
+      "fast": "150ms",
+      "normal": "220ms",
+      "slow": "320ms",
+      "easeOut": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "easeStandard": "cubic-bezier(0.4, 0, 0.2, 1)"
+    }
+  },
+  "rawReferenceExtracts": {
+    "payfit": {
+      "heroHeadingColor": "oklch(0.16172 0.03703 253.15)",
+      "bodyTextColor": "oklch(0.49112 0.03033 253.74)",
+      "ctaBackground": "oklch(0.5563 0.18803 256.77)",
+      "ctaRadius": "12px",
+      "fontFamilyText": "\"SF Pro Text-b0cb7fb75ac478b4\", \"SF Pro Text-b0cb7fb75ac478b4 fallback: Arial\", sans-serif",
+      "fontFamilyDisplay": "\"SF Pro Display-01de15f65a5e22c0\", \"SF Pro Display-01de15f65a5e22c0 fallback: Arial\", sans-serif"
+    },
+    "hosman": {
+      "pageBackground": "rgb(252, 251, 255)",
+      "headingColor": "rgb(33, 23, 90)",
+      "bodyColor": "rgb(30, 26, 55)",
+      "ctaBackground": "rgb(80, 118, 246)",
+      "cardRadius": "24px",
+      "cardShadow": "0 0 15px 0 rgba(0, 0, 0, 0.07)",
+      "headingFont": "Poppins, Verdana, sans-serif",
+      "inputFont": "Rubik, sans-serif"
+    },
+    "shadcn-b2D0wqNxS": {
+      "buttonBackground": "oklch(0.488 0.243 264.376)",
+      "buttonForeground": "oklch(0.97 0.014 254.604)",
+      "cardBackground": "oklch(1 0 0)",
+      "cardRing": "oklch(0.922 0 0)",
+      "cardRadius": "26px",
+      "cardShadow": "0 0 0 1px oklab(0.145 0 0 / 0.05), 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
+      "fontFamily": "Geist, \"Geist Fallback\""
+    }
+  },
+  "supplementaryDeferred": {
+    "realadvisor": {
+      "reason": "Cloudflare challenge in Chrome DevTools and raw HTTP 403 cf-mitigated: challenge",
+      "notBlocking": true,
+      "futureUses": [
+        "optional score-badge refinements",
+        "optional search-density refinements"
+      ]
+    }
+  }
+}
