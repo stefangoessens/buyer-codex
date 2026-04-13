@@ -7,15 +7,9 @@ import { TestimonialCard } from "@/components/marketing/TestimonialCard";
 import { HeroInput } from "@/components/marketing/HeroInput";
 import { BentoCard } from "@/components/marketing/BentoCard";
 import { metadataForStaticPage } from "@/lib/seo/pageDefinitions";
+import { buildHomepageTrustProofReadModel } from "@/lib/trustProof/readModel";
 
 /* ─── Data ────────────────────────────────────────────────────────────── */
-
-const trustStats = [
-  { value: "500+", label: "Buyers served" },
-  { value: "$2.1M", label: "Total savings" },
-  { value: "4.9\u2605", label: "Buyer rating" },
-  { value: "<5s", label: "To first analysis" },
-];
 
 const features = [
   { imageSrc: "/images/marketing/features/feature-1.png", imageAlt: "Paste a listing link and instantly get property data", title: "Paste any listing link", description: "Drop a Zillow, Redfin, or Realtor.com URL. We instantly pull the property data and start our AI analysis engine." },
@@ -29,17 +23,17 @@ const steps = [
   { number: 3, title: "Close with confidence", description: "Connect with a licensed Florida broker who uses your analysis to negotiate the best possible deal.", imageSrc: "/images/marketing/steps/step-3.png" },
 ];
 
-const testimonials = [
-  { quote: "I pasted a Zillow link and within seconds had a full pricing analysis. Saved us $18,000 on our first home in Tampa.", author: "Maria Gonzalez", role: "First-time buyer, Tampa", avatarSrc: "/images/marketing/testimonials/testimonial-1.jpg" },
-  { quote: "The AI analysis caught overpricing my agent missed. buyer-codex gave us the confidence to negotiate hard and win.", author: "James Chen", role: "Homebuyer, Miami" },
-  { quote: "From paste to close in 23 days. The deal room kept everything organized and our broker was incredible.", author: "Sarah Mitchell", role: "Relocating buyer, Orlando" },
-];
-
 /* ─── Page (Server Component) ─────────────────────────────────────────── */
 
 export const metadata: Metadata = metadataForStaticPage("home");
 
 export default function Home() {
+  const trustProof = buildHomepageTrustProofReadModel();
+  const trustStats = trustProof.stats.map((stat) => ({
+    value: stat.value,
+    label: stat.label,
+  }));
+
   return (
     <>
       {/* ── Hero ─────────────────────────────────────────────────────── */}
@@ -170,8 +164,30 @@ export default function Home() {
             <p className="text-sm font-semibold uppercase tracking-widest text-primary-400">Social proof</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-[-0.003em] text-neutral-800 lg:text-[41px] lg:leading-[1.2]">What buyers are saying</h2>
           </div>
+          {trustProof.sectionBadge && (
+            <p
+              className="mt-6 text-center text-xs font-semibold uppercase tracking-[0.18em] text-accent-700"
+              aria-label={trustProof.sectionBadgeAriaLabel ?? trustProof.sectionBadge}
+            >
+              {trustProof.sectionBadge}
+            </p>
+          )}
           <div className="mt-14 grid grid-cols-1 gap-8 md:grid-cols-3">
-            {testimonials.map((t) => <TestimonialCard key={t.author} quote={t.quote} author={t.author} role={t.role} avatarSrc={t.avatarSrc} />)}
+            {trustProof.caseStudies.map((study) => (
+              <TestimonialCard
+                key={study.id}
+                quote={study.summary}
+                author={study.buyerDisplayName}
+                role={study.buyerRole}
+                eyebrow={
+                  trustProof.sliceLabelingMode.kind === "mixed" &&
+                  study.isIllustrative
+                    ? study.badge ?? undefined
+                    : undefined
+                }
+                eyebrowAriaLabel={study.badgeAriaLabel ?? undefined}
+              />
+            ))}
           </div>
         </div>
       </section>
