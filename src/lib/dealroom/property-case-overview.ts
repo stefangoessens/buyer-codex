@@ -4,6 +4,13 @@ import type {
   PropertyCase,
 } from "@/lib/ai/engines/caseSynthesis";
 import {
+  assessEngineOutputGuardrail,
+  guardrailStateLabel,
+  type AdvisoryApprovalPath,
+  type AdvisoryGuardrailAssessment,
+  type AdvisoryGuardrailState,
+} from "@/lib/advisory/guardrails";
+import {
   buildStatusBadge,
   type DealStatus,
   type SectionStatus,
@@ -66,6 +73,8 @@ export interface PropertyCaseClaimView {
   confidenceTone: "strong" | "mixed" | "weak";
   citationId: string;
   sourceAnchorId: string;
+  guardrailState: AdvisoryGuardrailState;
+  guardrailLabel: string;
 }
 
 export interface PropertyCaseActionView {
@@ -77,12 +86,15 @@ export interface PropertyCaseActionView {
   riskLabel: string;
   suggestedContingencies: string[];
   rationale: PropertyCaseTakeaway[];
+  guardrailState: AdvisoryGuardrailState;
+  guardrailLabel: string;
+  guardrailExplanation: string;
 }
 
 export interface PropertyCaseMissingState {
   engine: CoverageEngineKey;
   label: string;
-  tone: "pending" | "uncertain" | "missing";
+  tone: "pending" | "uncertain" | "missing" | "review_required" | "blocked";
   title: string;
   description: string;
 }
@@ -97,6 +109,9 @@ export interface PropertyCaseSourceView {
   confidenceLabel: string;
   generatedAtLabel: string | null;
   claimCount: number;
+  guardrailState: AdvisoryGuardrailState;
+  guardrailLabel: string;
+  approvalPath: AdvisoryApprovalPath;
 }
 
 export interface PropertyCaseCoverageStats {
@@ -169,6 +184,13 @@ export interface InternalPropertyCaseOverview
     hitCount: number;
     adjudicationSummary: PropertyCaseAdjudicationSummary;
     adjudicationItems: PropertyCaseAdjudicationItem[];
+    guardrails: Array<{
+      citationId: string;
+      engineLabel: string;
+      state: AdvisoryGuardrailState;
+      approvalPath: AdvisoryApprovalPath;
+      summary: string;
+    }>;
   };
 }
 
@@ -205,11 +227,24 @@ export function buildPropertyCaseOverview(
   const isInternal = input.viewerRole === "broker" || input.viewerRole === "admin";
   const status = buildStatusBadge(input.dealStatus);
   const payload = input.caseRecord?.payload ?? null;
-  const claims = (payload?.claims ?? []).map((claim) => projectClaim(claim));
-  const missingStates = buildMissingStates(input.coverage, payload);
+  const coverageByKey = new Map(
+    input.coverage.map((entry) => [entry.key, entry]),
+  );
+  const citationGuardrails = buildCitationGuardrails(input.citations ?? []);
+  const offerGuardrail = findOfferGuardrail(input.citations ?? []);
+  const claims = (payload?.claims ?? [])
+    .filter((claim) => isClaimCoverageAvailable(claim, coverageByKey))
+    .map((claim) => projectClaim(claim, citationGuardrails.get(claim.citation)))
+    .filter((claim): claim is PropertyCaseClaimView => Boolean(claim));
+  const action = buildAction(payload, claims, coverageByKey, offerGuardrail);
+  const missingStates = buildMissingStates(
+    input.coverage,
+    payload,
+    action,
+    offerGuardrail,
+  );
   const coverageStats = buildCoverageStats(input.coverage, payload);
-  const keyTakeaways = buildTakeaways(payload?.claims ?? []);
-  const action = buildAction(payload, claims);
+  const keyTakeaways = buildTakeaways(claims);
   const sources = buildSources(payload?.claims ?? [], input.citations ?? []);
   const adjudicationItems = buildAdjudicationItems(
     payload?.claims ?? [],
@@ -283,11 +318,34 @@ export function buildPropertyCaseOverview(
       hitCount: input.caseRecord?.hitCount ?? 0,
       adjudicationSummary,
       adjudicationItems,
+      guardrails: Array.from(citationGuardrails.entries())
+        .map(([citationId, assessment]) => ({
+          citationId,
+          engineLabel: humanizeEngineType(
+            input.citations?.find((citation) => citation.citationId === citationId)
+              ?.engineType,
+          ),
+          state: assessment.state,
+          approvalPath: assessment.approvalPath,
+          summary: assessment.internalSummary,
+        }))
+        .sort((a, b) => a.engineLabel.localeCompare(b.engineLabel)),
     },
   };
 }
 
-function projectClaim(claim: ComparativeClaim): PropertyCaseClaimView {
+function projectClaim(
+  claim: ComparativeClaim,
+  assessment: AdvisoryGuardrailAssessment | undefined,
+): PropertyCaseClaimView | null {
+  if (
+    assessment?.state === "review_required" ||
+    assessment?.state === "blocked"
+  ) {
+    return null;
+  }
+
+  const guardrailState = assessment?.state ?? "can_say";
   return {
     id: claim.id,
     topic: claim.topic,
@@ -306,10 +364,12 @@ function projectClaim(claim: ComparativeClaim): PropertyCaseClaimView {
     confidenceTone: confidenceTone(claim.confidence),
     citationId: claim.citation,
     sourceAnchorId: sourceAnchorId(claim.citation),
+    guardrailState,
+    guardrailLabel: guardrailStateLabel(guardrailState),
   };
 }
 
-function buildTakeaways(claims: ComparativeClaim[]): PropertyCaseTakeaway[] {
+function buildTakeaways(claims: PropertyCaseClaimView[]): PropertyCaseTakeaway[] {
   return claims.slice(0, 3).map((claim) => ({
     title: topicLabels[claim.topic],
     body: claim.narrative,
@@ -319,8 +379,17 @@ function buildTakeaways(claims: ComparativeClaim[]): PropertyCaseTakeaway[] {
 function buildAction(
   payload: PropertyCase | null,
   claims: PropertyCaseClaimView[],
+  coverageByKey: Map<CoverageEngineKey, PropertyCaseCoverageInput>,
+  offerGuardrail: AdvisoryGuardrailAssessment | undefined,
 ): PropertyCaseActionView | null {
   if (!payload?.recommendedAction) return null;
+  if (coverageByKey.get("offer")?.status !== "available") return null;
+  if (
+    offerGuardrail?.state === "review_required" ||
+    offerGuardrail?.state === "blocked"
+  ) {
+    return null;
+  }
 
   const rationale = payload.recommendedAction.rationaleClaimIds
     .map((id) => claims.find((claim) => claim.id === id))
@@ -341,12 +410,19 @@ function buildAction(
     riskLabel: `${capitalize(payload.recommendedAction.riskLevel)} risk`,
     suggestedContingencies: [...payload.recommendedAction.suggestedContingencies],
     rationale,
+    guardrailState: offerGuardrail?.state ?? "can_say",
+    guardrailLabel: guardrailStateLabel(offerGuardrail?.state ?? "can_say"),
+    guardrailExplanation:
+      offerGuardrail?.buyerExplanation ??
+      "This recommendation cleared the buyer-safe advisory guardrail.",
   };
 }
 
 function buildMissingStates(
   coverage: PropertyCaseCoverageInput[],
   payload: PropertyCase | null,
+  action: PropertyCaseActionView | null,
+  offerGuardrail: AdvisoryGuardrailAssessment | undefined,
 ): PropertyCaseMissingState[] {
   const dropped = new Set(payload?.droppedEngines ?? []);
   const states: PropertyCaseMissingState[] = [];
@@ -388,6 +464,26 @@ function buildMissingStates(
           "We do not have enough verified data to show this signal yet.",
       });
     }
+  }
+
+  if (
+    payload?.recommendedAction &&
+    !action &&
+    offerGuardrail &&
+    (offerGuardrail.state === "review_required" ||
+      offerGuardrail.state === "blocked")
+  ) {
+    states.push({
+      engine: "offer",
+      label: engineLabels.offer,
+      tone:
+        offerGuardrail.state === "blocked" ? "blocked" : "review_required",
+      title:
+        offerGuardrail.state === "blocked"
+          ? "Offer guidance is blocked"
+          : "Offer guidance is waiting on broker review",
+      description: offerGuardrail.buyerExplanation,
+    });
   }
 
   return states;
@@ -447,6 +543,11 @@ function buildSources(
   return Array.from(claimsByCitation.entries())
     .map(([citationId, claimCount]) => {
       const citation = byCitation.get(citationId);
+      const guardrail = assessEngineOutputGuardrail({
+        engineType: citation?.engineType ?? "other",
+        confidence: citation?.confidence,
+        reviewState: citation?.reviewState,
+      });
       const status: PropertyCaseSourceView["status"] =
         !citation
           ? "unavailable"
@@ -471,6 +572,9 @@ function buildSources(
           ? formatShortDate(citation.generatedAt)
           : null,
         claimCount,
+        guardrailState: guardrail.state,
+        guardrailLabel: guardrailStateLabel(guardrail.state),
+        approvalPath: guardrail.approvalPath,
       };
     })
     .sort((a, b) => a.engineLabel.localeCompare(b.engineLabel));
@@ -594,6 +698,55 @@ function buildHeaderDescription(
   }
 
   return `${status.label}. We only surface a case once the inputs are safe to show, so this view stays explicit about what is still missing.`;
+}
+
+function buildCitationGuardrails(
+  citations: PropertyCaseCitationInput[],
+): Map<string, AdvisoryGuardrailAssessment> {
+  return new Map(
+    citations.map((citation) => [
+      citation.citationId,
+      assessEngineOutputGuardrail({
+        engineType: citation.engineType,
+        confidence: citation.confidence,
+        reviewState: citation.reviewState,
+      }),
+    ]),
+  );
+}
+
+function findOfferGuardrail(
+  citations: PropertyCaseCitationInput[],
+): AdvisoryGuardrailAssessment | undefined {
+  const offerCitation = citations.find((citation) => citation.engineType === "offer");
+  if (!offerCitation) return undefined;
+
+  return assessEngineOutputGuardrail({
+    engineType: offerCitation.engineType,
+    confidence: offerCitation.confidence,
+    reviewState: offerCitation.reviewState,
+  });
+}
+
+function coverageKeyForClaim(topic: ClaimTopic): CoverageEngineKey {
+  switch (topic) {
+    case "pricing":
+      return "pricing";
+    case "comps":
+      return "comps";
+    case "days_on_market":
+    case "leverage":
+      return "leverage";
+    case "offer_recommendation":
+      return "offer";
+  }
+}
+
+function isClaimCoverageAvailable(
+  claim: ComparativeClaim,
+  coverageByKey: Map<CoverageEngineKey, PropertyCaseCoverageInput>,
+): boolean {
+  return coverageByKey.get(coverageKeyForClaim(claim.topic))?.status === "available";
 }
 
 function confidenceTone(value: number): "strong" | "mixed" | "weak" {

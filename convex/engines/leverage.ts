@@ -22,8 +22,8 @@ export const runLeverageEngine = internalAction({
     });
     if (!property) return null;
 
-    const enrichment: any = await ctx.runQuery(
-      internal.enrichment.getForPropertyInternal,
+    const dossier: any = await ctx.runMutation(
+      internal.propertyDossiers.syncForProperty,
       { propertyId: args.propertyId },
     );
     const prompt: any = await ctx.runQuery(
@@ -39,7 +39,7 @@ export const runLeverageEngine = internalAction({
     }
 
     const input: LeverageInput =
-      enrichment?.engineInputs?.leverage ?? {
+      dossier?.sections?.downstreamInputs?.data?.engineInputs?.leverage ?? {
         propertyId: args.propertyId,
         listPrice: property.listPrice ?? 0,
         daysOnMarket: property.daysOnMarket ?? 0,

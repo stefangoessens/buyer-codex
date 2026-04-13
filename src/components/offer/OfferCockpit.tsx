@@ -46,7 +46,12 @@ export function OfferCockpit({ dealRoomId }: OfferCockpitProps) {
 
   const { data } = cockpit;
   const scenarios = data.scenarios?.output;
+  const scenarioGuardrail = data.scenarios?.guardrail;
   const disabled = !cockpit.canEdit;
+  const buyerScenarioBlocked =
+    data.viewerRole === "buyer" &&
+    (scenarioGuardrail?.state === "review_required" ||
+      scenarioGuardrail?.state === "blocked");
 
   return (
     <EligibilityGate
@@ -81,7 +86,7 @@ export function OfferCockpit({ dealRoomId }: OfferCockpitProps) {
           onDiscard={() => cockpit.reset()}
         />
 
-        {scenarios ? (
+        {scenarios && !buyerScenarioBlocked ? (
           <ScenarioComparison
             scenarios={scenarios.scenarios}
             recommendedIndex={scenarios.recommendedIndex}
@@ -91,7 +96,23 @@ export function OfferCockpit({ dealRoomId }: OfferCockpitProps) {
             inputSummary={scenarios.inputSummary}
             confidence={data.scenarios?.confidence}
             refreshedAt={data.scenarios?.generatedAt}
+            guardrailNote={
+              scenarioGuardrail?.state === "softened"
+                ? `${scenarioGuardrail.buyerHeadline}. ${scenarioGuardrail.buyerExplanation}`
+                : undefined
+            }
           />
+        ) : buyerScenarioBlocked ? (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-neutral-500">
+              <p className="font-medium text-neutral-700">
+                {scenarioGuardrail?.buyerHeadline}
+              </p>
+              <p className="mt-2">
+                {scenarioGuardrail?.buyerExplanation}
+              </p>
+            </CardContent>
+          </Card>
         ) : (
           <Card>
             <CardContent className="py-8 text-center text-sm text-neutral-500">

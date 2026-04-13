@@ -5,11 +5,12 @@ import {
   prepareListingIntakeSubmission,
 } from "@/lib/intake/pasteLink";
 import {
-  PASTE_LINK_DROP_OFF_ALERTS,
-  PASTE_LINK_FUNNEL_NAME,
-  PASTE_LINK_FUNNEL_STAGES,
-  PASTE_LINK_REGISTERED_DEAL_ROOM_KPI,
-  PASTE_TO_TEASER_SLO,
+    PASTE_LINK_DROP_OFF_ALERTS,
+    PASTE_LINK_FUNNEL_NAME,
+    PASTE_LINK_FUNNEL_STAGES,
+    PASTE_LINK_REGISTERED_DEAL_ROOM_KPI,
+    PASTE_TO_DOSSIER_SLO,
+    PASTE_TO_TEASER_SLO,
 } from "@/lib/intake/pasteLinkFunnel";
 
 describe("buildListingIntakeHref", () => {
@@ -90,8 +91,10 @@ describe("paste-link funnel configuration", () => {
     ]);
   });
 
-  it("documents the <5s teaser SLO and the <60s conversion KPI", () => {
+  it("documents the teaser and dossier SLOs alongside the <60s conversion KPI", () => {
     expect(PASTE_TO_TEASER_SLO.targetMs).toBe(5000);
+    expect(PASTE_TO_DOSSIER_SLO.targetMs).toBe(60000);
+    expect(PASTE_TO_DOSSIER_SLO.measurement).toBe("deal_room_unlocked.latencyMs");
     expect(PASTE_LINK_REGISTERED_DEAL_ROOM_KPI.targetWindowSeconds).toBe(60);
   });
 

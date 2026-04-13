@@ -15,6 +15,7 @@ interface IntakePageProps {
     platform?: string;
     listingId?: string;
     sourceListingId?: string;
+    attemptId?: string;
   }>;
 }
 

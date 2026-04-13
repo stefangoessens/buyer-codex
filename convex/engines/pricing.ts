@@ -42,14 +42,14 @@ export const runPricingEngine = internalAction({
       throw new Error(`Unknown pricing prompt version: ${args.promptVersion}`);
     }
 
-    const enrichment: any = await ctx.runQuery(
-      internal.enrichment.getForPropertyInternal,
+    const dossier: any = await ctx.runMutation(
+      internal.propertyDossiers.syncForProperty,
       { propertyId: args.propertyId },
     );
 
     // 3. Build and run the pricing engine
     const input: PricingInput =
-      enrichment?.engineInputs?.pricing ?? {
+      dossier?.sections?.downstreamInputs?.data?.engineInputs?.pricing ?? {
         propertyId: args.propertyId,
         listPrice: property.listPrice ?? 0,
         address: property.address?.formatted ?? "Unknown",

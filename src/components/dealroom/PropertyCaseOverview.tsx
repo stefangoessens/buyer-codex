@@ -488,9 +488,16 @@ function PropertyCaseOverviewBody({
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-2">
-                      <Badge variant="outline" className="border-neutral-200 bg-white text-neutral-700">
-                        {claim.topicLabel}
-                      </Badge>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="border-neutral-200 bg-white text-neutral-700">
+                          {claim.topicLabel}
+                        </Badge>
+                        {claim.guardrailState !== "can_say" && (
+                          <Badge variant="outline" className="border-neutral-200 bg-white text-neutral-700">
+                            {claim.guardrailLabel}
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-base font-medium leading-7 text-neutral-900">
                         {claim.narrative}
                       </p>
@@ -548,7 +555,9 @@ function PropertyCaseOverviewBody({
                 <div className="space-y-5">
                   <div className="rounded-[22px] bg-neutral-950 p-5 text-white shadow-[0_28px_56px_-38px_rgba(3,14,29,0.45)]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">
-                      Suggested opener
+                      {overview.action.guardrailState === "softened"
+                        ? "Illustrative opener"
+                        : "Suggested opener"}
                     </p>
                     <p className="mt-3 text-3xl font-semibold">
                       {overview.action.openingPriceLabel}
@@ -560,7 +569,17 @@ function PropertyCaseOverviewBody({
                       <RiskBadge risk={overview.action.riskLevel}>
                         {overview.action.riskLabel}
                       </RiskBadge>
+                      {overview.action.guardrailState !== "can_say" && (
+                        <Badge className="bg-white/10 text-white">
+                          {overview.action.guardrailLabel}
+                        </Badge>
+                      )}
                     </div>
+                    {overview.action.guardrailState !== "can_say" && (
+                      <p className="mt-4 text-sm leading-6 text-white/78">
+                        {overview.action.guardrailExplanation}
+                      </p>
+                    )}
                   </div>
 
                   {overview.action.rationale.length > 0 && (
@@ -672,6 +691,10 @@ function PropertyCaseOverviewBody({
                         "border-warning-200 bg-warning-50/70",
                       item.tone === "missing" &&
                         "border-neutral-200 bg-neutral-50",
+                      item.tone === "review_required" &&
+                        "border-warning-200 bg-warning-50/70",
+                      item.tone === "blocked" &&
+                        "border-error-200 bg-error-50/70",
                     )}
                   >
                     <div className="flex flex-wrap items-center gap-2">
@@ -750,6 +773,41 @@ function PropertyCaseOverviewBody({
                   </div>
                 </div>
 
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/55">
+                    Advisory guardrails
+                  </p>
+                  <div className="mt-3 flex flex-col gap-3">
+                    {overview.internal.guardrails.length > 0 ? (
+                      overview.internal.guardrails.map((guardrail) => (
+                        <div
+                          key={`${guardrail.citationId}-${guardrail.state}`}
+                          className="rounded-xl border border-white/10 bg-white/5 p-3"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className="bg-white/10 text-white">
+                              {guardrail.engineLabel}
+                            </Badge>
+                            <Badge className="bg-white/10 text-white">
+                              {guardrail.state.replaceAll("_", " ")}
+                            </Badge>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-white/78">
+                            {guardrail.summary}
+                          </p>
+                          <p className="mt-2 text-xs uppercase tracking-[0.16em] text-white/50">
+                            {guardrail.approvalPath.replaceAll("_", " ")}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-sm text-white/75">
+                        No advisory guardrail escalations.
+                      </span>
+                    )}
+                  </div>
+                </div>
+
                 <BrokerAdjudicationSection
                   overview={overview}
                   telemetryEnabled={telemetryEnabled}
@@ -808,6 +866,8 @@ function PropertyCaseOverviewBody({
                   <span>
                     {source.claimCount} linked claim{source.claimCount === 1 ? "" : "s"}
                   </span>
+                  <span className="text-neutral-300">•</span>
+                  <span>{source.guardrailLabel}</span>
                   {source.generatedAtLabel && (
                     <>
                       <span className="text-neutral-300">•</span>

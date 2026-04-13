@@ -6,6 +6,8 @@
  * and UI components all share a single source of truth.
  */
 
+import { assessEngineOutputGuardrail } from "../../src/lib/advisory/guardrails";
+
 /**
  * Confidence threshold for auto-approval.
  * Outputs >= this threshold are automatically approved.
@@ -16,10 +18,38 @@ export const AUTO_APPROVE_THRESHOLD = 0.8;
 /**
  * Determine the initial review state based on confidence score.
  */
+export function determineReviewState(confidence: number): "approved" | "pending";
+export function determineReviewState(args: {
+  engineType: string;
+  confidence: number;
+  output?: string;
+}): "approved" | "pending";
 export function determineReviewState(
-  confidence: number,
+  input:
+    | number
+    | {
+        engineType: string;
+        confidence: number;
+        output?: string;
+      },
 ): "approved" | "pending" {
-  return confidence >= AUTO_APPROVE_THRESHOLD ? "approved" : "pending";
+  if (typeof input === "number") {
+    return input >= AUTO_APPROVE_THRESHOLD ? "approved" : "pending";
+  }
+
+  const guardrail = assessEngineOutputGuardrail({
+    engineType: input.engineType,
+    confidence: input.confidence,
+    output: input.output,
+  });
+  if (
+    guardrail.baseState === "review_required" ||
+    guardrail.baseState === "blocked"
+  ) {
+    return "pending";
+  }
+
+  return input.confidence >= AUTO_APPROVE_THRESHOLD ? "approved" : "pending";
 }
 
 /**

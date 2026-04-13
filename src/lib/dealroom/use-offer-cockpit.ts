@@ -5,6 +5,11 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { OfferOutput, OfferScenario } from "@/lib/ai/engines/types";
+import type {
+  AdvisoryApprovalPath,
+  AdvisoryGuardrailState,
+  AdvisoryOutputClass,
+} from "@/lib/advisory/guardrails";
 import {
   emptyTerms,
   scenarioToTerms,
@@ -50,8 +55,16 @@ type CockpitServerPayload = {
   scenarios: {
     output: OfferOutput;
     confidence: number;
+    reviewState: "pending" | "approved" | "rejected";
     generatedAt: string;
     modelId: string;
+    guardrail: {
+      state: AdvisoryGuardrailState;
+      classes: AdvisoryOutputClass[];
+      approvalPath: AdvisoryApprovalPath;
+      buyerHeadline: string;
+      buyerExplanation: string;
+    };
   } | null;
   eligibility: OfferEligibilitySnapshot;
   canEdit: boolean;
@@ -110,23 +123,35 @@ export function useOfferCockpit(
   const discardDraft = useMutation(api.offerCockpit.discardDraft);
 
   const listPrice = data?.listPrice ?? 0;
+  const buyerCanUseScenarioDefaults =
+    data?.viewerRole !== "buyer" ||
+    (data?.scenarios?.guardrail.state !== "review_required" &&
+      data?.scenarios?.guardrail.state !== "blocked");
 
   const initialTerms = useMemo<OfferTerms>(() => {
     if (data?.draft) return toTerms(data.draft, emptyTerms(listPrice));
-    const scenarios = data?.scenarios?.output?.scenarios ?? [];
-    const recommendedIdx = data?.scenarios?.output?.recommendedIndex ?? 1;
+    const scenarios = buyerCanUseScenarioDefaults
+      ? data?.scenarios?.output?.scenarios ?? []
+      : [];
+    const recommendedIdx = buyerCanUseScenarioDefaults
+      ? data?.scenarios?.output?.recommendedIndex ?? 1
+      : 1;
     const scenario = scenarios[recommendedIdx] ?? scenarios[0];
     if (scenario) return scenarioToTerms(scenario, listPrice);
     return emptyTerms(listPrice);
-  }, [data, listPrice]);
+  }, [buyerCanUseScenarioDefaults, data, listPrice]);
 
   const initialScenarioName = useMemo<string | null>(() => {
     if (data?.draft?.selectedScenarioName) return data.draft.selectedScenarioName;
-    const scenarios = data?.scenarios?.output?.scenarios ?? [];
-    const recommendedIdx = data?.scenarios?.output?.recommendedIndex ?? 1;
+    const scenarios = buyerCanUseScenarioDefaults
+      ? data?.scenarios?.output?.scenarios ?? []
+      : [];
+    const recommendedIdx = buyerCanUseScenarioDefaults
+      ? data?.scenarios?.output?.recommendedIndex ?? 1
+      : 1;
     const scenario = scenarios[recommendedIdx] ?? scenarios[0];
     return scenario?.name ?? null;
-  }, [data]);
+  }, [buyerCanUseScenarioDefaults, data]);
 
   const [terms, setTermsState] = useState<OfferTerms>(initialTerms);
   const [pristineTerms, setPristineTerms] = useState<OfferTerms>(initialTerms);

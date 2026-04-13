@@ -14,6 +14,7 @@ import {
   type IntentClassification,
 } from "./intents";
 import {
+  composeGuardrailedResponse,
   composeGroundedAnswer,
   composeLlmPrompt,
   composeOffTopicRefusal,
@@ -23,6 +24,11 @@ import {
   type EngineOutputRef,
 } from "./response-composer";
 import { isEngineAvailable, routeForIntent } from "./router";
+import {
+  assessCopilotQuestionGuardrail,
+  assessEngineOutputGuardrail,
+  pickMoreRestrictiveGuardrail,
+} from "@/lib/advisory/guardrails";
 
 export interface OrchestratorDeps {
   /** Classify via LLM when rule-based confidence is below the fallback threshold. */
@@ -88,6 +94,10 @@ export async function orchestrate(
 
   const route = routeForIntent(classification.intent);
   const engineAvailable = isEngineAvailable(classification.intent);
+  const questionGuardrail = assessCopilotQuestionGuardrail({
+    question: input.question,
+    intent: classification.intent,
+  });
   const debug = {
     engineAvailable,
     ruleIntent: ruleClassification.intent,
@@ -96,6 +106,22 @@ export async function orchestrate(
 
   // "other" intent: guarded general, never routed to engines.
   if (classification.intent === "other") {
+    if (questionGuardrail) {
+      return {
+        classification,
+        response: composeGuardrailedResponse(
+          {
+            intent: classification.intent,
+            engine: "guarded_general",
+            engineRef: null,
+            questionPreview: input.question.slice(0, 80),
+          },
+          questionGuardrail,
+        ),
+        debug,
+      };
+    }
+
     if (!deps.llmGuardedGeneral) {
       return {
         classification,
@@ -138,6 +164,22 @@ export async function orchestrate(
   }
 
   if (!engineAvailable) {
+    if (questionGuardrail) {
+      return {
+        classification,
+        response: composeGuardrailedResponse(
+          {
+            intent: classification.intent,
+            engine: route.engine,
+            engineRef: null,
+            questionPreview: input.question.slice(0, 80),
+          },
+          questionGuardrail,
+        ),
+        debug,
+      };
+    }
+
     return {
       classification,
       response: composeStubResponse({
@@ -161,6 +203,22 @@ export async function orchestrate(
   }
 
   if (!hasEnoughContext(engineRef)) {
+    if (questionGuardrail) {
+      return {
+        classification,
+        response: composeGuardrailedResponse(
+          {
+            intent: classification.intent,
+            engine: route.engine,
+            engineRef,
+            questionPreview: input.question.slice(0, 80),
+          },
+          questionGuardrail,
+        ),
+        debug,
+      };
+    }
+
     return {
       classification,
       response: composeStubResponse({
@@ -173,6 +231,37 @@ export async function orchestrate(
     };
   }
 
+  const guardedEngineRef = engineRef!;
+  const engineGuardrail = assessEngineOutputGuardrail({
+    engineType: route.engine,
+    confidence: guardedEngineRef.confidence,
+    output: guardedEngineRef.rawOutput,
+    reviewState: guardedEngineRef.reviewState,
+  });
+  const effectiveGuardrail = pickMoreRestrictiveGuardrail(
+    questionGuardrail,
+    engineGuardrail,
+  );
+  if (
+    effectiveGuardrail &&
+    effectiveGuardrail.state !== "can_say" &&
+    !(effectiveGuardrail.state === "softened" && route.engine === "comps")
+  ) {
+    return {
+      classification,
+      response: composeGuardrailedResponse(
+        {
+          intent: classification.intent,
+          engine: route.engine,
+          engineRef: guardedEngineRef,
+          questionPreview: input.question.slice(0, 80),
+        },
+        effectiveGuardrail,
+      ),
+      debug,
+    };
+  }
+
   try {
     // Strip LLM output and return the grounded answer. We do not need the
     // requiresLlm preview path in the orchestrator output — callers get
@@ -180,13 +269,13 @@ export async function orchestrate(
     const _preview = composeLlmPrompt({
       intent: classification.intent,
       engine: route.engine,
-      engineRef,
+      engineRef: guardedEngineRef,
       questionPreview: input.question.slice(0, 80),
     });
     void _preview;
     const text = await deps.llmRespond(
       classification.intent,
-      engineRef!,
+      guardedEngineRef,
       input.question,
     );
     return {
@@ -195,7 +284,7 @@ export async function orchestrate(
         {
           intent: classification.intent,
           engine: route.engine,
-          engineRef,
+          engineRef: guardedEngineRef,
           questionPreview: input.question.slice(0, 80),
         },
         text,

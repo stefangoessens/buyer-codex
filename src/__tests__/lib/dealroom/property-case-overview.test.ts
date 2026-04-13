@@ -104,6 +104,13 @@ describe("buildPropertyCaseOverview", () => {
           generatedAt: "2026-04-13T18:55:00.000Z",
           reviewState: "approved",
         },
+        {
+          citationId: "engineOut_offer_1",
+          engineType: "offer",
+          confidence: 0.88,
+          generatedAt: "2026-04-13T18:56:00.000Z",
+          reviewState: "approved",
+        },
       ],
       viewerRole: "buyer",
     });
@@ -112,8 +119,10 @@ describe("buildPropertyCaseOverview", () => {
     expect(surface.viewerRole).toBe("buyer");
     expect(surface.viewState).toBe("ready");
     expect(surface.claims).toHaveLength(3);
+    expect(surface.claims[0]?.guardrailState).toBe("softened");
     expect(surface.keyTakeaways).toHaveLength(3);
     expect(surface.action?.openingPriceLabel).toBe("$615,000");
+    expect(surface.action?.guardrailState).toBe("softened");
     expect(surface.sources[0]?.anchorId).toBe("source-engineOut_pricing_1");
     expect(surface.coverageStats.availableCount).toBe(4);
     expect(surface.internal).toBeUndefined();
@@ -132,7 +141,6 @@ describe("buildPropertyCaseOverview", () => {
         hitCount: 1,
         payload: payloadFixture({
           claims: [claimFixture()],
-          recommendedAction: undefined,
           droppedEngines: ["comps"],
           contributingEngines: 2,
         }),
@@ -147,8 +155,17 @@ describe("buildPropertyCaseOverview", () => {
         },
         {
           key: "offer",
-          status: "unavailable",
-          reason: "Offer scenarios have not been generated yet.",
+          status: "available",
+          reason: "Offer scenarios were generated but require broker review.",
+        },
+      ],
+      citations: [
+        {
+          citationId: "engineOut_offer_1",
+          engineType: "offer",
+          confidence: 0.9,
+          generatedAt: "2026-04-13T18:59:00.000Z",
+          reviewState: "pending",
         },
       ],
       viewerRole: "buyer",
@@ -156,11 +173,12 @@ describe("buildPropertyCaseOverview", () => {
 
     expect(surface.viewState).toBe("partial");
     expect(surface.coverageStats).toMatchObject({
-      availableCount: 1,
+      availableCount: 2,
       pendingCount: 1,
       uncertainCount: 1,
-      missingCount: 1,
+      missingCount: 0,
     });
+    expect(surface.action).toBeNull();
     expect(surface.missingStates).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -173,11 +191,10 @@ describe("buildPropertyCaseOverview", () => {
         }),
         expect.objectContaining({
           engine: "offer",
-          tone: "missing",
+          tone: "review_required",
         }),
       ]),
     );
-    expect(surface.action).toBeNull();
   });
 
   it("keeps internal-only cache metadata off buyer-safe views and on staff views", () => {
@@ -196,6 +213,15 @@ describe("buildPropertyCaseOverview", () => {
         }),
       },
       coverage: availableCoverage(),
+      citations: [
+        {
+          citationId: "engineOut_pricing_1",
+          engineType: "pricing",
+          confidence: 0.82,
+          generatedAt: "2026-04-13T18:55:00.000Z",
+          reviewState: "approved",
+        },
+      ],
       viewerRole: "broker",
     });
 
@@ -210,8 +236,16 @@ describe("buildPropertyCaseOverview", () => {
     expect(surface.internal.droppedEngines).toContain("leverage");
     expect(surface.internal.adjudicationSummary).toEqual({
       pendingCount: 0,
-      approvedCount: 0,
+      approvedCount: 1,
       rejectedCount: 0,
+    });
+    expect(surface.internal.adjudicationItems[0]).toMatchObject({
+      citationId: "engineOut_pricing_1",
+      reviewState: "approved",
+    });
+    expect(surface.internal.guardrails[0]).toMatchObject({
+      engineLabel: "Pricing",
+      state: "softened",
     });
   });
 

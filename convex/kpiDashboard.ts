@@ -25,6 +25,7 @@ import { type QueryCtx } from "./_generated/server";
 import { buildLeadAttributionReadModel } from "./lib/leadAttribution";
 import { requireAuth } from "./lib/session";
 import { averageCalibrationDrift } from "../src/lib/ai/engines/pricingCalibration";
+import { buildIntakeReliabilityReport } from "../src/lib/intake/reliability";
 
 // ─── range + metric validators ──────────────────────────────────────────────
 
@@ -56,6 +57,62 @@ const metricValueValidator = v.object({
   value: v.union(v.number(), v.null()),
   previousValue: v.union(v.number(), v.null()),
   source: v.union(v.literal("snapshot"), v.literal("computed"), v.literal("unavailable")),
+});
+
+const intakeSourceSummaryValidator = v.object({
+  sourcePlatform: v.string(),
+  sourceLabel: v.string(),
+  totalAttempts: v.number(),
+  readyCount: v.number(),
+  partialCount: v.number(),
+  failedCount: v.number(),
+  unsupportedCount: v.number(),
+  pendingCount: v.number(),
+  retryableFailureCount: v.number(),
+  usableRate: v.union(v.number(), v.null()),
+  failureRate: v.union(v.number(), v.null()),
+  partialRate: v.union(v.number(), v.null()),
+  medianTimeToTeaserMs: v.union(v.number(), v.null()),
+  medianTimeToDossierMs: v.union(v.number(), v.null()),
+  coverageStatus: v.union(
+    v.literal("healthy"),
+    v.literal("needs_attention"),
+    v.literal("missing"),
+  ),
+});
+
+const intakeFailureModeSummaryValidator = v.object({
+  mode: v.union(
+    v.literal("unsupported_url"),
+    v.literal("malformed_url"),
+    v.literal("missing_listing_id"),
+    v.literal("parser_failed"),
+    v.literal("partial_extraction"),
+    v.literal("no_match"),
+    v.literal("ambiguous_match"),
+    v.literal("low_confidence_match"),
+    v.literal("unknown"),
+  ),
+  count: v.number(),
+  retryableCount: v.number(),
+});
+
+const intakeReliabilityReportValidator = v.object({
+  totals: v.object({
+    totalAttempts: v.number(),
+    readyCount: v.number(),
+    partialCount: v.number(),
+    failedCount: v.number(),
+    unsupportedCount: v.number(),
+    pendingCount: v.number(),
+    retryableFailureCount: v.number(),
+    usableRate: v.union(v.number(), v.null()),
+    failureRate: v.union(v.number(), v.null()),
+    medianTimeToTeaserMs: v.union(v.number(), v.null()),
+    medianTimeToDossierMs: v.union(v.number(), v.null()),
+  }),
+  sources: v.array(intakeSourceSummaryValidator),
+  failureModes: v.array(intakeFailureModeSummaryValidator),
 });
 
 // ─── metric catalog (duplicated from src/lib/admin/kpiCatalog.ts) ──────────
@@ -100,6 +157,34 @@ const METRICS: readonly MetricDef[] = [
     category: "funnel",
     unit: "percent",
     direction: "higher_better",
+  },
+  {
+    key: "funnel.intake_usable_rate",
+    label: "Usable intake rate",
+    category: "funnel",
+    unit: "percent",
+    direction: "higher_better",
+  },
+  {
+    key: "funnel.intake_failure_rate",
+    label: "Intake failure rate",
+    category: "funnel",
+    unit: "percent",
+    direction: "lower_better",
+  },
+  {
+    key: "funnel.time_to_teaser_ms",
+    label: "Median time to teaser",
+    category: "funnel",
+    unit: "duration_ms",
+    direction: "lower_better",
+  },
+  {
+    key: "funnel.time_to_dossier_ms",
+    label: "Median time to dossier",
+    category: "funnel",
+    unit: "duration_ms",
+    direction: "lower_better",
   },
   {
     key: "engagement.deal_rooms_created",
@@ -242,6 +327,23 @@ async function computeMetric(
       if (inWindow.length === 0) return 0;
       return registered / inWindow.length;
     }
+    case "funnel.intake_usable_rate":
+    case "funnel.intake_failure_rate":
+    case "funnel.time_to_teaser_ms":
+    case "funnel.time_to_dossier_ms": {
+      const report = await computeIntakeReliabilityReport(ctx, startMs, endMs);
+      switch (metric.key) {
+        case "funnel.intake_usable_rate":
+          return report.totals.usableRate;
+        case "funnel.intake_failure_rate":
+          return report.totals.failureRate;
+        case "funnel.time_to_teaser_ms":
+          return report.totals.medianTimeToTeaserMs;
+        case "funnel.time_to_dossier_ms":
+          return report.totals.medianTimeToDossierMs;
+      }
+      return null;
+    }
     case "engagement.deal_rooms_created": {
       const rows = await ctx.db.query("dealRooms").collect();
       return rows.filter((r) => {
@@ -350,6 +452,18 @@ async function computeMetric(
     default:
       return null;
   }
+}
+
+async function computeIntakeReliabilityReport(
+  ctx: QueryCtx,
+  startMs: number,
+  endMs: number,
+) {
+  const attempts = await ctx.db.query("intakeAttempts").collect();
+  const inWindow = attempts.filter((attempt) =>
+    withinRange(attempt.submittedAt, startMs, endMs),
+  );
+  return buildIntakeReliabilityReport(inWindow);
 }
 
 async function resolveMetric(
@@ -489,5 +603,23 @@ export const getCatalog = query({
       unit: m.unit,
       direction: m.direction,
     }));
+  },
+});
+
+export const getIntakeReliabilityReport = query({
+  args: {
+    range: rangeValidator,
+  },
+  returns: intakeReliabilityReportValidator,
+  handler: async (ctx, args) => {
+    await requireInternalUser(ctx);
+
+    const startMs = new Date(args.range.start).getTime();
+    const endMs = new Date(args.range.end).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) {
+      throw new Error("Invalid date range");
+    }
+
+    return await computeIntakeReliabilityReport(ctx, startMs, endMs);
   },
 });
