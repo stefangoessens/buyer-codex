@@ -39,6 +39,45 @@ export interface PricingOutput {
 
 // ═══ Comps Engine Types ═══
 
+export const COMP_SOURCE_PLATFORMS = ["redfin", "zillow", "realtor"] as const;
+
+export type CompSourcePlatform = (typeof COMP_SOURCE_PLATFORMS)[number];
+
+export type CompCondition = "renovated" | "original" | "unknown";
+
+export type CompSelectionBasis = "subdivision" | "zip" | "school_zone";
+
+export interface CompSourceAttribution {
+  portal: CompSourcePlatform;
+  citation: string;
+  qualityScore: number;
+  soldPrice: number;
+  soldDate: string;
+  selected: boolean;
+}
+
+export interface CompConflict {
+  field: "soldPrice";
+  note: string;
+  chosenPortal: CompSourcePlatform;
+  values: Array<{
+    portal: CompSourcePlatform;
+    citation: string;
+    value: number;
+  }>;
+}
+
+export interface CompAdjustmentSummary {
+  bedsDelta: number;
+  bathsDelta: number;
+  sqftDelta: number;
+  yearBuiltDelta: number;
+  lotSizeDelta?: number;
+  garageSpacesDelta?: number;
+  locationMatch: CompSelectionBasis | "broader";
+  locationScore: number;
+}
+
 /** Comparable property candidate from sold listings */
 export interface CompCandidate {
   canonicalId: string;
@@ -56,8 +95,16 @@ export interface CompCandidate {
   pool?: boolean;
   hoaFee?: number;
   subdivision?: string;
+  schoolDistrict?: string;
   zip: string;
   sourcePlatform: string;
+  sourceCitation?: string;
+  sourceQualityScore?: number;
+  sourcePlatforms?: CompSourcePlatform[];
+  sourceCitations?: CompSourceAttribution[];
+  conflicts?: CompConflict[];
+  garageSpaces?: number;
+  condition?: CompCondition;
   dom?: number;
 }
 
@@ -74,8 +121,11 @@ export interface CompsSubject {
   pool?: boolean;
   hoaFee?: number;
   subdivision?: string;
+  schoolDistrict?: string;
   zip: string;
   listPrice: number;
+  garageSpaces?: number;
+  condition?: CompCondition;
 }
 
 export interface CompsInput {
@@ -89,6 +139,8 @@ export interface CompResult {
   similarityScore: number;
   explanation: string;
   sourceCitation: string;
+  sourceCitations?: CompSourceAttribution[];
+  adjustments?: CompAdjustmentSummary;
 }
 
 export interface CompsAggregates {
@@ -101,7 +153,7 @@ export interface CompsAggregates {
 export interface CompsOutput {
   comps: CompResult[];
   aggregates: CompsAggregates;
-  selectionBasis: "subdivision" | "zip" | "school_zone";
+  selectionBasis: CompSelectionBasis;
   selectionReason: string;
   totalCandidates: number;
   dedupedCandidates: number;

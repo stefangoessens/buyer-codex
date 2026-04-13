@@ -53,8 +53,10 @@ export const runCompsEngine = internalAction({
       pool: property.pool,
       hoaFee: property.hoaFee,
       subdivision: property.subdivision,
+      schoolDistrict: property.schoolDistrict,
       zip: property.zip ?? property.address?.zip ?? "",
       listPrice: property.listPrice ?? 0,
+      garageSpaces: property.garageSpaces,
     };
 
     const candidates =
@@ -64,6 +66,31 @@ export const runCompsEngine = internalAction({
     const inputSnapshot = JSON.stringify({ subject, candidates });
 
     const result = selectComps({ subject, candidates });
+    const citations = Array.from(
+      new Set(
+        result.comps.flatMap((comp) =>
+          comp.sourceCitations?.map((citation) => citation.citation) ??
+          [comp.sourceCitation],
+        ),
+      ),
+    );
+    const confidenceBase =
+      result.comps.length >= 3 ? 0.7 : result.comps.length >= 1 ? 0.52 : 0.3;
+    const basisBoost =
+      result.selectionBasis === "subdivision"
+        ? 0.18
+        : result.selectionBasis === "school_zone"
+          ? 0.1
+          : 0.04;
+    const conflictPenalty = result.comps.some(
+      (comp) => (comp.candidate.conflicts?.length ?? 0) > 0,
+    )
+      ? 0.04
+      : 0;
+    const confidence = Number(
+      Math.max(0.3, Math.min(0.94, confidenceBase + basisBoost - conflictPenalty))
+        .toFixed(2),
+    );
 
     const outputId: any = await ctx.runMutation(
       internal.aiEngineOutputs.createOutput,
@@ -73,13 +100,8 @@ export const runCompsEngine = internalAction({
         promptKey: "default",
         promptVersion: args.promptVersion,
         inputSnapshot,
-        confidence:
-          result.comps.length >= 3
-            ? 0.85
-            : result.comps.length >= 1
-              ? 0.6
-              : 0.3,
-        citations: result.comps.map((c) => c.sourceCitation),
+        confidence,
+        citations,
         output: JSON.stringify(result),
         modelId: prompt.model,
       },

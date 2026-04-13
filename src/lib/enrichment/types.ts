@@ -269,7 +269,10 @@ export interface RecentComparableSale {
   pool?: boolean;
   hoaFee?: number;
   subdivision?: string;
+  schoolDistrict?: string;
   zip?: string;
+  garageSpaces?: number;
+  condition?: "renovated" | "original" | "unknown";
   dom?: number;
   provenance: FieldProvenance;
   capturedAt: string;

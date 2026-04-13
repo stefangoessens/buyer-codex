@@ -92,6 +92,7 @@ const recentSales = [
     sqft: 1_780,
     yearBuilt: 2018,
     propertyType: "Condo",
+    schoolDistrict: "Broward County",
     zip: "33301",
     dom: 21,
     provenance: { source: "zillow://comp-1", fetchedAt: "2026-04-12T12:00:00Z" },
@@ -110,6 +111,7 @@ const recentSales = [
     sqft: 1_900,
     yearBuilt: 2020,
     propertyType: "Condo",
+    schoolDistrict: "Broward County",
     zip: "33301",
     dom: 18,
     provenance: { source: "redfin://comp-2", fetchedAt: "2026-04-12T12:00:00Z" },
@@ -166,7 +168,9 @@ describe("enrichment/engineContext", () => {
     expect(candidates[0]).toMatchObject({
       canonicalId: "comp-1",
       sourcePlatform: "zillow",
+      sourceCitation: "zillow://comp-1",
       soldPrice: 880_000,
+      schoolDistrict: "Broward County",
       zip: "33301",
     });
   });

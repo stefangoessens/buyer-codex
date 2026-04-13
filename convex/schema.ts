@@ -2569,7 +2569,16 @@ export default defineSchema({
     pool: v.optional(v.boolean()),
     hoaFee: v.optional(v.number()),
     subdivision: v.optional(v.string()),
+    schoolDistrict: v.optional(v.string()),
     zip: v.optional(v.string()),
+    garageSpaces: v.optional(v.number()),
+    condition: v.optional(
+      v.union(
+        v.literal("renovated"),
+        v.literal("original"),
+        v.literal("unknown"),
+      ),
+    ),
     dom: v.optional(v.number()),
     provenance: v.object({
       source: v.string(),
