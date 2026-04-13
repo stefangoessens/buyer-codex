@@ -396,7 +396,19 @@ async function replaceRecentComparableSalesRows(args: {
         hoaFee: typeof sale.hoaFee === "number" ? sale.hoaFee : undefined,
         subdivision:
           typeof sale.subdivision === "string" ? sale.subdivision : undefined,
+        schoolDistrict:
+          typeof sale.schoolDistrict === "string"
+            ? sale.schoolDistrict
+            : undefined,
         zip: typeof sale.zip === "string" ? sale.zip : undefined,
+        garageSpaces:
+          typeof sale.garageSpaces === "number" ? sale.garageSpaces : undefined,
+        condition:
+          sale.condition === "renovated" ||
+          sale.condition === "original" ||
+          sale.condition === "unknown"
+            ? sale.condition
+            : undefined,
         dom: typeof sale.dom === "number" ? sale.dom : undefined,
         provenance: {
           source: args.citation,

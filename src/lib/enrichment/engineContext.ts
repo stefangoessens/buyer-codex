@@ -28,6 +28,8 @@ export interface EngineContextPropertyInput {
   pool?: boolean;
   hoaFee?: number;
   subdivision?: string;
+  schoolDistrict?: string;
+  garageSpaces?: number;
   daysOnMarket?: number;
   description?: string;
   zestimate?: number;
@@ -130,8 +132,12 @@ export function buildCompCandidatesFromRecentSales(
     pool: sale.pool,
     hoaFee: sale.hoaFee,
     subdivision: sale.subdivision,
+    schoolDistrict: sale.schoolDistrict,
     zip: sale.zip ?? "",
     sourcePlatform: sale.portal,
+    sourceCitation: sale.provenance.source,
+    garageSpaces: sale.garageSpaces,
+    condition: sale.condition,
     dom: sale.dom,
   }));
 }

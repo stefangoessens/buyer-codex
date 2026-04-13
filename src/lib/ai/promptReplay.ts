@@ -123,15 +123,40 @@ export async function replayPromptExecution(args: {
         candidates: CompsInput["candidates"];
       }>(args.inputSnapshot);
       const replayed = selectComps(input);
+      const citations = Array.from(
+        new Set(
+          replayed.comps.flatMap((comp) =>
+            comp.sourceCitations?.map((citation) => citation.citation) ??
+            [comp.sourceCitation],
+          ),
+        ),
+      );
+      const confidenceBase =
+        replayed.comps.length >= 3 ? 0.7 : replayed.comps.length >= 1 ? 0.52 : 0.3;
+      const basisBoost =
+        replayed.selectionBasis === "subdivision"
+          ? 0.18
+          : replayed.selectionBasis === "school_zone"
+            ? 0.1
+            : 0.04;
+      const conflictPenalty = replayed.comps.some(
+        (comp) => (comp.candidate.conflicts?.length ?? 0) > 0,
+      )
+        ? 0.04
+        : 0;
 
       return {
         engineType: prompt.engineType,
         promptKey: prompt.promptKey,
         promptVersion: prompt.version,
         modelId: prompt.model,
-        confidence:
-          replayed.comps.length >= 3 ? 0.85 : replayed.comps.length >= 1 ? 0.6 : 0.3,
-        citations: replayed.comps.map((comp) => comp.sourceCitation),
+        confidence: Number(
+          Math.max(
+            0.3,
+            Math.min(0.94, confidenceBase + basisBoost - conflictPenalty),
+          ).toFixed(2),
+        ),
+        citations,
         outputSnapshot: JSON.stringify(replayed),
       };
     }
