@@ -7,6 +7,7 @@ import { resolveBuyerDashboardState } from "@/lib/dashboard/deal-index-state";
 import { cn } from "@/lib/utils";
 import { DealRoomGrid } from "./DealRoomGrid";
 import { EmptyDashboardState } from "./EmptyDashboardState";
+import { OnboardingResumeCard } from "./OnboardingResumeCard";
 import { PasteLinkCTA } from "./PasteLinkCTA";
 
 interface BuyerDashboardProps {
@@ -32,6 +33,7 @@ export function BuyerDashboard({ now }: BuyerDashboardProps) {
       </header>
 
       <PasteLinkCTA />
+      <OnboardingResumeCard />
 
       {state.kind !== "loading" && (
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -64,7 +66,7 @@ export function BuyerDashboard({ now }: BuyerDashboardProps) {
 
       <section>
         <div className="mb-4 flex items-baseline justify-between gap-4">
-          <h2 className="text-lg font-semibold text-neutral-900">Your deals</h2>
+          <h2 className="text-lg font-semibold text-neutral-900">Your searches</h2>
           {state.kind === "ready" && (
             <span className="text-xs text-neutral-500">
               {state.activeDeals.length} active · {state.recentDeals.length} recent
@@ -76,7 +78,7 @@ export function BuyerDashboard({ now }: BuyerDashboardProps) {
         {state.kind === "loading" ? (
           <Card>
             <CardContent className="py-12 text-center text-sm text-neutral-500">
-              Loading your deals…
+              Loading your searches…
             </CardContent>
           </Card>
         ) : state.kind === "empty" ? (

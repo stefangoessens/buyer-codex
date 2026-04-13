@@ -1,8 +1,14 @@
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
 import { authProvider } from "./lib/validators";
-import { requireAuth, sessionUserValidator } from "./lib/session";
+import {
+  getSessionContext,
+  inferAuthProviderFromIssuer,
+  requireAuth,
+  sessionUserValidator,
+} from "./lib/session";
 
 export const get = query({
   args: { userId: v.id("users") },
@@ -118,5 +124,104 @@ export const updateProfile = mutation({
       await ctx.db.patch(currentUser._id, patch);
     }
     return null;
+  },
+});
+
+/**
+ * Ensure the current authenticated identity is bound to a buyer row in Convex.
+ *
+ * Web onboarding uses this right after Clerk sign-in: if the identity is new,
+ * we create a buyer row; if it already exists (or matches by email), we bind
+ * the auth fields and refresh the presentation fields. This keeps onboarding
+ * flows resumable without exposing a public arbitrary user-creation endpoint.
+ */
+export const ensureCurrentBuyer = mutation({
+  args: {
+    email: v.string(),
+    name: v.string(),
+    phone: v.optional(v.string()),
+    avatarUrl: v.optional(v.string()),
+    attributionSessionId: v.optional(v.string()),
+  },
+  returns: sessionUserValidator,
+  handler: async (ctx, args) => {
+    const session = await getSessionContext(ctx);
+    if (session.kind === "anonymous") {
+      throw new Error("Authentication required");
+    }
+
+    const now = new Date().toISOString();
+    const authProvider = inferAuthProviderFromIssuer(session.identity.issuer);
+
+    const bindUser = async (userId: Id<"users">) => {
+      const patch: Record<string, unknown> = {
+        email: args.email,
+        name: args.name,
+        lastAuthenticatedAt: now,
+        authProvider,
+        authIssuer: session.identity.issuer,
+        authSubject: session.identity.subject,
+        authTokenIdentifier: session.identity.tokenIdentifier,
+        sessionVersion: 1,
+      };
+
+      if (args.phone !== undefined) patch.phone = args.phone;
+      if (args.avatarUrl !== undefined) patch.avatarUrl = args.avatarUrl;
+
+      await ctx.db.patch(userId, patch);
+
+      if (args.attributionSessionId) {
+        await ctx.runMutation(api.leadAttribution.handoffToUser, {
+          sessionId: args.attributionSessionId,
+          userId,
+        });
+      }
+
+      const row = await ctx.db.get(userId);
+      if (!row) {
+        throw new Error("User not found after binding auth identity");
+      }
+      return row;
+    };
+
+    if (session.kind === "authenticated") {
+      return await bindUser(session.user._id);
+    }
+
+    const existingByEmail = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .unique();
+
+    if (existingByEmail) {
+      return await bindUser(existingByEmail._id);
+    }
+
+    const userId = await ctx.db.insert("users", {
+      email: args.email,
+      name: args.name,
+      role: "buyer",
+      phone: args.phone,
+      avatarUrl: args.avatarUrl,
+      authProvider,
+      authIssuer: session.identity.issuer,
+      authSubject: session.identity.subject,
+      authTokenIdentifier: session.identity.tokenIdentifier,
+      sessionVersion: 1,
+      lastAuthenticatedAt: now,
+    });
+
+    if (args.attributionSessionId) {
+      await ctx.runMutation(api.leadAttribution.handoffToUser, {
+        sessionId: args.attributionSessionId,
+        userId,
+      });
+    }
+
+    const created = await ctx.db.get(userId);
+    if (!created) {
+      throw new Error("User not found after creation");
+    }
+    return created;
   },
 });

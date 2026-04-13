@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { PasteLinkInput } from "@/components/marketing/PasteLinkInput";
+import { buildListingIntakeHref } from "@/lib/intake/pasteLink";
 
 /**
  * Authenticated-dashboard version of the homepage hero paste-link CTA.
@@ -14,10 +16,12 @@ import { PasteLinkInput } from "@/components/marketing/PasteLinkInput";
  */
 export function PasteLinkCTA() {
   const router = useRouter();
+  const [, startTransition] = useTransition();
 
   const handleSubmit = (url: string) => {
-    const target = `/intake?url=${encodeURIComponent(url)}`;
-    router.push(target);
+    startTransition(() => {
+      router.push(buildListingIntakeHref(url));
+    });
   };
 
   return (
