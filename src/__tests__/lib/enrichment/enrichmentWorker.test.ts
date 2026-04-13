@@ -58,15 +58,23 @@ function makeAdapters(
     async recentSales() {
       return { sales: [], citation: "bright-data://recent" };
     },
-    async browserUseFallback({ sourceUrl, portal, reason }) {
+    async browserUseHosted({ sourceUrl, portal, trigger }) {
       return {
         result: {
           sourceUrl,
           portal,
           canonicalFields: { listPrice: 500_000 },
+          fieldMetadata: {
+            listPrice: {
+              confidence: 0.8,
+              citations: [{ url: `${sourceUrl}#list-price`, label: "List price" }],
+            },
+          },
           confidence: 0.8,
-          evidence: [],
-          reason,
+          citations: [{ url: sourceUrl, label: "Listing page" }],
+          trace: { steps: [], artifacts: [] },
+          reviewState: "needs_review",
+          trigger,
           capturedAt: "2026-04-12T12:00:00Z",
         },
         citation: "browser-use://stub",

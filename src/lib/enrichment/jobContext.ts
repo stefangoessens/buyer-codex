@@ -93,7 +93,7 @@ export function buildEnrichmentContext(
           zip: property.address.zip,
         },
       };
-    case "browser_use_fallback":
+    case "browser_use_hosted":
       return null;
   }
 }

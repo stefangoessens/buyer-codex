@@ -11,29 +11,29 @@ import {
 } from "../src/lib/enrichment/engineContext";
 
 function summarizeJobs(jobs: Array<any>) {
+  let queued = 0;
   let succeeded = 0;
   let failed = 0;
-  let pending = 0;
   let running = 0;
-  let skipped = 0;
+  let escalated = 0;
   let lastUpdated: string | undefined;
 
   for (const job of jobs) {
     switch (job.status) {
+      case "queued":
+        queued++;
+        break;
       case "succeeded":
         succeeded++;
         break;
       case "failed":
         failed++;
         break;
-      case "pending":
-        pending++;
-        break;
       case "running":
         running++;
         break;
-      case "skipped":
-        skipped++;
+      case "escalated":
+        escalated++;
         break;
     }
 
@@ -45,13 +45,103 @@ function summarizeJobs(jobs: Array<any>) {
 
   return {
     totalJobs: jobs.length,
+    queued,
     succeeded,
     failed,
-    pending,
     running,
-    skipped,
+    escalated,
     lastUpdated,
   };
+}
+
+function safeParseJson<T>(value: string | undefined): T | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
+function loadBrowserUseRuns(jobs: Array<any>) {
+  return jobs
+    .filter((job) => job.source === "browser_use_hosted")
+    .sort((a, b) => (b.requestedAt ?? "").localeCompare(a.requestedAt ?? ""))
+    .map((job) => {
+      const context = safeParseJson<Record<string, any>>(job.contextJson) ?? {};
+      const result = safeParseJson<Record<string, any>>(job.resultRef) ?? {};
+      return {
+        jobId: job._id,
+        runState: job.status,
+        reviewState:
+          typeof result.reviewState === "string"
+            ? result.reviewState
+            : job.status === "escalated"
+              ? "needs_review"
+              : "pending",
+        trigger:
+          typeof result.trigger === "string"
+            ? result.trigger
+            : typeof context.trigger === "string"
+              ? context.trigger
+              : undefined,
+        sourceUrl:
+          typeof result.sourceUrl === "string"
+            ? result.sourceUrl
+            : typeof context.sourceUrl === "string"
+              ? context.sourceUrl
+              : undefined,
+        portal:
+          typeof result.portal === "string"
+            ? result.portal
+            : typeof context.portal === "string"
+              ? context.portal
+              : undefined,
+        note:
+          typeof context.note === "string" && context.note.length > 0
+            ? context.note
+            : undefined,
+        parseConfidence:
+          typeof context.parseConfidence === "number"
+            ? context.parseConfidence
+            : undefined,
+        minimumParseConfidence:
+          typeof context.minimumParseConfidence === "number"
+            ? context.minimumParseConfidence
+            : undefined,
+        missingCriticalFields: Array.isArray(context.missingCriticalFields)
+          ? context.missingCriticalFields
+          : [],
+        conflictingFields: Array.isArray(context.conflictingFields)
+          ? context.conflictingFields
+          : [],
+        confidence:
+          typeof result.confidence === "number" ? result.confidence : undefined,
+        citations: Array.isArray(result.citations) ? result.citations : [],
+        trace:
+          result.trace && typeof result.trace === "object"
+            ? result.trace
+            : { steps: [], artifacts: [] },
+        canonicalFields:
+          result.canonicalFields && typeof result.canonicalFields === "object"
+            ? result.canonicalFields
+            : {},
+        fieldMetadata:
+          result.fieldMetadata && typeof result.fieldMetadata === "object"
+            ? result.fieldMetadata
+            : {},
+        mergeProvenance:
+          result.mergeProvenance && typeof result.mergeProvenance === "object"
+            ? result.mergeProvenance
+            : {},
+        conflicts: Array.isArray(result.conflicts) ? result.conflicts : [],
+        requestedAt: job.requestedAt,
+        startedAt: job.startedAt,
+        completedAt: job.completedAt,
+        errorCode: job.errorCode,
+        errorMessage: job.errorMessage,
+      };
+    });
 }
 
 async function loadListingAgentsForProperty(ctx: any, propertyId: Id<"properties">) {
@@ -166,6 +256,7 @@ async function buildEnrichmentPayload(ctx: any, propertyId: Id<"properties">) {
       property.createdAt ??
       "",
   });
+  const browserUseRuns = loadBrowserUseRuns(jobs);
 
   return {
     summary: summarizeJobs(jobs),
@@ -175,6 +266,7 @@ async function buildEnrichmentPayload(ctx: any, propertyId: Id<"properties">) {
     neighborhoodContexts,
     portalEstimates,
     recentSales,
+    browserUseRuns,
     engineInputs: {
       marketContext,
       pricing: buildPricingInputFromEnrichment({
@@ -244,6 +336,7 @@ export const getForProperty = query({
       listingAgents: payload.listingAgents.map((agent: any) =>
         toBuyerSafeAgent(agent, args.includeInternal ?? false),
       ),
+      browserUseRuns: args.includeInternal ? payload.browserUseRuns : undefined,
       snapshots: args.includeInternal ? payload.snapshots : undefined,
       engineInputs: args.includeInternal ? payload.engineInputs : undefined,
     };

@@ -37,6 +37,7 @@ export const SOURCE_PRIORITY: Record<string, number> = {
   realtor: 3,
   county: 4, // County is NOT globally highest — only preferred for tax/legal via getFieldPriority
   manual: 5,
+  browser_use_hosted: 6,
 };
 
 /** Per-field provenance tracking */

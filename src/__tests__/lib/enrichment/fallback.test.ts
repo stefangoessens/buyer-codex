@@ -1,27 +1,42 @@
 import { describe, expect, it } from "vitest";
 import {
-  ESCALATION_SKIP_LABELS,
-  buildFallbackDedupeKey,
-  decideEscalation,
-  errorCodeToFallbackReason,
-  normalizeBrowserUseFallbackResult,
+  BROWSER_USE_SKIP_LABELS,
+  buildBrowserUseDedupeKey,
+  decideBrowserUseRun,
+  errorCodeToBrowserUseTrigger,
+  normalizeBrowserUseHostedResult,
 } from "@/lib/enrichment/fallback";
 import {
-  FALLBACK_REASONS,
-  FALLBACK_REASON_LABELS,
+  BROWSER_USE_TRIGGER_LABELS,
+  BROWSER_USE_TRIGGER_TYPES,
 } from "@/lib/enrichment/types";
 
 const NOW = new Date("2026-04-12T12:00:00Z");
-const BASE_FALLBACK_RESULT = {
+const BASE_RESULT = {
   sourceUrl: "https://zillow.com/homedetails/123",
   portal: "zillow" as const,
   canonicalFields: {
     listPrice: 500_000,
     beds: 3,
   },
+  fieldMetadata: {
+    listPrice: {
+      confidence: 0.91,
+      citations: [{ url: "https://portal.example/list-price", label: "List price" }],
+    },
+  },
   confidence: 0.82,
-  evidence: [{ kind: "screenshot" as const, url: "s3://bucket/fallback.png" }],
-  reason: "parser_schema_drift" as const,
+  citations: [{ url: "https://portal.example/root", label: "Listing page" }],
+  trace: {
+    runId: "run_123",
+    sessionId: "session_456",
+    steps: [{ label: "Open listing", status: "completed" as const }],
+    artifacts: [
+      { kind: "screenshot" as const, url: "s3://bucket/browser-use.png" },
+    ],
+  },
+  reviewState: "needs_review" as const,
+  trigger: "parser_failure" as const,
   capturedAt: "2026-04-12T12:05:00Z",
 };
 
@@ -31,221 +46,240 @@ function baseInput(overrides = {}) {
     sourceUrl: "https://zillow.com/homedetails/123",
     portal: "zillow" as const,
     extractorErrorCode: "parse_error" as const,
-    priorFallbackAttempts: 0,
-    maxFallbackAttempts: 2,
+    priorBrowserUseAttempts: 0,
+    maxBrowserUseAttempts: 2,
     now: NOW,
     ...overrides,
   };
 }
 
-describe("enrichment/fallback", () => {
-  describe("errorCodeToFallbackReason", () => {
-    it("maps parse_error to parser_schema_drift", () => {
-      expect(errorCodeToFallbackReason("parse_error")).toBe("parser_schema_drift");
+describe("enrichment/browserUse", () => {
+  describe("errorCodeToBrowserUseTrigger", () => {
+    it("maps parse_error to parser_failure", () => {
+      expect(errorCodeToBrowserUseTrigger("parse_error")).toBe("parser_failure");
     });
 
-    it("maps rate_limited and unauthorized to anti_bot_block", () => {
-      expect(errorCodeToFallbackReason("rate_limited")).toBe("anti_bot_block");
-      expect(errorCodeToFallbackReason("unauthorized")).toBe("anti_bot_block");
-    });
-
-    it("maps network and timeout to vendor_unavailable", () => {
-      expect(errorCodeToFallbackReason("network_error")).toBe("vendor_unavailable");
-      expect(errorCodeToFallbackReason("timeout")).toBe("vendor_unavailable");
-    });
-
-    it("returns null for not_found and unknown — never auto-escalates", () => {
-      expect(errorCodeToFallbackReason("not_found")).toBeNull();
-      expect(errorCodeToFallbackReason("unknown")).toBeNull();
+    it("does not map access-layer or opaque failures", () => {
+      expect(errorCodeToBrowserUseTrigger("network_error")).toBeNull();
+      expect(errorCodeToBrowserUseTrigger("rate_limited")).toBeNull();
+      expect(errorCodeToBrowserUseTrigger("timeout")).toBeNull();
+      expect(errorCodeToBrowserUseTrigger("unauthorized")).toBeNull();
+      expect(errorCodeToBrowserUseTrigger("not_found")).toBeNull();
+      expect(errorCodeToBrowserUseTrigger("unknown")).toBeNull();
     });
   });
 
-  describe("decideEscalation — auto path", () => {
-    it("escalates parse_error → parser_schema_drift", () => {
-      const decision = decideEscalation(baseInput());
+  describe("decideBrowserUseRun", () => {
+    it("queues parser_failure when deterministic parsing fails", () => {
+      const decision = decideBrowserUseRun(baseInput());
       expect(decision.eligible).toBe(true);
       if (decision.eligible) {
-        expect(decision.fallbackReason).toBe("parser_schema_drift");
-        expect(decision.dedupeKey).toContain("p1");
-        expect(decision.dedupeKey).toContain("browser_use_fallback");
+        expect(decision.trigger).toBe("parser_failure");
+        expect(decision.runState).toBe("queued");
+        expect(decision.dedupeKey).toContain("browser_use_hosted");
       }
     });
 
-    it("escalates anti-bot block via rate_limited", () => {
-      const decision = decideEscalation(
-        baseInput({ extractorErrorCode: "rate_limited" }),
+    it("queues low_confidence_parse when confidence is below threshold", () => {
+      const decision = decideBrowserUseRun(
+        baseInput({
+          extractorErrorCode: undefined,
+          parseConfidence: 0.41,
+          minimumParseConfidence: 0.7,
+        }),
       );
       expect(decision.eligible).toBe(true);
       if (decision.eligible) {
-        expect(decision.fallbackReason).toBe("anti_bot_block");
+        expect(decision.trigger).toBe("low_confidence_parse");
       }
     });
 
-    it("does NOT escalate not_found", () => {
-      const decision = decideEscalation(
-        baseInput({ extractorErrorCode: "not_found" }),
-      );
-      expect(decision.eligible).toBe(false);
-      if (!decision.eligible) {
-        expect(decision.skipReason).toContain("no_mapping_for_error_code");
-        expect(decision.skipReason).toContain("not_found");
-      }
-    });
-
-    it("does NOT escalate unknown", () => {
-      const decision = decideEscalation(
-        baseInput({ extractorErrorCode: "unknown" }),
-      );
-      expect(decision.eligible).toBe(false);
-    });
-  });
-
-  describe("decideEscalation — attempt cap", () => {
-    it("stops escalating after maxFallbackAttempts", () => {
-      const decision = decideEscalation(
-        baseInput({ priorFallbackAttempts: 2, maxFallbackAttempts: 2 }),
-      );
-      expect(decision.eligible).toBe(false);
-      if (!decision.eligible) {
-        expect(decision.skipReason).toBe("max_fallback_attempts_exceeded");
-      }
-    });
-
-    it("still allows the final attempt at the cap boundary", () => {
-      const decision = decideEscalation(
-        baseInput({ priorFallbackAttempts: 1, maxFallbackAttempts: 2 }),
+    it("queues missing_critical_fields when required fields are absent", () => {
+      const decision = decideBrowserUseRun(
+        baseInput({
+          extractorErrorCode: undefined,
+          missingCriticalFields: ["hoaFee", "taxAnnual"],
+        }),
       );
       expect(decision.eligible).toBe(true);
+      if (decision.eligible) {
+        expect(decision.trigger).toBe("missing_critical_fields");
+      }
     });
-  });
 
-  describe("decideEscalation — manual override", () => {
-    it("escalates with manual_override reason even on not_found", () => {
-      const decision = decideEscalation(
+    it("queues conflicting_portal_data when explicit conflicts exist", () => {
+      const decision = decideBrowserUseRun(
+        baseInput({
+          extractorErrorCode: undefined,
+          conflictingFields: ["listPrice"],
+        }),
+      );
+      expect(decision.eligible).toBe(true);
+      if (decision.eligible) {
+        expect(decision.trigger).toBe("conflicting_portal_data");
+      }
+    });
+
+    it("queues operator_requested_deep_extract when the operator explicitly asks", () => {
+      const decision = decideBrowserUseRun(
         baseInput({
           extractorErrorCode: "not_found",
-          manualOverride: true,
+          operatorRequestedDeepExtract: true,
         }),
       );
       expect(decision.eligible).toBe(true);
       if (decision.eligible) {
-        expect(decision.fallbackReason).toBe("manual_override");
+        expect(decision.trigger).toBe("operator_requested_deep_extract");
       }
     });
 
-    it("manual override does NOT bypass the attempt cap", () => {
-      const decision = decideEscalation(
+    it("does not use Browser Use as an access-layer escape hatch", () => {
+      const decision = decideBrowserUseRun(
+        baseInput({ extractorErrorCode: "rate_limited" }),
+      );
+      expect(decision.eligible).toBe(false);
+      if (!decision.eligible) {
+        expect(decision.skipReason).toBe("access_layer_error:rate_limited");
+        expect(decision.runState).toBeUndefined();
+      }
+    });
+
+    it("escalates instead of queuing once the attempt budget is exhausted", () => {
+      const decision = decideBrowserUseRun(
         baseInput({
-          manualOverride: true,
-          priorFallbackAttempts: 2,
-          maxFallbackAttempts: 2,
+          priorBrowserUseAttempts: 2,
+          maxBrowserUseAttempts: 2,
+          missingCriticalFields: ["hoaFee"],
+          extractorErrorCode: undefined,
         }),
       );
       expect(decision.eligible).toBe(false);
-    });
-  });
-
-  describe("decideEscalation — unsupported portal", () => {
-    it("escalates with unsupported_portal reason", () => {
-      const decision = decideEscalation(
-        baseInput({
-          portal: "unknown",
-          unsupportedPortal: true,
-          extractorErrorCode: "unknown",
-        }),
-      );
-      expect(decision.eligible).toBe(true);
-      if (decision.eligible) {
-        expect(decision.fallbackReason).toBe("unsupported_portal");
+      if (!decision.eligible) {
+        expect(decision.skipReason).toBe("max_browser_use_attempts_exceeded");
+        expect(decision.runState).toBe("escalated");
+        expect(decision.trigger).toBe("missing_critical_fields");
       }
     });
   });
 
-  describe("buildFallbackDedupeKey", () => {
+  describe("buildBrowserUseDedupeKey", () => {
     it("is deterministic for the same inputs", () => {
-      const a = buildFallbackDedupeKey("p1", "https://a.com/x", 0, NOW);
-      const b = buildFallbackDedupeKey("p1", "https://a.com/x", 0, NOW);
+      const a = buildBrowserUseDedupeKey(
+        "p1",
+        "https://a.com/x",
+        "parser_failure",
+        0,
+        NOW,
+      );
+      const b = buildBrowserUseDedupeKey(
+        "p1",
+        "https://a.com/x",
+        "parser_failure",
+        0,
+        NOW,
+      );
       expect(a).toBe(b);
     });
 
-    it("differs per-URL", () => {
-      const a = buildFallbackDedupeKey("p1", "https://a.com/x", 0, NOW);
-      const b = buildFallbackDedupeKey("p1", "https://a.com/y", 0, NOW);
-      expect(a).not.toBe(b);
-    });
-
-    it("differs per-attempt — successive retries get fresh keys", () => {
-      const a = buildFallbackDedupeKey("p1", "https://a.com/x", 0, NOW);
-      const b = buildFallbackDedupeKey("p1", "https://a.com/x", 1, NOW);
-      expect(a).not.toBe(b);
-    });
-
-    it("stays stable within the same hour bucket", () => {
-      const early = new Date("2026-04-12T12:15:00Z");
-      const late = new Date("2026-04-12T12:45:00Z");
-      const a = buildFallbackDedupeKey("p1", "https://a.com/x", 0, early);
-      const b = buildFallbackDedupeKey("p1", "https://a.com/x", 0, late);
-      expect(a).toBe(b);
-    });
-
-    it("rolls over at hour boundaries", () => {
-      const before = new Date("2026-04-12T12:59:00Z");
-      const after = new Date("2026-04-12T13:01:00Z");
-      const a = buildFallbackDedupeKey("p1", "https://a.com/x", 0, before);
-      const b = buildFallbackDedupeKey("p1", "https://a.com/x", 0, after);
+    it("differs per trigger and attempt", () => {
+      const a = buildBrowserUseDedupeKey(
+        "p1",
+        "https://a.com/x",
+        "parser_failure",
+        0,
+        NOW,
+      );
+      const b = buildBrowserUseDedupeKey(
+        "p1",
+        "https://a.com/x",
+        "missing_critical_fields",
+        1,
+        NOW,
+      );
       expect(a).not.toBe(b);
     });
   });
 
-  describe("normalizeBrowserUseFallbackResult", () => {
+  describe("normalizeBrowserUseHostedResult", () => {
     it("unwraps the worker payload and strips empty canonical fields", () => {
-      const normalized = normalizeBrowserUseFallbackResult({
+      const normalized = normalizeBrowserUseHostedResult({
         result: {
-          ...BASE_FALLBACK_RESULT,
+          ...BASE_RESULT,
           canonicalFields: {
-            ...BASE_FALLBACK_RESULT.canonicalFields,
+            ...BASE_RESULT.canonicalFields,
             hoaFee: null,
             description: "",
             taxAnnual: undefined,
           },
-          evidence: [
-            ...BASE_FALLBACK_RESULT.evidence,
-            { kind: "bad-kind", url: "s3://bucket/skip-me.png" },
-          ],
+          trace: {
+            ...BASE_RESULT.trace,
+            artifacts: [
+              ...BASE_RESULT.trace.artifacts,
+              { kind: "bad-kind", url: "s3://bucket/skip-me.png" },
+            ],
+          },
         },
       });
 
-      expect(normalized).toEqual({
-        ...BASE_FALLBACK_RESULT,
-        canonicalFields: {
-          listPrice: 500_000,
-          beds: 3,
-        },
+      expect(normalized).not.toBeNull();
+      expect(normalized?.canonicalFields).toEqual({
+        listPrice: 500_000,
+        beds: 3,
+      });
+      expect(normalized?.fieldMetadata.listPrice).toEqual(
+        BASE_RESULT.fieldMetadata.listPrice,
+      );
+      expect(normalized?.fieldMetadata.beds).toEqual({
+        confidence: 0.82,
+        citations: [{ url: "https://portal.example/root", label: "Listing page" }],
+      });
+      expect(normalized?.trace.artifacts).toEqual([
+        { kind: "screenshot", url: "s3://bucket/browser-use.png", label: undefined },
+      ]);
+    });
+
+    it("defaults per-field metadata from overall confidence and citations", () => {
+      const normalized = normalizeBrowserUseHostedResult({
+        ...BASE_RESULT,
+        fieldMetadata: {},
+      });
+
+      expect(normalized?.fieldMetadata.beds).toEqual({
+        confidence: 0.82,
+        citations: [{ url: "https://portal.example/root", label: "Listing page" }],
       });
     });
 
     it("accepts a flat Browser Use result payload", () => {
-      const normalized = normalizeBrowserUseFallbackResult(BASE_FALLBACK_RESULT);
+      const normalized = normalizeBrowserUseHostedResult(BASE_RESULT);
 
       expect(normalized?.portal).toBe("zillow");
-      expect(normalized?.reason).toBe("parser_schema_drift");
+      expect(normalized?.trigger).toBe("parser_failure");
       expect(normalized?.canonicalFields.listPrice).toBe(500_000);
     });
 
     it("returns null for malformed payloads", () => {
       expect(
-        normalizeBrowserUseFallbackResult({
+        normalizeBrowserUseHostedResult({
           result: {
-            ...BASE_FALLBACK_RESULT,
+            ...BASE_RESULT,
             confidence: Number.NaN,
           },
         }),
       ).toBeNull();
       expect(
-        normalizeBrowserUseFallbackResult({
+        normalizeBrowserUseHostedResult({
           result: {
-            ...BASE_FALLBACK_RESULT,
-            canonicalFields: "not-an-object",
+            ...BASE_RESULT,
+            portal: "unknown",
+          },
+        }),
+      ).toBeNull();
+      expect(
+        normalizeBrowserUseHostedResult({
+          result: {
+            ...BASE_RESULT,
+            trigger: "not-a-real-trigger",
           },
         }),
       ).toBeNull();
@@ -253,16 +287,20 @@ describe("enrichment/fallback", () => {
   });
 
   describe("labels", () => {
-    it("exposes a label for every fallback reason", () => {
-      for (const reason of FALLBACK_REASONS) {
-        expect(FALLBACK_REASON_LABELS[reason]).toBeDefined();
-        expect(FALLBACK_REASON_LABELS[reason]!.length).toBeGreaterThan(0);
+    it("exposes a label for every Browser Use trigger", () => {
+      for (const trigger of BROWSER_USE_TRIGGER_TYPES) {
+        expect(BROWSER_USE_TRIGGER_LABELS[trigger]).toBeDefined();
+        expect(BROWSER_USE_TRIGGER_LABELS[trigger]!.length).toBeGreaterThan(0);
       }
     });
 
     it("exposes labels for the standard skip reasons", () => {
-      expect(ESCALATION_SKIP_LABELS["max_fallback_attempts_exceeded"]).toBeDefined();
-      expect(ESCALATION_SKIP_LABELS["no_mapping_for_error_code:not_found"]).toBeDefined();
+      expect(
+        BROWSER_USE_SKIP_LABELS["max_browser_use_attempts_exceeded"],
+      ).toBeDefined();
+      expect(
+        BROWSER_USE_SKIP_LABELS["access_layer_error:rate_limited"],
+      ).toBeDefined();
     });
   });
 });

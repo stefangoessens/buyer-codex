@@ -9,7 +9,10 @@ import {
 } from "../src/lib/enrichment/jobContext";
 import { canonicalizeAgentId } from "../src/lib/enrichment/listingAgentStats";
 import { computeNeighborhoodContext } from "../src/lib/enrichment/neighborhoodStats";
-import { normalizeBrowserUseFallbackResult } from "../src/lib/enrichment/fallback";
+import {
+  decideBrowserUseRun,
+  normalizeBrowserUseHostedResult,
+} from "../src/lib/enrichment/fallback";
 import { mergeSourceRecords } from "../src/lib/intake/merge";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -25,7 +28,7 @@ const sourceValidator = v.union(
   v.literal("neighborhood_market"),
   v.literal("portal_estimates"),
   v.literal("recent_sales"),
-  v.literal("browser_use_fallback"),
+  v.literal("browser_use_hosted"),
 );
 
 const snapshotSourceValidator = v.union(
@@ -44,10 +47,10 @@ type EnrichmentSource =
   | "neighborhood_market"
   | "portal_estimates"
   | "recent_sales"
-  | "browser_use_fallback";
+  | "browser_use_hosted";
 
 const SOURCE_PRIORITY: Record<EnrichmentSource, number> = {
-  browser_use_fallback: 5,
+  browser_use_hosted: 5,
   cross_portal_match: 10,
   portal_estimates: 20,
   census_geocode: 30,
@@ -62,7 +65,7 @@ const SOURCE_PRIORITY: Record<EnrichmentSource, number> = {
  *  window are still considered fresh — `enqueueJob` returns the existing id
  *  as a no-op rather than kicking off a redundant fetch. */
 const SOURCE_CACHE_TTL_HOURS: Record<EnrichmentSource, number> = {
-  browser_use_fallback: 1,
+  browser_use_hosted: 1,
   cross_portal_match: 72,
   portal_estimates: 24,
   census_geocode: 24 * 30,
@@ -85,8 +88,8 @@ function buildDedupeKey(
 // Mutations — job lifecycle
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Idempotent enqueue keyed by dedupeKey. Pending/running rows short-circuit;
- *  fresh succeeded rows short-circuit; anything else creates a new pending row. */
+/** Idempotent enqueue keyed by dedupeKey. Queued/running rows short-circuit;
+ *  fresh succeeded rows short-circuit; anything else creates a new queued row. */
 export const enqueueJob = internalMutation({
   args: {
     propertyId: v.id("properties"),
@@ -99,8 +102,8 @@ export const enqueueJob = internalMutation({
   returns: v.id("enrichmentJobs"),
   handler: async (ctx, args) => {
     // Take the LATEST row for this dedupe key, not the first. Older stale or
-    // failed rows must not shadow newer pending/running/succeeded rows, or
-    // idempotency collapses into "insert another pending" on every call.
+    // failed rows must not shadow newer queued/running/succeeded rows, or
+    // idempotency collapses into "insert another queued" on every call.
     const existing = await ctx.db
       .query("enrichmentJobs")
       .withIndex("by_dedupeKey", (q) => q.eq("dedupeKey", args.dedupeKey))
@@ -108,7 +111,7 @@ export const enqueueJob = internalMutation({
       .first();
 
     if (existing) {
-      if (existing.status === "pending" || existing.status === "running") {
+      if (existing.status === "queued" || existing.status === "running") {
         return existing._id;
       }
       if (existing.status === "succeeded" && existing.completedAt) {
@@ -123,7 +126,7 @@ export const enqueueJob = internalMutation({
     const jobId = await ctx.db.insert("enrichmentJobs", {
       propertyId: args.propertyId,
       source: args.source,
-      status: "pending" as const,
+      status: "queued" as const,
       attempt: 0,
       maxAttempts: args.maxAttempts,
       priority: args.priority,
@@ -509,7 +512,7 @@ export const enqueueAllSourcesForProperty = internalMutation({
       .collect();
     const inFlightSources = new Set<EnrichmentSource>(
       inFlightRows
-        .filter((row: any) => row.status === "pending" || row.status === "running")
+        .filter((row: any) => row.status === "queued" || row.status === "running")
         .map((row: any) => row.source as EnrichmentSource),
     );
 
@@ -561,22 +564,21 @@ export const enqueueAllSourcesForProperty = internalMutation({
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// Browser Use fallback (KIN-784)
+// Browser Use hosted enrichment (KIN-1019)
 // ─────────────────────────────────────────────────────────────────────────
 
-const fallbackReasonValidator = v.union(
-  v.literal("parser_schema_drift"),
-  v.literal("anti_bot_block"),
-  v.literal("vendor_unavailable"),
-  v.literal("unsupported_portal"),
-  v.literal("manual_override"),
+const browserUseTriggerValidator = v.union(
+  v.literal("parser_failure"),
+  v.literal("low_confidence_parse"),
+  v.literal("missing_critical_fields"),
+  v.literal("conflicting_portal_data"),
+  v.literal("operator_requested_deep_extract"),
 );
 
-const fallbackPortalValidator = v.union(
+const browserUsePortalValidator = v.union(
   v.literal("zillow"),
   v.literal("redfin"),
   v.literal("realtor"),
-  v.literal("unknown"),
 );
 
 const extractorErrorCodeValidator = v.union(
@@ -590,185 +592,221 @@ const extractorErrorCodeValidator = v.union(
 );
 
 /**
- * Enqueue a Browser Use fallback job for a property whose deterministic
- * extraction failed. Only enqueues when the extractor error code maps
- * to a known fallback-eligible reason, when operator manually overrides,
- * or when the portal is unsupported. Idempotent via fallback dedupe key.
- *
- * Returns `{ eligible: true, jobId }` on enqueue, or `{ eligible: false,
- * skipReason }` when the failure does not warrant fallback.
+ * Enqueue Browser Use hosted only when an explicit extraction trigger fires.
+ * Bright Data/access concerns stay out of this trigger path.
  */
-export const enqueueBrowserUseFallback = internalMutation({
+export const enqueueBrowserUseHosted = internalMutation({
   args: {
     propertyId: v.id("properties"),
     sourceUrl: v.string(),
-    portal: fallbackPortalValidator,
-    extractorErrorCode: extractorErrorCodeValidator,
-    manualOverride: v.optional(v.boolean()),
-    unsupportedPortal: v.optional(v.boolean()),
+    portal: browserUsePortalValidator,
+    extractorErrorCode: v.optional(extractorErrorCodeValidator),
+    parseConfidence: v.optional(v.number()),
+    minimumParseConfidence: v.optional(v.number()),
+    missingCriticalFields: v.optional(v.array(v.string())),
+    conflictingFields: v.optional(v.array(v.string())),
+    operatorRequestedDeepExtract: v.optional(v.boolean()),
     operatorNote: v.optional(v.string()),
   },
-  returns: v.union(
-    v.object({
-      eligible: v.literal(true),
-      jobId: v.id("enrichmentJobs"),
-      fallbackReason: fallbackReasonValidator,
-    }),
-    v.object({
-      eligible: v.literal(false),
-      skipReason: v.string(),
-    }),
-  ),
+  returns: v.object({
+    eligible: v.boolean(),
+    jobId: v.optional(v.id("enrichmentJobs")),
+    trigger: v.optional(browserUseTriggerValidator),
+    runState: v.optional(v.union(v.literal("queued"), v.literal("escalated"))),
+    skipReason: v.optional(v.string()),
+  }),
   handler: async (ctx, args) => {
-    // Count prior fallback attempts for this (property, sourceUrl). Inline
-    // to avoid narrowing the Convex ctx type through a helper.
     const priorRows = await ctx.db
       .query("enrichmentJobs")
       .withIndex("by_propertyId_and_source", (q) =>
         q
           .eq("propertyId", args.propertyId)
-          .eq("source", "browser_use_fallback"),
+          .eq("source", "browser_use_hosted"),
       )
       .collect();
 
-    let priorFallbackAttempts = 0;
+    let priorBrowserUseAttempts = 0;
     for (const row of priorRows) {
-      if (row.status === "skipped") continue;
       if (!row.contextJson) continue;
       try {
         const parsed = JSON.parse(row.contextJson) as { sourceUrl?: string };
-        if (parsed?.sourceUrl === args.sourceUrl) priorFallbackAttempts++;
+        if (parsed?.sourceUrl === args.sourceUrl) priorBrowserUseAttempts++;
       } catch {
-        priorFallbackAttempts++;
+        priorBrowserUseAttempts++;
       }
     }
 
-    const maxFallbackAttempts = 2;
+    const maxBrowserUseAttempts = 2;
+    const now = new Date().toISOString();
+    const decision = decideBrowserUseRun({
+      propertyId: args.propertyId,
+      sourceUrl: args.sourceUrl,
+      portal: args.portal,
+      extractorErrorCode: args.extractorErrorCode,
+      parseConfidence: args.parseConfidence,
+      minimumParseConfidence: args.minimumParseConfidence,
+      missingCriticalFields: args.missingCriticalFields,
+      conflictingFields: args.conflictingFields,
+      operatorRequestedDeepExtract: args.operatorRequestedDeepExtract,
+      priorBrowserUseAttempts,
+      maxBrowserUseAttempts,
+      now: new Date(now),
+    });
 
-    if (priorFallbackAttempts >= maxFallbackAttempts) {
-      return {
-        eligible: false as const,
-        skipReason: "max_fallback_attempts_exceeded",
-      };
-    }
+    if (!decision.eligible) {
+      if (
+        decision.runState === "escalated" &&
+        decision.trigger &&
+        decision.dedupeKey
+      ) {
+        const existingEscalation = await ctx.db
+          .query("enrichmentJobs")
+          .withIndex("by_dedupeKey", (q) => q.eq("dedupeKey", decision.dedupeKey!))
+          .order("desc")
+          .first();
+        if (existingEscalation && existingEscalation.status === "escalated") {
+          return {
+            eligible: false,
+            jobId: existingEscalation._id,
+            trigger: decision.trigger,
+            runState: "escalated" as const,
+            skipReason: decision.skipReason,
+          };
+        }
 
-    let fallbackReason:
-      | "parser_schema_drift"
-      | "anti_bot_block"
-      | "vendor_unavailable"
-      | "unsupported_portal"
-      | "manual_override"
-      | null = null;
+        const contextJson = JSON.stringify({
+          propertyId: args.propertyId,
+          sourceUrl: args.sourceUrl,
+          portal: args.portal,
+          trigger: decision.trigger,
+          extractorErrorCode: args.extractorErrorCode,
+          parseConfidence: args.parseConfidence,
+          minimumParseConfidence: args.minimumParseConfidence,
+          missingCriticalFields: args.missingCriticalFields,
+          conflictingFields: args.conflictingFields,
+          note: args.operatorNote,
+        });
+        const jobId = await ctx.db.insert("enrichmentJobs", {
+          propertyId: args.propertyId,
+          source: "browser_use_hosted" as const,
+          status: "escalated" as const,
+          attempt: priorBrowserUseAttempts,
+          maxAttempts: maxBrowserUseAttempts,
+          priority: SOURCE_PRIORITY.browser_use_hosted,
+          requestedAt: now,
+          completedAt: now,
+          dedupeKey: decision.dedupeKey,
+          contextJson,
+          errorCode: "max_browser_use_attempts_exceeded",
+          errorMessage:
+            "Browser Use hosted exceeded the attempt cap and requires operator review",
+          resultRef: JSON.stringify({
+            trigger: decision.trigger,
+            runState: "escalated",
+            reviewState: decision.reviewState,
+            sourceUrl: args.sourceUrl,
+            portal: args.portal,
+          }),
+        });
 
-    if (args.manualOverride) {
-      fallbackReason = "manual_override";
-    } else if (args.unsupportedPortal) {
-      fallbackReason = "unsupported_portal";
-    } else {
-      switch (args.extractorErrorCode) {
-        case "parse_error":
-          fallbackReason = "parser_schema_drift";
-          break;
-        case "rate_limited":
-        case "unauthorized":
-          fallbackReason = "anti_bot_block";
-          break;
-        case "network_error":
-        case "timeout":
-          fallbackReason = "vendor_unavailable";
-          break;
-        default:
-          fallbackReason = null;
+        await ctx.db.insert("auditLog", {
+          action: "browser_use_hosted_escalated",
+          entityType: "enrichmentJobs",
+          entityId: jobId,
+          details: JSON.stringify({
+            propertyId: args.propertyId,
+            sourceUrl: args.sourceUrl,
+            portal: args.portal,
+            trigger: decision.trigger,
+            priorAttempts: priorBrowserUseAttempts,
+          }),
+          timestamp: now,
+        });
+
+        return {
+          eligible: false,
+          jobId,
+          trigger: decision.trigger,
+          runState: "escalated" as const,
+          skipReason: decision.skipReason,
+        };
       }
-    }
 
-    if (!fallbackReason) {
       return {
-        eligible: false as const,
-        skipReason: `no_mapping_for_error_code:${args.extractorErrorCode}`,
+        eligible: false,
+        skipReason: decision.skipReason,
       };
     }
 
-    const hourBucket = new Date().toISOString().slice(0, 13);
-    const urlHash = simpleHash(args.sourceUrl);
-    const dedupeKey = buildDedupeKey(
-      args.propertyId,
-      "browser_use_fallback",
-      `${urlHash}::${priorFallbackAttempts}::${hourBucket}`,
-    );
-
-    // Idempotency: if a job with this dedupe key is already pending or
-    // running, reuse it instead of enqueuing a duplicate.
     const existing = await ctx.db
       .query("enrichmentJobs")
-      .withIndex("by_dedupeKey", (q) => q.eq("dedupeKey", dedupeKey))
+      .withIndex("by_dedupeKey", (q) => q.eq("dedupeKey", decision.dedupeKey))
       .order("desc")
       .first();
-    if (existing && (existing.status === "pending" || existing.status === "running")) {
+    if (existing && (existing.status === "queued" || existing.status === "running")) {
       return {
-        eligible: true as const,
+        eligible: true,
         jobId: existing._id,
-        fallbackReason,
+        trigger: decision.trigger,
+        runState: "queued" as const,
       };
     }
 
-    const now = new Date().toISOString();
     const contextJson = JSON.stringify({
       propertyId: args.propertyId,
       sourceUrl: args.sourceUrl,
       portal: args.portal,
-      reason: fallbackReason,
-      originatingErrorCode: args.extractorErrorCode,
+      trigger: decision.trigger,
+      extractorErrorCode: args.extractorErrorCode,
+      parseConfidence: args.parseConfidence,
+      minimumParseConfidence: args.minimumParseConfidence,
+      missingCriticalFields: args.missingCriticalFields,
+      conflictingFields: args.conflictingFields,
       note: args.operatorNote,
     });
 
     const jobId = await ctx.db.insert("enrichmentJobs", {
       propertyId: args.propertyId,
-      source: "browser_use_fallback" as const,
-      status: "pending" as const,
+      source: "browser_use_hosted" as const,
+      status: "queued" as const,
       attempt: 0,
-      maxAttempts: maxFallbackAttempts,
-      priority: SOURCE_PRIORITY.browser_use_fallback,
+      maxAttempts: maxBrowserUseAttempts,
+      priority: SOURCE_PRIORITY.browser_use_hosted,
       requestedAt: now,
-      dedupeKey,
+      dedupeKey: decision.dedupeKey,
       contextJson,
     });
 
     await ctx.db.insert("auditLog", {
-      action: "browser_use_fallback_enqueued",
+      action: "browser_use_hosted_enqueued",
       entityType: "enrichmentJobs",
       entityId: jobId,
       details: JSON.stringify({
         propertyId: args.propertyId,
         sourceUrl: args.sourceUrl,
         portal: args.portal,
-        fallbackReason,
-        originatingErrorCode: args.extractorErrorCode,
-        priorAttempts: priorFallbackAttempts,
+        trigger: decision.trigger,
+        extractorErrorCode: args.extractorErrorCode,
+        parseConfidence: args.parseConfidence,
+        minimumParseConfidence: args.minimumParseConfidence,
+        missingCriticalFields: args.missingCriticalFields,
+        conflictingFields: args.conflictingFields,
+        priorAttempts: priorBrowserUseAttempts,
       }),
       timestamp: now,
     });
 
     return {
-      eligible: true as const,
+      eligible: true,
       jobId,
-      fallbackReason,
+      trigger: decision.trigger,
+      runState: "queued" as const,
     };
   },
 });
 
-/** Cheap non-crypto hash — same formula as src/lib/enrichment/fallback.ts. */
-function simpleHash(input: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
-/** Atomic claim: only advance pending → running. A second worker racing on
- *  the same pending row observes status !== "pending" and throws, so the
+/** Atomic claim: only advance queued → running. A second worker racing on
+ *  the same queued row observes status !== "queued" and throws, so the
  *  caller can pick a different job. Convex mutations serialize conflicting
  *  writes, so the read-then-patch inside a single mutation handler is
  *  race-safe for this document. */
@@ -778,9 +816,9 @@ export const markRunning = internalMutation({
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
     if (!job) throw new Error("Enrichment job not found");
-    if (job.status !== "pending") {
+    if (job.status !== "queued") {
       throw new Error(
-        `Enrichment job ${args.jobId} cannot be claimed: status is "${job.status}" (expected "pending")`,
+        `Enrichment job ${args.jobId} cannot be claimed: status is "${job.status}" (expected "queued")`,
       );
     }
     await ctx.db.patch(args.jobId, {
@@ -837,7 +875,7 @@ export const markFailed = internalMutation({
       const backoffSec = Math.min(10 * Math.pow(2, job.attempt), 3600);
       const nextRetryAt = new Date(now.getTime() + backoffSec * 1000).toISOString();
       await ctx.db.patch(args.jobId, {
-        status: "pending" as const,
+        status: "queued" as const,
         errorCode: args.errorCode,
         errorMessage: args.errorMessage,
         nextRetryAt,
@@ -856,15 +894,23 @@ export const markFailed = internalMutation({
       return null;
     }
 
+    const finalStatus =
+      job.source === "browser_use_hosted" && job.attempt >= job.maxAttempts
+        ? ("escalated" as const)
+        : ("failed" as const);
+
     await ctx.db.patch(args.jobId, {
-      status: "failed" as const,
+      status: finalStatus,
       completedAt: now.toISOString(),
       errorCode: args.errorCode,
       errorMessage: args.errorMessage,
       nextRetryAt: undefined,
     });
     await ctx.db.insert("auditLog", {
-      action: "enrichment_job_failed",
+      action:
+        finalStatus === "escalated"
+          ? "enrichment_job_escalated"
+          : "enrichment_job_failed",
       entityType: "enrichmentJobs",
       entityId: args.jobId,
       details: JSON.stringify({
@@ -1407,15 +1453,15 @@ export const persistJobResult = internalMutation({
         resultRef = JSON.stringify(ids);
         break;
       }
-      case "browser_use_fallback": {
-        const normalized = normalizeBrowserUseFallbackResult(payload);
+      case "browser_use_hosted": {
+        const normalized = normalizeBrowserUseHostedResult(payload);
         if (!normalized) {
-          throw new Error("Invalid browser_use_fallback payload");
+          throw new Error("Invalid browser_use_hosted payload");
         }
 
         const mergeResult = mergeSourceRecords([
           {
-            sourcePlatform: "browser_use_fallback",
+            sourcePlatform: "browser_use_hosted",
             fetchedAt: normalized.capturedAt,
             data: normalized.canonicalFields,
           },
@@ -1429,12 +1475,20 @@ export const persistJobResult = internalMutation({
         });
 
         resultRef = JSON.stringify({
+          kind: "browser_use_hosted",
           sourceUrl: normalized.sourceUrl,
           portal: normalized.portal,
-          reason: normalized.reason,
+          trigger: normalized.trigger,
+          runState: "succeeded",
+          reviewState: normalized.reviewState,
           confidence: normalized.confidence,
           capturedAt: normalized.capturedAt,
-          evidenceCount: normalized.evidence.length,
+          canonicalFields: normalized.canonicalFields,
+          fieldMetadata: normalized.fieldMetadata,
+          citations: normalized.citations,
+          trace: normalized.trace,
+          mergeProvenance: mergeResult.provenance,
+          conflicts: mergeResult.conflicts,
           mergedFieldCount: Object.keys(mergeResult.mergedFields).length,
           citation: args.citation,
         });
@@ -1471,7 +1525,7 @@ export const getJobsForProperty = query({
   },
 });
 
-/** Ready-to-run queue: pending + (no retry gate OR retry gate has passed).
+/** Ready-to-run queue: queued + (no retry gate OR retry gate has passed).
  *  Ordered by priority asc. */
 export const getPendingJobs = query({
   args: { limit: v.optional(v.number()) },
@@ -1480,12 +1534,12 @@ export const getPendingJobs = query({
     const limit = args.limit ?? 50;
     const now = new Date().toISOString();
 
-    const pending = await ctx.db
+    const queued = await ctx.db
       .query("enrichmentJobs")
-      .withIndex("by_status_and_priority", (q) => q.eq("status", "pending"))
+      .withIndex("by_status_and_priority", (q) => q.eq("status", "queued"))
       .collect();
 
-    const ready = pending.filter(
+    const ready = queued.filter(
       (j) => !j.nextRetryAt || j.nextRetryAt <= now,
     );
     ready.sort((a, b) => a.priority - b.priority);
@@ -1497,11 +1551,11 @@ export const getEnrichmentSummaryForProperty = query({
   args: { propertyId: v.id("properties") },
   returns: v.object({
     totalJobs: v.number(),
+    queued: v.number(),
     succeeded: v.number(),
     failed: v.number(),
-    pending: v.number(),
     running: v.number(),
-    skipped: v.number(),
+    escalated: v.number(),
     lastUpdated: v.optional(v.string()),
   }),
   handler: async (ctx, args) => {
@@ -1512,29 +1566,29 @@ export const getEnrichmentSummaryForProperty = query({
       )
       .collect();
 
+    let queued = 0;
     let succeeded = 0;
     let failed = 0;
-    let pending = 0;
     let running = 0;
-    let skipped = 0;
+    let escalated = 0;
     let lastUpdated: string | undefined;
 
     for (const job of jobs) {
       switch (job.status) {
+        case "queued":
+          queued++;
+          break;
         case "succeeded":
           succeeded++;
           break;
         case "failed":
           failed++;
           break;
-        case "pending":
-          pending++;
-          break;
         case "running":
           running++;
           break;
-        case "skipped":
-          skipped++;
+        case "escalated":
+          escalated++;
           break;
       }
       const candidate = job.completedAt ?? job.startedAt ?? job.requestedAt;
@@ -1545,11 +1599,11 @@ export const getEnrichmentSummaryForProperty = query({
 
     return {
       totalJobs: jobs.length,
+      queued,
       succeeded,
       failed,
-      pending,
       running,
-      skipped,
+      escalated,
       lastUpdated,
     };
   },
