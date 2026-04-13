@@ -14,16 +14,15 @@
 //   3. Check consent / suppression state before doing anything else
 //   4. Classify the message body via the shared classifier
 //   5. Handle each intent (STOP, START, HELP, URL, text, empty)
-//   6. For URL intents: reuse the listing URL parser logic from KIN-774
-//      (mirrored at convex/intake.ts PORTAL_PATTERNS) to extract portal
-//      + listing id, then create or reuse a sourceListings row
+//   6. For URL intents: reuse the shared Convex-side listing URL parser
+//      mirror so SMS and generic intake stay in sync
 //   7. Build a signed reply link for the happy path
 //   8. Persist one smsIntakeMessages row per processed message
 //
 // What lives elsewhere:
 //   - Twilio signature validation → convex/http.ts (outside this task's scope)
 //   - Actual outbound SMS send → Twilio REST client in a Convex action
-//   - URL parser mirror → inlined below (Convex can't import from src/)
+//   - Shared Convex-side parser mirror → convex/lib/listingUrlParser.ts
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { internalMutation, query } from "./_generated/server";
@@ -37,158 +36,15 @@ import {
   recordRateLimitOutcome,
 } from "./lib/rateLimitBuckets";
 import {
-  buildSignedLink,
+  buildSignedIntakeLink,
   classifyInboundSms,
   hashPhone,
   normalizePhone,
 } from "./lib/smsIntakeCompute";
-
-// ───────────────────────────────────────────────────────────────────────────
-// URL parser — inlined mirror of src/lib/intake/parser.ts (KIN-774)
-//
-// Convex can't import from src/, so the parse logic is duplicated here in
-// the same shape the src module uses: discriminated-union result, typed
-// platform name, listing id, address hint. This matches the semantics of
-// `parseListingUrl` from src/lib/intake/index.ts byte-for-byte.
-// ───────────────────────────────────────────────────────────────────────────
-
-type SmsSourcePlatform = "zillow" | "redfin" | "realtor";
-
-interface SmsPortalMetadata {
-  platform: SmsSourcePlatform;
-  listingId: string;
-  normalizedUrl: string;
-  addressHint: string | null;
-  rawUrl: string;
-}
-
-type SmsParseResult =
-  | { success: true; data: SmsPortalMetadata }
-  | { success: false; error: { code: string; message: string } };
-
-interface PortalPatternMatch {
-  listingId: string;
-  addressHint: string | null;
-}
-
-interface PortalDef {
-  platform: SmsSourcePlatform;
-  domains: string[];
-  match: (url: URL) => PortalPatternMatch | null;
-}
-
-function matchZillow(url: URL): PortalPatternMatch | null {
-  const zpidMatch = url.pathname.match(/(\d+)_zpid/);
-  if (!zpidMatch) return null;
-  const addressMatch = url.pathname.match(/\/homedetails\/([^/]+)\//);
-  let addressHint: string | null = null;
-  if (addressMatch) {
-    try {
-      addressHint = decodeURIComponent(addressMatch[1]).replace(/-/g, " ");
-    } catch {
-      addressHint = addressMatch[1].replace(/-/g, " ");
-    }
-  }
-  return { listingId: zpidMatch[1], addressHint };
-}
-
-function matchRedfin(url: URL): PortalPatternMatch | null {
-  const homeMatch = url.pathname.match(/\/home\/(\d+)/);
-  if (!homeMatch) return null;
-  const pathParts = url.pathname
-    .split("/home/")[0]
-    .split("/")
-    .filter(Boolean);
-  const addressHint =
-    pathParts.length >= 3
-      ? pathParts.slice(2).join(" ").replace(/-/g, " ")
-      : null;
-  return { listingId: homeMatch[1], addressHint };
-}
-
-function matchRealtor(url: URL): PortalPatternMatch | null {
-  const detailMatch = url.pathname.match(
-    /\/realestateandhomes-detail\/([^/]+)/,
-  );
-  if (!detailMatch) return null;
-  const slug = detailMatch[1];
-  const addressHint = slug.startsWith("M") ? null : slug.replace(/_/g, " ");
-  return { listingId: slug, addressHint };
-}
-
-const SMS_PORTAL_MATCHERS: PortalDef[] = [
-  {
-    platform: "zillow",
-    domains: ["zillow.com", "www.zillow.com"],
-    match: matchZillow,
-  },
-  {
-    platform: "redfin",
-    domains: ["redfin.com", "www.redfin.com"],
-    match: matchRedfin,
-  },
-  {
-    platform: "realtor",
-    domains: ["realtor.com", "www.realtor.com"],
-    match: matchRealtor,
-  },
-];
-
-function parseListingUrlInline(input: string): SmsParseResult {
-  const trimmed = input.trim();
-  let url: URL;
-  try {
-    const withProtocol = trimmed.startsWith("http")
-      ? trimmed
-      : `https://${trimmed}`;
-    url = new URL(withProtocol);
-  } catch {
-    return {
-      success: false,
-      error: { code: "malformed_url", message: "Input is not a valid URL" },
-    };
-  }
-
-  const hostname = url.hostname.toLowerCase();
-  for (const portal of SMS_PORTAL_MATCHERS) {
-    if (
-      !portal.domains.some((d) => hostname === d || hostname.endsWith(`.${d}`))
-    ) {
-      continue;
-    }
-
-    const match = portal.match(url);
-    if (!match) {
-      return {
-        success: false,
-        error: {
-          code: "missing_listing_id",
-          message: `URL appears to be ${portal.platform} but no listing ID could be extracted`,
-        },
-      };
-    }
-
-    const normalized = new URL(url.pathname, `https://${portal.domains[0]}`);
-    return {
-      success: true,
-      data: {
-        platform: portal.platform,
-        listingId: match.listingId,
-        normalizedUrl: normalized.toString(),
-        addressHint: match.addressHint,
-        rawUrl: trimmed,
-      },
-    };
-  }
-
-  return {
-    success: false,
-    error: {
-      code: "unsupported_url",
-      message: `URL domain "${hostname}" is not a supported real estate portal`,
-    },
-  };
-}
+import {
+  buildSourceUrlLookupCandidates,
+  parseListingUrl,
+} from "./lib/listingUrlParser";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Environment-dependent config
@@ -256,7 +112,7 @@ const REPLY_COPY = {
   blocked:
     "This number is temporarily blocked from sending more listing links. Please wait and try again later.",
   // Prefix — the signed link is appended per message.
-  urlProcessedPrefix: "Deal room ready — open it here: ",
+  urlProcessedPrefix: "Continue your intake here: ",
 } as const;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -519,7 +375,7 @@ export const processInboundSms = internalMutation({
           now,
         });
 
-        const parsed = parseListingUrlInline(intent.url);
+        const parsed = parseListingUrl(intent.url);
         if (!parsed.success) {
           // "unsupported_url" is the interesting failure mode — the
           // user sent something that parses as a URL but isn't from
@@ -554,40 +410,43 @@ export const processInboundSms = internalMutation({
           return result;
         }
 
-        // Happy path — reuse an existing sourceListings row for the
-        // same URL if we already have one (prevents duplicate rows
-        // when the same link is texted in multiple times).
-        const existingListing = await ctx.db
-          .query("sourceListings")
-          .withIndex("by_sourceUrl", (q) =>
-            q.eq("sourceUrl", parsed.data.rawUrl),
-          )
-          .first();
+        // Happy path — match either the normalized portal URL or the exact raw
+        // pasted URL so tracking params / protocol noise do not create
+        // duplicate intake rows for the same listing.
+        let existingListing: Doc<"sourceListings"> | null = null;
+        for (const sourceUrl of buildSourceUrlLookupCandidates(
+          parsed.data.rawUrl,
+          parsed.data.normalizedUrl,
+        )) {
+          existingListing = await ctx.db
+            .query("sourceListings")
+            .withIndex("by_sourceUrl", (q) => q.eq("sourceUrl", sourceUrl))
+            .first();
+          if (existingListing) {
+            break;
+          }
+        }
 
         const sourceListingId =
           existingListing?._id ??
           (await ctx.db.insert("sourceListings", {
             sourcePlatform: parsed.data.platform,
-            sourceUrl: parsed.data.rawUrl,
+            sourceUrl: parsed.data.normalizedUrl,
             rawData: JSON.stringify({
               source: "sms",
               messageSid: args.messageSid,
+              rawUrl: parsed.data.rawUrl,
               normalizedUrl: parsed.data.normalizedUrl,
-              addressHint: parsed.data.addressHint,
             }),
             extractedAt: now,
             status: "pending",
           }));
 
-        // Build a signed link pointing at the sourceListing via the
-        // generic intake route. We don't have a dealRoomId yet — the
-        // anonymous SMS sender doesn't have a buyer record, so the
-        // signed link resolves to the listing. When the user clicks
-        // through and registers, the web layer creates the deal room
-        // and swaps the link target.
-        const replyLink = await buildSignedLink(
+        // Anonymous SMS senders do not have a deal room yet, so reply into the
+        // signed public intake route instead of a deal-room URL.
+        const replyLink = await buildSignedIntakeLink(
           getAppBaseUrl(),
-          sourceListingId,
+          parsed.data.normalizedUrl,
           getSignedLinkSecret(),
         );
 
