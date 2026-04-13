@@ -103,19 +103,62 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 /**
- * Popup (or internal test harness) sends a "forward" message with the
- * current tab URL. The background worker builds the intake forward URL
- * and opens it in a new tab. This keeps the forward logic out of the
- * popup so content security policies don't block `window.open` calls.
+ * POST the raw listing URL into the shared intake API. The backend
+ * canonicalizes the URL, resolves duplicate vs created, and decides the
+ * signed-in vs signed-out branch. The extension then opens the returned
+ * landing URL in a new tab.
  */
+async function submitExtensionIntake(rawUrl, buyerCodexBaseUrl, accessToken) {
+  const baseUrl = buyerCodexBaseUrl.replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/api/extension/intake`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    credentials: "include",
+    body: JSON.stringify({ url: rawUrl }),
+  });
+
+  return await response.json();
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "forward_to_intake" && typeof message.url === "string") {
     const baseUrl = message.buyerCodexBaseUrl || "https://buyer-codex.app";
-    const encoded = encodeURIComponent(message.url);
-    const target = `${baseUrl.replace(/\/$/, "")}/intake?url=${encoded}&source=extension`;
-    chrome.tabs.create({ url: target }).then(
-      (tab) => sendResponse({ ok: true, tabId: tab.id }),
-      (err) => sendResponse({ ok: false, error: String(err) }),
+    submitExtensionIntake(message.url, baseUrl, message.accessToken).then(
+      (result) => {
+        if (!result?.ok || typeof result.redirectUrl !== "string") {
+          sendResponse({
+            ok: false,
+            code: result?.code || "backend_unavailable",
+            error: result?.error || "Extension intake failed.",
+          });
+          return;
+        }
+
+        chrome.tabs.create({ url: result.redirectUrl }).then(
+          (tab) =>
+            sendResponse({
+              ok: true,
+              tabId: tab.id,
+              result: result.kind,
+              authState: result.authState,
+            }),
+          (err) =>
+            sendResponse({
+              ok: false,
+              code: "backend_unavailable",
+              error: String(err),
+            }),
+        );
+      },
+      (err) =>
+        sendResponse({
+          ok: false,
+          code: "backend_unavailable",
+          error: String(err),
+        }),
     );
     // Return true to indicate an async response.
     return true;

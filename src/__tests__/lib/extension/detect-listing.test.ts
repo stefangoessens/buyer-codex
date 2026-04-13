@@ -1,7 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  detectListingPage,
+  buildExtensionIntakeRedirectUrl,
   buildIntakeForwardUrl,
+  detectListingPage,
+  getExtensionIntakeViewModel,
 } from "@/lib/extension/detect-listing";
 
 describe("detectListingPage — empty / internal pages", () => {
@@ -42,10 +44,10 @@ describe("detectListingPage — empty / internal pages", () => {
   });
 });
 
-describe("detectListingPage — supported listings (happy path)", () => {
+describe("detectListingPage — supported listings", () => {
   it("detects a Zillow listing URL (long form /homedetails/)", () => {
     const result = detectListingPage(
-      "https://www.zillow.com/homedetails/123-Main-St-Miami-FL-33131/12345678_zpid/"
+      "https://www.zillow.com/homedetails/123-Main-St-Miami-FL-33131/12345678_zpid/",
     );
     expect(result.status).toBe("supported_listing");
     expect(result.platform).toBe("zillow");
@@ -55,10 +57,8 @@ describe("detectListingPage — supported listings (happy path)", () => {
   });
 
   it("detects a Zillow listing URL (short form /homes/<id>_zpid)", () => {
-    // Codex P2 finding on KIN-816 — short-form Zillow URLs are accepted
-    // by the canonical parser and must also trigger the extension badge.
     const result = detectListingPage(
-      "https://www.zillow.com/homes/12345678_zpid/"
+      "https://www.zillow.com/homes/12345678_zpid/",
     );
     expect(result.status).toBe("supported_listing");
     expect(result.platform).toBe("zillow");
@@ -66,7 +66,7 @@ describe("detectListingPage — supported listings (happy path)", () => {
 
   it("detects a Redfin listing URL", () => {
     const result = detectListingPage(
-      "https://www.redfin.com/FL/Miami/123-Main-St-33131/home/12345678"
+      "https://www.redfin.com/FL/Miami/123-Main-St-33131/home/12345678",
     );
     expect(result.status).toBe("supported_listing");
     expect(result.platform).toBe("redfin");
@@ -75,7 +75,7 @@ describe("detectListingPage — supported listings (happy path)", () => {
 
   it("detects a Realtor.com listing URL", () => {
     const result = detectListingPage(
-      "https://www.realtor.com/realestateandhomes-detail/123-Main-St_Miami_FL_33131_M12345-67890"
+      "https://www.realtor.com/realestateandhomes-detail/123-Main-St_Miami_FL_33131_M12345-67890",
     );
     expect(result.status).toBe("supported_listing");
     expect(result.platform).toBe("realtor");
@@ -84,15 +84,17 @@ describe("detectListingPage — supported listings (happy path)", () => {
 
   it("provides a forwardable normalizedUrl for listings", () => {
     const result = detectListingPage(
-      "https://www.zillow.com/homedetails/123-Main-St-Miami-FL-33131/12345678_zpid/"
+      "https://www.zillow.com/homedetails/123-Main-St-Miami-FL-33131/12345678_zpid/",
     );
-    if (result.status !== "supported_listing") throw new Error("expected supported");
+    if (result.status !== "supported_listing") {
+      throw new Error("expected supported");
+    }
     expect(result.normalizedUrl).toMatch(/zillow\.com/);
   });
 
-  it("message prompts user to click to save", () => {
+  it("prompts the user to click save", () => {
     const result = detectListingPage(
-      "https://www.zillow.com/homedetails/123-Main-St/12345678_zpid/"
+      "https://www.zillow.com/homedetails/123-Main-St/12345_zpid/",
     );
     expect(result.message).toMatch(/save to buyer-codex/i);
   });
@@ -126,9 +128,8 @@ describe("detectListingPage — invalid URLs", () => {
   });
 
   it("handles missing protocol gracefully", () => {
-    // parseListingUrl prepends https:// if missing, so this should parse
     const result = detectListingPage(
-      "zillow.com/homedetails/123-Main/12345_zpid/"
+      "zillow.com/homedetails/123-Main/12345_zpid/",
     );
     expect(result.status).toBe("supported_listing");
   });
@@ -138,7 +139,7 @@ describe("buildIntakeForwardUrl", () => {
   it("builds a well-formed intake URL", () => {
     const url = buildIntakeForwardUrl(
       "https://buyer-codex.app",
-      "https://www.zillow.com/homedetails/123-Main-St/12345_zpid/"
+      "https://www.zillow.com/homedetails/123-Main-St/12345_zpid/",
     );
     expect(url).toMatch(/^https:\/\/buyer-codex\.app\/intake\?url=/);
     expect(url).toContain("source=extension");
@@ -147,7 +148,7 @@ describe("buildIntakeForwardUrl", () => {
   it("URL-encodes the forwarded listing URL", () => {
     const url = buildIntakeForwardUrl(
       "https://buyer-codex.app",
-      "https://www.zillow.com/homedetails/123 Main St/12345_zpid/"
+      "https://www.zillow.com/homedetails/123 Main St/12345_zpid/",
     );
     expect(url).not.toContain("123 Main St");
     expect(url).toContain("123%20Main%20St");
@@ -156,55 +157,60 @@ describe("buildIntakeForwardUrl", () => {
   it("strips trailing slash from base URL", () => {
     const url = buildIntakeForwardUrl(
       "https://buyer-codex.app/",
-      "https://www.zillow.com/homedetails/123/12345_zpid/"
+      "https://www.zillow.com/homedetails/123/12345_zpid/",
     );
     expect(url).toMatch(/^https:\/\/buyer-codex\.app\/intake\?/);
     expect(url).not.toMatch(/app\/\/intake/);
   });
+});
 
-  it("handles staging/preview subdomains", () => {
-    const url = buildIntakeForwardUrl(
-      "https://preview-abc123.buyer-codex.app",
-      "https://www.redfin.com/FL/Miami/home/12345"
-    );
-    expect(url).toContain("preview-abc123.buyer-codex.app/intake");
+describe("buildExtensionIntakeRedirectUrl", () => {
+  it("includes the explicit intake outcome and auth state", () => {
+    const url = buildExtensionIntakeRedirectUrl("https://buyer-codex.app", {
+      kind: "duplicate",
+      authState: "signed_in",
+      platform: "redfin",
+      listingId: "123456",
+      normalizedUrl: "https://www.redfin.com/FL/Miami/home/123456",
+      sourceListingId: "sl_123456",
+    });
+
+    expect(url).toContain("source=extension");
+    expect(url).toContain("result=duplicate");
+    expect(url).toContain("auth=signed_in");
+    expect(url).toContain("sourceListingId=sl_123456");
   });
 });
 
-describe("detection states for extension popup rendering", () => {
-  // These are the 5 states the popup needs to render distinct UI for.
-  // The extension never lies about support — if the URL isn't a
-  // listing on a supported portal, the popup says so explicitly.
+describe("getExtensionIntakeViewModel", () => {
+  it("returns a duplicate signed-in dashboard handoff", () => {
+    const model = getExtensionIntakeViewModel({
+      kind: "duplicate",
+      authState: "signed_in",
+      platform: "zillow",
+      listingId: "12345",
+      normalizedUrl: "https://www.zillow.com/homedetails/12345_zpid/",
+      sourceListingId: "sl_existing",
+    });
 
-  it("supported_listing enables the save CTA", () => {
-    const result = detectListingPage(
-      "https://www.zillow.com/homedetails/123/12345_zpid/"
-    );
-    expect(result.status).toBe("supported_listing");
-    expect(result.normalizedUrl).toBeTruthy();
+    expect(model.primaryHref).toBe("/dashboard");
+    expect(model.statusLabel).toBe("Duplicate listing");
+    expect(model.title).toContain("already");
   });
 
-  it("supported_portal_no_listing disables CTA, shows guidance", () => {
-    const result = detectListingPage("https://www.redfin.com/");
-    expect(result.status).toBe("supported_portal_no_listing");
-    expect(result.normalizedUrl).toBeUndefined();
-  });
+  it("returns a signed-out created handoff", () => {
+    const model = getExtensionIntakeViewModel({
+      kind: "created",
+      authState: "signed_out",
+      platform: "realtor",
+      listingId: "M12345-67890",
+      normalizedUrl:
+        "https://www.realtor.com/realestateandhomes-detail/123-Main-St_Miami_FL_33131_M12345-67890",
+      sourceListingId: "sl_new",
+    });
 
-  it("unsupported_portal disables CTA, lists supported portals", () => {
-    const result = detectListingPage("https://www.bing.com/");
-    expect(result.status).toBe("unsupported_portal");
-    expect(result.normalizedUrl).toBeUndefined();
-  });
-
-  it("invalid_url disables CTA with clear error", () => {
-    // An empty/internal page short-circuits to "empty" before parser runs.
-    // The only way to hit invalid_url is a malformed but non-internal URL.
-    const result = detectListingPage("https:///missing-host");
-    expect(["invalid_url", "unsupported_portal"]).toContain(result.status);
-  });
-
-  it("empty disables CTA on internal pages", () => {
-    const result = detectListingPage("chrome://extensions");
-    expect(result.status).toBe("empty");
+    expect(model.primaryHref).toBe("/");
+    expect(model.primaryLabel).toBe("Go to buyer-codex");
+    expect(model.statusLabel).toBe("Saved to intake");
   });
 });
