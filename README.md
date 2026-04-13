@@ -53,3 +53,8 @@ pnpm workers:test
 - Use [`AGENTS.md`](./AGENTS.md) for project workflow and Linear operating rules.
 - Use Linear issue descriptions as the execution spec for recovered work.
 - CI/CD and preview workflow details live in [docs/ci-cd-preview-workflow.md](./docs/ci-cd-preview-workflow.md).
+
+## Strategy And Compliance Artifacts
+
+- [KIN-962 - Convex Auth Viability](./docs/adr/KIN-962-convex-auth-viability.md)
+- [KIN-963 - Florida Compliance Matrix](./docs/adr/KIN-963-florida-compliance-matrix.md)
