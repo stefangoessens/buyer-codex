@@ -22,7 +22,7 @@ export function DealRoomCard({ row, now }: DealRoomCardProps) {
 
   return (
     <Link
-      href={`/dealroom/${row.dealRoomId}/offer`}
+      href={`/dealroom/${row.dealRoomId}`}
       className="group block"
     >
       <Card className="h-full overflow-hidden p-0 transition-all hover:border-primary-300 hover:shadow-md">
