@@ -187,28 +187,6 @@ export function escalatingBlockMs(
   return Math.min(scaled, config.maxBlockMs);
 }
 
-export function shouldFlagSuspiciousSpike(
-  channel: Channel,
-  previousActiveCount: number,
-  nextActiveCount: number,
-): boolean {
-  const threshold = Math.max(
-    3,
-    Math.ceil(CHANNEL_CONFIGS[channel].maxRequests * 0.8),
-  );
-
-  return previousActiveCount < threshold && nextActiveCount >= threshold;
-}
-
-export function toExplicitRateLimitState(
-  state: Extract<RateLimitState, { allowed: false }>,
-): ExplicitRateLimitState {
-  return {
-    status: state.reason === "block_active" ? "blocked" : "retry_later",
-    retryAt: state.blockedUntil,
-  };
-}
-
 /**
  * Check whether a new request should be allowed for a given bucket.
  *

@@ -6,7 +6,7 @@ import {
   type BuyerFeeLedgerEntryRecord,
   type CompensationLedgerState,
 } from "@buyer-codex/shared";
-import { query, mutation, internalQuery } from "./_generated/server";
+import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { requireAuth, requireRole } from "./lib/session";
@@ -361,6 +361,55 @@ export const initializeCompensationStatus = mutation({
 
     await ctx.db.insert("auditLog", {
       userId: user._id,
+      action: "compensation_status_initialized",
+      entityType: "compensationStatus",
+      entityId: statusId,
+      details: JSON.stringify({ dealRoomId: args.dealRoomId }),
+      timestamp: now,
+    });
+
+    return null;
+  },
+});
+
+export const initializeCompensationStatusInternal = internalMutation({
+  args: {
+    dealRoomId: v.id("dealRooms"),
+    actorUserId: v.optional(v.id("users")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const dealRoom = await ctx.db.get(args.dealRoomId);
+
+    if (!dealRoom) {
+      throw new Error("Deal room not found");
+    }
+
+    const existing = await ctx.db
+      .query("compensationStatus")
+      .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", args.dealRoomId))
+      .unique();
+
+    if (existing) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    const empty = createEmptyBuyerFeeLedgerRollup();
+    const statusId = await ctx.db.insert("compensationStatus", {
+      dealRoomId: args.dealRoomId,
+      status: "unknown",
+      lastTransitionAt: now,
+      expectedBuyerFee: empty.expectedBuyerFee,
+      sellerPaidAmount: empty.sellerPaidAmount,
+      buyerPaidAmount: empty.buyerPaidAmount,
+      projectedClosingCredit: empty.projectedClosingCredit,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("auditLog", {
+      userId: args.actorUserId,
       action: "compensation_status_initialized",
       entityType: "compensationStatus",
       entityId: statusId,
