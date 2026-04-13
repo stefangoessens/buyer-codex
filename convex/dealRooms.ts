@@ -4,6 +4,12 @@ import { internal } from "./_generated/api";
 import { api } from "./_generated/api";
 import { getCurrentUser, requireAuth } from "./lib/session";
 import { buildDealRoomFlowProfile, loadBuyerProfileView } from "./lib/buyerProfile";
+import {
+  filterByAccessLevel,
+  hasFullDealRoomAccess,
+  hasInternalDealRoomAccess,
+  resolveAccessLevel,
+} from "../src/lib/dealroom/access";
 
 /** Get a deal room with access-level-gated property data */
 export const get = query({
@@ -18,45 +24,33 @@ export const get = query({
 
     // Check auth
     const user = await getCurrentUser(ctx);
-    let accessLevel: "anonymous" | "registered" | "full" = "anonymous";
+    const isOwner = user ? dealRoom.buyerId === user._id : false;
+    const isStaff = user ? user.role === "broker" || user.role === "admin" : false;
+    const accessLevel = resolveAccessLevel(
+      dealRoom.accessLevel,
+      Boolean(user),
+      isOwner,
+      isStaff,
+    );
 
-    if (user) {
-      if (user.role === "broker" || user.role === "admin") {
-        accessLevel = "full";
-      } else if (dealRoom.buyerId === user._id) {
-        accessLevel = dealRoom.accessLevel;
-      } else {
-        accessLevel = "registered";
-      }
-    }
-
-    // Filter property fields by access level
-    const TEASER_FIELDS = [
-      "canonicalId", "address", "status", "listPrice", "beds", "bathsFull",
-      "bathsHalf", "sqftLiving", "propertyType", "yearBuilt", "photoUrls",
-      "photoCount", "pool", "waterfrontType", "hoaFee", "hoaFrequency",
-    ];
-
-    let propertyData = property;
-    if (accessLevel === "anonymous") {
-      const filtered: Record<string, unknown> = { _id: property._id };
-      for (const field of TEASER_FIELDS) {
-        if (field in property) {
-          filtered[field] = (property as Record<string, unknown>)[field];
-        }
-      }
-      propertyData = filtered as typeof property;
-    }
+    const propertyData = filterByAccessLevel(
+      property as Record<string, unknown>,
+      accessLevel,
+    ) as typeof property;
 
     const enrichment: any = await ctx.runQuery(
       internal.enrichment.getForPropertyInternal,
       { propertyId: dealRoom.propertyId },
     );
-    const buyerProfile = buildDealRoomFlowProfile(
-      await loadBuyerProfileView(ctx, dealRoom.buyerId, false),
-    );
+    const buyerProfile =
+      isOwner || isStaff
+        ? buildDealRoomFlowProfile(
+            await loadBuyerProfileView(ctx, dealRoom.buyerId, false),
+          )
+        : null;
 
-    const includeAgentContact = accessLevel === "full";
+    const includeDealRoomActions = hasFullDealRoomAccess(accessLevel);
+    const includeInternalOnlyData = hasInternalDealRoomAccess(accessLevel);
     const enrichmentData = enrichment
       ? {
           summary: enrichment.summary,
@@ -78,11 +72,11 @@ export const get = query({
             recentActivityCount: agent.recentActivityCount,
             provenance: agent.provenance,
             lastRefreshedAt: agent.lastRefreshedAt,
-            phone: includeAgentContact ? agent.phone : undefined,
-            email: includeAgentContact ? agent.email : undefined,
+            phone: includeDealRoomActions ? agent.phone : undefined,
+            email: includeDealRoomActions ? agent.email : undefined,
           })),
-          snapshots: accessLevel === "full" ? enrichment.snapshots : undefined,
-          engineInputs: accessLevel === "full" ? enrichment.engineInputs : undefined,
+          snapshots: includeInternalOnlyData ? enrichment.snapshots : undefined,
+          engineInputs: includeInternalOnlyData ? enrichment.engineInputs : undefined,
         }
       : null;
 
