@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Document Summaries (KIN-852)
 //
-// Typed query surface over `fileAnalyses` that returns buyer-safe or
+// Typed query surface over `fileAnalysisJobs` that returns buyer-safe or
 // internal document summaries depending on caller role. Projection
 // happens server-side via the shared pure helper in
 // `convex/lib/documentSummary.ts` — buyers never see raw extraction
@@ -35,6 +35,7 @@ const severityValidator = v.union(
 const documentTypeValidator = v.union(
   v.literal("seller_disclosure"),
   v.literal("hoa_doc"),
+  v.literal("hoa_document"),
   v.literal("inspection_report"),
   v.literal("title_commitment"),
   v.literal("survey"),
@@ -100,25 +101,97 @@ const internalSummaryValidator = v.object({
 // ───────────────────────────────────────────────────────────────────────────
 
 /** Lift a Convex doc into the pure-lib input shape. */
-function toRawAnalysis(doc: Doc<"fileAnalyses">): RawFileAnalysis {
+function toRawAnalysis(
+  job: Doc<"fileAnalysisJobs">,
+  findings: Array<Doc<"fileAnalysisFindings">>,
+): RawFileAnalysis {
+  const parsedPayload = parsePayload(job.payload);
+  const fallbackFactsPayload =
+    job.payload ??
+    JSON.stringify({
+      buyerFacts: findings.map((finding) => finding.summary).slice(0, 3),
+    });
+
   return {
-    _id: doc._id,
-    documentId: doc.documentId,
-    dealRoomId: doc.dealRoomId,
-    documentType: doc.documentType,
-    fileName: doc.fileName,
-    status: doc.status,
-    reviewState: doc.reviewState,
-    factsPayload: doc.factsPayload,
-    reviewNotes: doc.reviewNotes,
-    confidence: doc.confidence,
-    severity: doc.severity,
-    uploadedAt: doc.uploadedAt,
-    analyzedAt: doc.analyzedAt,
-    reviewedAt: doc.reviewedAt,
-    extractedPageCount: doc.extractedPageCount,
-    totalPageCount: doc.totalPageCount,
+    _id: job._id,
+    documentId: String(job.fileStorageId),
+    dealRoomId: String(job.dealRoomId),
+    documentType: normalizeDocumentType(job.docType),
+    fileName: job.fileName,
+    status: mapJobStatus(job.status),
+    reviewState: mapReviewState(job.status),
+    factsPayload: fallbackFactsPayload,
+    reviewNotes: job.reviewNotes,
+    confidence: job.overallConfidence ?? 0,
+    severity: job.overallSeverity ?? "info",
+    uploadedAt: job.createdAt,
+    analyzedAt: job.completedAt,
+    reviewedAt: job.resolvedAt,
+    extractedPageCount: parsedPayload?.pageClassifications.length ?? 0,
+    totalPageCount:
+      parsedPayload?.totalPageCount ??
+      parsedPayload?.pageClassifications.length ??
+      0,
   };
+}
+
+function normalizeDocumentType(docType: Doc<"fileAnalysisJobs">["docType"]): RawFileAnalysis["documentType"] {
+  if (docType === "unknown") return "other";
+  return docType;
+}
+
+function mapJobStatus(
+  status: Doc<"fileAnalysisJobs">["status"],
+): RawFileAnalysis["status"] {
+  switch (status) {
+    case "completed":
+    case "resolved":
+      return "succeeded";
+    default:
+      return status;
+  }
+}
+
+function mapReviewState(
+  status: Doc<"fileAnalysisJobs">["status"],
+): RawFileAnalysis["reviewState"] {
+  switch (status) {
+    case "completed":
+    case "resolved":
+      return "approved";
+    default:
+      return "pending";
+  }
+}
+
+function parsePayload(payload: string | undefined): {
+  pageClassifications: Array<{ pageNumber: number }>;
+  totalPageCount?: number;
+} | null {
+  if (!payload) return null;
+  try {
+    const parsed = JSON.parse(payload) as {
+      pageClassifications?: unknown;
+      totalPageCount?: unknown;
+    };
+    return {
+      pageClassifications: Array.isArray(parsed.pageClassifications)
+        ? parsed.pageClassifications.filter(
+            (page): page is { pageNumber: number } =>
+              Boolean(page) &&
+              typeof page === "object" &&
+              "pageNumber" in page &&
+              typeof page.pageNumber === "number",
+          )
+        : [],
+      totalPageCount:
+        typeof parsed.totalPageCount === "number"
+          ? parsed.totalPageCount
+          : undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -156,12 +229,19 @@ export const listByDealRoom = query({
       return { role: "buyer" as const, summaries: [] };
     }
 
-    const docs = await ctx.db
-      .query("fileAnalyses")
+    const jobs = await ctx.db
+      .query("fileAnalysisJobs")
       .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", args.dealRoomId))
       .collect();
-
-    const raw = docs.map(toRawAnalysis);
+    const raw = await Promise.all(
+      jobs.map(async (job) => {
+        const findings = await ctx.db
+          .query("fileAnalysisFindings")
+          .withIndex("by_jobId", (q) => q.eq("jobId", job._id))
+          .collect();
+        return toRawAnalysis(job, findings);
+      }),
+    );
 
     if (user.role === "buyer") {
       const filtered = filterForBuyer(raw);
@@ -207,13 +287,20 @@ export const getByDocumentId = query({
       return null;
     }
 
-    const doc = await ctx.db
-      .query("fileAnalyses")
-      .withIndex("by_documentId", (q) => q.eq("documentId", args.documentId))
-      .unique();
-    if (!doc || doc.dealRoomId !== args.dealRoomId) return null;
+    const jobs = await ctx.db
+      .query("fileAnalysisJobs")
+      .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", args.dealRoomId))
+      .collect();
+    const job =
+      jobs.find((candidate) => String(candidate.fileStorageId) === args.documentId) ??
+      null;
+    if (!job) return null;
 
-    const raw = toRawAnalysis(doc);
+    const findings = await ctx.db
+      .query("fileAnalysisFindings")
+      .withIndex("by_jobId", (q) => q.eq("jobId", job._id))
+      .collect();
+    const raw = toRawAnalysis(job, findings);
 
     if (user.role === "buyer") {
       if (raw.reviewState === "rejected") return null;

@@ -1,14 +1,17 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyDocument,
+  classifyDocumentPages,
   applyFlRiskRules,
   analyzeDocument,
+  analyzeDocumentPages,
   DOC_TYPES,
   FL_RISK_RULES,
   FINDING_SEVERITIES,
   DOC_PARSER_VERSION,
   type ExtractedFacts,
 } from "@/lib/ai/engines/docParser";
+import { getPromptVersionRef } from "../../../../../packages/shared/src/prompt-registry";
 
 const TODAY = "2028-04-12";
 
@@ -63,6 +66,34 @@ describe("classifyDocument", () => {
       "SELLER'S PROPERTY DISCLOSURE STATEMENT\nHOA annual budget mentioned here\nKnown defects: yes";
     const result = classifyDocument(text);
     expect(result.docType).toBe("seller_disclosure");
+  });
+});
+
+describe("classifyDocumentPages", () => {
+  it("labels each page independently", () => {
+    const result = classifyDocumentPages([
+      {
+        pageNumber: 1,
+        text: "SELLER'S PROPERTY DISCLOSURE STATEMENT\nRoof age 19 years",
+      },
+      {
+        pageNumber: 2,
+        text: "TITLE COMMITMENT\nSchedule B - Exceptions from coverage",
+      },
+    ]);
+
+    expect(result).toEqual([
+      {
+        pageNumber: 1,
+        docType: "seller_disclosure",
+        confidence: expect.any(Number),
+      },
+      {
+        pageNumber: 2,
+        docType: "title_commitment",
+        confidence: expect.any(Number),
+      },
+    ]);
   });
 });
 
@@ -393,6 +424,86 @@ describe("analyzeDocument", () => {
       today: TODAY,
     });
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+});
+
+describe("analyzeDocumentPages", () => {
+  it("extracts typed facts with citations and prompt provenance", () => {
+    const result = analyzeDocumentPages({
+      pages: [
+        {
+          pageNumber: 1,
+          text: [
+            "SELLER'S PROPERTY DISCLOSURE STATEMENT",
+            "Roof age: 22 years",
+            "Flood zone: AE",
+            "Permits disclosed: no",
+          ].join("\n"),
+        },
+        {
+          pageNumber: 2,
+          text: [
+            "SELLER'S PROPERTY DISCLOSURE STATEMENT",
+            "Known issue: unpermitted patio enclosure added without permit",
+          ].join("\n"),
+        },
+      ],
+      today: TODAY,
+    });
+
+    expect(result.docType).toBe("seller_disclosure");
+    expect(result.pageClassifications).toEqual([
+      {
+        pageNumber: 1,
+        docType: "seller_disclosure",
+        confidence: expect.any(Number),
+      },
+      {
+        pageNumber: 2,
+        docType: "seller_disclosure",
+        confidence: expect.any(Number),
+      },
+    ]);
+    expect(result.facts.roofAgeYears).toBe(22);
+    expect(result.facts.floodZone).toBe("AE");
+    expect(result.facts.permitsDisclosed).toBe("no");
+    expect(result.findings.every((finding) => finding.citation?.pageNumber)).toBe(
+      true,
+    );
+    expect(result.buyerFacts.length).toBeGreaterThan(0);
+    expect(result.promptKey).toBe("default");
+    expect(result.promptVersion).toBe(
+      getPromptVersionRef("doc_parser", "default").version,
+    );
+  });
+
+  it("extracts title exceptions into lien findings", () => {
+    const result = analyzeDocumentPages({
+      pages: [
+        {
+          pageNumber: 1,
+          text: [
+            "TITLE COMMITMENT",
+            "Schedule B - Exceptions from coverage:",
+            "1. Utility easement",
+            "2. HOA lien",
+            "3. Municipal code enforcement lien",
+          ].join("\n"),
+        },
+      ],
+      today: TODAY,
+    });
+
+    expect(result.docType).toBe("title_commitment");
+    expect(result.facts.lienCount).toBe(2);
+    expect(result.findings.find((finding) => finding.rule === "lien_or_encumbrance"))
+      .toMatchObject({
+        severity: "critical",
+        requiresReview: true,
+        citation: {
+          pageNumber: 1,
+        },
+      });
   });
 });
 

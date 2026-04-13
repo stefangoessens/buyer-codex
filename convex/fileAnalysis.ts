@@ -70,6 +70,9 @@ async function canReadDealRoom(
 /** Strip internal-only fields from a job for buyer-facing responses. */
 function stripJobForBuyer(job: Doc<"fileAnalysisJobs">): Record<string, unknown> {
   const {
+    payload: _payload,
+    overallConfidence: _confidence,
+    engineVersion: _engineVersion,
     reviewedBy: _r,
     reviewNotes: _rn,
     errorCount: _ec,
@@ -127,9 +130,13 @@ export const getWithFindings = query({
       .collect();
 
     if (access === "buyer") {
+      const buyerVisibleFindings =
+        job.status === "completed" || job.status === "resolved"
+          ? findings.map(stripFindingForBuyer)
+          : [];
       return {
         job: stripJobForBuyer(job),
-        findings: findings.map(stripFindingForBuyer),
+        findings: buyerVisibleFindings,
       };
     }
     return { job, findings };

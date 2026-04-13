@@ -150,6 +150,39 @@ describe("projectBuyerSummary — buyer-safe projection", () => {
     expect(summary.keyFacts).toEqual([]);
   });
 
+  it("falls back to finding labels and summaries from the job payload", () => {
+    const summary = projectBuyerSummary(
+      mkAnalysis({
+        factsPayload: JSON.stringify({
+          findings: [
+            {
+              label: "Roof age 22 years - likely uninsurable",
+              summary: "Roof is 22 years old and will need replacement.",
+            },
+          ],
+        }),
+      }),
+    );
+    expect(summary.keyFacts).toEqual([
+      "Roof age 22 years - likely uninsurable",
+      "Roof is 22 years old and will need replacement.",
+    ]);
+  });
+
+  it("falls back to the plain-English summary when buyerFacts are absent", () => {
+    const summary = projectBuyerSummary(
+      mkAnalysis({
+        factsPayload: JSON.stringify({
+          plainEnglishSummary:
+            "Analyzed seller disclosure. Overall severity: high.",
+        }),
+      }),
+    );
+    expect(summary.keyFacts).toEqual([
+      "Analyzed seller disclosure. Overall severity: high.",
+    ]);
+  });
+
   it("returns empty facts on malformed JSON payload", () => {
     const summary = projectBuyerSummary(
       mkAnalysis({ factsPayload: "not valid json" }),
@@ -258,6 +291,10 @@ describe("projectBuyerSummary — headlines + reasons", () => {
       projectBuyerSummary(mkAnalysis({ documentType: "inspection_report" }))
         .headline,
     ).toBe("Inspection report analyzed");
+    expect(
+      projectBuyerSummary(mkAnalysis({ documentType: "hoa_document" }))
+        .headline,
+    ).toBe("HOA document analyzed");
     expect(
       projectBuyerSummary(mkAnalysis({ documentType: "hoa_doc" })).headline,
     ).toBe("HOA document analyzed");
