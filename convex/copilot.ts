@@ -212,7 +212,7 @@ export const ask = action({
     const { orchestrate } = await import("../src/lib/copilot/orchestrator");
     const { routeForIntent } = await import("../src/lib/copilot/router");
 
-    const cockpit: any = await ctx.runQuery(api.dealRooms.get, {
+    const cockpit: any = await ctx.runQuery(internal.dealRooms.get, {
       dealRoomId: args.dealRoomId,
     });
     if (!cockpit) throw new Error("Deal room not available");

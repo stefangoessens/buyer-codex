@@ -2,7 +2,7 @@
 
 import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 
 export const runOfferEngine = internalAction({
   args: {
@@ -39,7 +39,7 @@ export const runOfferEngine = internalAction({
 
     // Get latest pricing output for fair value
     const pricingOutput: any = await ctx.runQuery(
-      api.aiEngineOutputs.getLatest,
+      internal.aiEngineOutputs.getLatest,
       {
         propertyId: args.propertyId,
         engineType: "pricing",
@@ -56,7 +56,7 @@ export const runOfferEngine = internalAction({
 
     // Get latest leverage score
     const leverageOutput: any = await ctx.runQuery(
-      api.aiEngineOutputs.getLatest,
+      internal.aiEngineOutputs.getLatest,
       {
         propertyId: args.propertyId,
         engineType: "leverage",

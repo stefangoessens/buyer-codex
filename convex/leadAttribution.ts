@@ -6,11 +6,10 @@
 // `convex/schema.ts` for the data model and legal lifecycle.
 //
 // Access rules:
-//   - `captureTouch`, `handoffToUser`, `markConverted` are public (no
-//     auth). They run on the pre-auth path and on the registration
-//     callback path where identity is not yet established; we key on
-//     `sessionId` / `userId` directly and trust the caller to pass the
-//     correct values. Rate limiting and CSRF are enforced at the edge.
+//   - `captureTouch` is public (no auth). It runs on the pre-auth path
+//     and keys on anonymous `sessionId`.
+//   - `handoffToUser` and `markConverted` are internal-only so external
+//     callers cannot mutate attribution for an arbitrary `userId`.
 //   - `getBySessionId` is public — any caller holding the session id
 //     can read that row (it is the same trust model as a cookie).
 //   - `getByUserId` is self-or-broker/admin.
@@ -20,7 +19,7 @@
 // reconstruct the handoff history even after the row is cleaned up.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { query, mutation, internalQuery } from "./_generated/server";
+import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { leadAttributionStatus } from "./lib/validators";
 import type { Id } from "./_generated/dataModel";
@@ -325,8 +324,8 @@ export const captureTouch = mutation({
 });
 
 /**
- * Hand off an anonymous session to a registered user. Public mutation —
- * called right after authentication completes during registration.
+ * Hand off an anonymous session to a registered user. Internal mutation —
+ * called from trusted backend flows after authentication completes.
  *
  *   - If a leadAttribution row exists for the session, patch it with
  *     userId + status="registered" + registeredAt.
@@ -341,7 +340,7 @@ export const captureTouch = mutation({
  *
  * Returns the attribution row id.
  */
-export const handoffToUser = mutation({
+export const handoffToUser = internalMutation({
   args: {
     sessionId: v.string(),
     userId: v.id("users"),
@@ -464,16 +463,16 @@ export const handoffToUser = mutation({
 });
 
 /**
- * Mark a registered user's attribution row as converted. Public —
- * called from downstream flows (first deal room creation, first tour
- * request) that don't carry the user's auth context in-line.
+ * Mark a registered user's attribution row as converted. Internal —
+ * called from trusted downstream flows (first deal room creation, first
+ * tour request) after the caller has already resolved the user context.
  *
  * Idempotent: calling this on an already-converted row is a no-op.
  * Calling it on an anonymous row that was never handed off is a no-op
  * and returns null rather than throwing, since the caller has no way
  * to surface the error to the user.
  */
-export const markConverted = mutation({
+export const markConverted = internalMutation({
   args: { userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {

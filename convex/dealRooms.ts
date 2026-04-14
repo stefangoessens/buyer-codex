@@ -1,7 +1,6 @@
 import { query, mutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { api } from "./_generated/api";
 import { getCurrentUser, requireAuth } from "./lib/session";
 import { buildDealRoomFlowProfile, loadBuyerProfileView } from "./lib/buyerProfile";
 import {
@@ -12,7 +11,7 @@ import {
 } from "../src/lib/dealroom/access";
 
 /** Get a deal room with access-level-gated property data */
-export const get = query({
+export const get = internalQuery({
   args: { dealRoomId: v.id("dealRooms") },
   returns: v.any(),
   handler: async (ctx, args) => {
@@ -134,7 +133,7 @@ export const create = mutation({
       .collect();
     const alreadyExists = existing.find((dr) => dr.propertyId === args.propertyId);
     if (alreadyExists) {
-      await ctx.runMutation(api.leadAttribution.markConverted, {
+      await ctx.runMutation(internal.leadAttribution.markConverted, {
         userId: user._id,
       });
       return alreadyExists._id;
@@ -154,7 +153,7 @@ export const create = mutation({
       actorUserId: user._id,
     });
 
-    await ctx.runMutation(api.leadAttribution.markConverted, {
+    await ctx.runMutation(internal.leadAttribution.markConverted, {
       userId: user._id,
     });
 

@@ -28,6 +28,7 @@ import {
   type IntakeAttemptStatus,
   type IntakeFailureMode,
 } from "../src/lib/intake/reliability";
+import { getCurrentUser } from "./lib/session";
 
 const canonicalAddressInputValidator = v.object({
   street: v.string(),
@@ -54,7 +55,6 @@ const createAddressIntakeArgs = v.object({
     canonicalAddressInputValidator,
     v.object({ raw: v.string() }),
   ),
-  userId: v.optional(v.id("users")),
 });
 
 const matchCandidateReturn = v.object({
@@ -324,8 +324,8 @@ function buildCreateAddressIntakeResponse(args: {
  * creates a sourceListing row, searches for candidate properties, and
  * returns a confidence-aware result.
  *
- * Public — runs before auth. If a `userId` is provided it's linked to
- * the audit log entry.
+ * Public — runs before auth. When an authenticated user exists, their
+ * application user id is attached to the audit log entry server-side.
  */
 export const createAddressIntake = mutation({
   args: createAddressIntakeArgs,
@@ -346,6 +346,7 @@ export const createAddressIntake = mutation({
     const canonical = normalizationResult.canonical;
     const sourceUrl = manualSourceUrl(canonical);
     const now = new Date().toISOString();
+    const currentUser = await getCurrentUser(ctx);
 
     // Query ALL candidate properties in this zip — do not truncate with
     // .take(N) because index order is not similarity order, and a dense
@@ -401,7 +402,7 @@ export const createAddressIntake = mutation({
 
     // Audit trail.
     await ctx.db.insert("auditLog", {
-      userId: args.userId,
+      userId: currentUser?._id,
       action: "address_intake_submitted",
       entityType: "sourceListing",
       entityId: intakeId,

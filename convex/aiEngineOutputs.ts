@@ -2,6 +2,7 @@ import {
   query,
   mutation,
   internalMutation,
+  internalQuery,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
@@ -75,7 +76,7 @@ type SubmitAdjudicationArgs = {
 // ═══ Queries ═══
 
 /** Get a specific engine output by ID */
-export const get = query({
+export const get = internalQuery({
   args: { outputId: v.id("aiEngineOutputs") },
   returns: v.any(),
   handler: async (ctx, args) => {
@@ -84,7 +85,7 @@ export const get = query({
 });
 
 /** Get all outputs for a property + engine type */
-export const getByPropertyAndEngine = query({
+export const getByPropertyAndEngine = internalQuery({
   args: {
     propertyId: v.id("properties"),
     engineType: v.string(),
@@ -101,7 +102,7 @@ export const getByPropertyAndEngine = query({
 });
 
 /** Get the latest output for a property + engine type */
-export const getLatest = query({
+export const getLatest = internalQuery({
   args: {
     propertyId: v.id("properties"),
     engineType: v.string(),

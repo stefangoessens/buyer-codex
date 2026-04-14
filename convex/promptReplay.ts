@@ -81,7 +81,7 @@ export const replayHistoricalOutput = action({
     replay: replayValidator,
     comparison: comparisonValidator,
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     const canAccessConsole = await ctx.runQuery(
       api.adminShell.canAccessConsole,
       {},
@@ -90,7 +90,7 @@ export const replayHistoricalOutput = action({
       throw new Error("Not authorized to replay prompt versions");
     }
 
-    const output = await ctx.runQuery(api.aiEngineOutputs.get, {
+    const output: any = await ctx.runQuery(internal.aiEngineOutputs.get, {
       outputId: args.outputId,
     });
     if (!output) {
@@ -108,7 +108,7 @@ export const replayHistoricalOutput = action({
     }
 
     const promptKey = args.promptKey ?? output.promptKey ?? "default";
-    const prompt = await ctx.runQuery(internal.promptRegistry.getByVersion, {
+    const prompt: any = await ctx.runQuery(internal.promptRegistry.getByVersion, {
       engineType: output.engineType,
       promptKey,
       version: args.promptVersion,
