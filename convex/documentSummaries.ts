@@ -19,6 +19,7 @@ import {
   sortByPriority,
   type RawFileAnalysis,
 } from "./lib/documentSummary";
+import { parseAnalysisSnapshot } from "./lib/fileAnalysisPipeline";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Validators for return shape
@@ -105,9 +106,14 @@ function toRawAnalysis(
   job: Doc<"fileAnalysisJobs">,
   findings: Array<Doc<"fileAnalysisFindings">>,
 ): RawFileAnalysis {
-  const parsedPayload = parsePayload(job.payload);
+  const snapshot = parseAnalysisSnapshot(job.payload);
   const fallbackFactsPayload =
-    job.payload ??
+    snapshot?.analysis.buyerFacts.length || snapshot?.analysis.plainEnglishSummary
+      ? JSON.stringify({
+          buyerFacts: snapshot?.analysis.buyerFacts ?? [],
+          plainEnglishSummary: snapshot?.analysis.plainEnglishSummary ?? "",
+        })
+      : job.payload ??
     JSON.stringify({
       buyerFacts: findings.map((finding) => finding.summary).slice(0, 3),
     });
@@ -127,10 +133,9 @@ function toRawAnalysis(
     uploadedAt: job.createdAt,
     analyzedAt: job.completedAt,
     reviewedAt: job.resolvedAt,
-    extractedPageCount: parsedPayload?.pageClassifications.length ?? 0,
+    extractedPageCount: snapshot?.analysis.pageClassifications.length ?? 0,
     totalPageCount:
-      parsedPayload?.totalPageCount ??
-      parsedPayload?.pageClassifications.length ??
+      snapshot?.analysis.pageClassifications.length ??
       0,
   };
 }
@@ -161,36 +166,6 @@ function mapReviewState(
       return "approved";
     default:
       return "pending";
-  }
-}
-
-function parsePayload(payload: string | undefined): {
-  pageClassifications: Array<{ pageNumber: number }>;
-  totalPageCount?: number;
-} | null {
-  if (!payload) return null;
-  try {
-    const parsed = JSON.parse(payload) as {
-      pageClassifications?: unknown;
-      totalPageCount?: unknown;
-    };
-    return {
-      pageClassifications: Array.isArray(parsed.pageClassifications)
-        ? parsed.pageClassifications.filter(
-            (page): page is { pageNumber: number } =>
-              Boolean(page) &&
-              typeof page === "object" &&
-              "pageNumber" in page &&
-              typeof page.pageNumber === "number",
-          )
-        : [],
-      totalPageCount:
-        typeof parsed.totalPageCount === "number"
-          ? parsed.totalPageCount
-          : undefined,
-    };
-  } catch {
-    return null;
   }
 }
 

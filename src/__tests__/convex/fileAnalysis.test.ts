@@ -14,6 +14,7 @@ type TableName =
   | "dealRooms"
   | "fileAnalysisJobs"
   | "fileAnalysisFindings"
+  | "fileFacts"
   | "auditLog";
 
 type Tables = Record<TableName, Array<Record<string, unknown>>>;
@@ -64,6 +65,7 @@ function createTables(initial: Partial<Tables> = {}) {
     dealRooms: [...(initial.dealRooms ?? [])],
     fileAnalysisJobs: [...(initial.fileAnalysisJobs ?? [])],
     fileAnalysisFindings: [...(initial.fileAnalysisFindings ?? [])],
+    fileFacts: [...(initial.fileFacts ?? [])],
     auditLog: [...(initial.auditLog ?? [])],
   };
 
@@ -189,6 +191,52 @@ const runningJob = (overrides: Partial<Record<string, unknown>> = {}) => ({
   ...overrides,
 });
 
+const analysisResult = (overrides: Partial<Record<string, unknown>> = {}) => ({
+  docType: "seller_disclosure",
+  facts: {
+    docType: "seller_disclosure",
+    classifierConfidence: 0.91,
+    roofAgeYears: 12,
+    floodZone: "X",
+    permitsDisclosed: "yes",
+  },
+  findings: [
+    {
+      rule: "flood_zone_risk",
+      severity: "low",
+      label: "Flood zone X - moderate/minimal risk",
+      summary: "Flood insurance is optional.",
+      confidence: 0.9,
+      requiresReview: false,
+      citation: {
+        pageNumber: 1,
+        lineStart: 8,
+        lineEnd: 9,
+        snippet: "Property is located in flood zone X.",
+      },
+      observedData: {
+        floodZone: "X",
+      },
+    },
+  ],
+  overallSeverity: "low",
+  overallConfidence: 0.91,
+  requiresBrokerReview: false,
+  plainEnglishSummary: "Analyzed seller disclosure.",
+  buyerFacts: ["Roof age 12 years", "Flood zone X"],
+  pageClassifications: [
+    {
+      pageNumber: 1,
+      docType: "seller_disclosure",
+      confidence: 0.91,
+    },
+  ],
+  promptKey: "default",
+  promptVersion: "doc-parser-v1",
+  engineVersion: "1.0.0",
+  ...overrides,
+});
+
 beforeEach(() => {
   sessionMocks.requireAuth.mockReset();
   sessionMocks.requireAuth.mockResolvedValue(BROKER_USER);
@@ -203,35 +251,55 @@ describe("fileAnalysis pipeline", () => {
           payload: "{\"internalFacts\":\"secret\"}",
         }),
       ],
+      fileFacts: [
+        {
+          _id: "fact_old",
+          factSlug: "flood.zone",
+          storageId: "storage_1",
+          propertyId: "property_1",
+          dealRoomId: "deal_1",
+          analysisRunId: "job_old",
+          valueKind: "text",
+          valueText: "AE",
+          confidence: 0.7,
+          reviewStatus: "approved",
+          internalOnly: false,
+          createdAt: "2026-04-12T09:00:00.000Z",
+          updatedAt: "2026-04-12T09:00:00.000Z",
+        },
+      ],
     });
 
     await invokeRegisteredHandler(fileAnalysisModule.recordAnalysisResult, ctx, {
       jobId: "job_1",
-      docType: "seller_disclosure",
-      payload: JSON.stringify({
-        buyerFacts: ["Roof age 12 years", "Flood zone X"],
-        plainEnglishSummary: "Analyzed seller disclosure.",
-      }),
-      overallSeverity: "low",
-      overallConfidence: 0.91,
-      engineVersion: "1.0.0",
-      findings: [
-        {
-          rule: "flood_zone_risk",
-          severity: "low",
-          label: "Flood zone X - moderate/minimal risk",
-          summary: "Flood insurance is optional.",
-          confidence: 0.9,
-          requiresReview: false,
-        },
-      ],
+      analysis: analysisResult(),
     });
 
     const job = tables.fileAnalysisJobs[0];
     expect(job?.status).toBe("completed");
     expect(job?.requiresBrokerReview).toBe(false);
-    expect(job?.payload).toContain("buyerFacts");
+    expect(job?.payload).toContain("\"schemaVersion\":\"file_analysis/v1\"");
+    expect(job?.promptKey).toBe("default");
+    expect(job?.promptVersion).toBe("doc-parser-v1");
     expect(tables.fileAnalysisFindings).toHaveLength(1);
+    expect(tables.fileAnalysisFindings[0]?.citationPageNumber).toBe(1);
+    expect(tables.fileAnalysisFindings[0]?.observedDataJson).toContain(
+      "\"floodZone\":\"X\"",
+    );
+    expect(tables.fileFacts).toHaveLength(4);
+    expect(tables.fileFacts[0]?.reviewStatus).toBe("superseded");
+    expect(
+      tables.fileFacts.some(
+        (fact) =>
+          fact.factSlug === "inspection.roof_age_years" &&
+          fact.analysisRunId === "job_1",
+      ),
+    ).toBe(true);
+    expect(
+      tables.fileFacts.some(
+        (fact) => fact.factSlug === "permits.disclosed" && fact.valueEnum === "yes",
+      ),
+    ).toBe(true);
 
     sessionMocks.requireAuth.mockResolvedValue(BUYER_USER);
     const buyerView = await invokeRegisteredHandler<{
@@ -255,27 +323,52 @@ describe("fileAnalysis pipeline", () => {
 
     await invokeRegisteredHandler(fileAnalysisModule.recordAnalysisResult, ctx, {
       jobId: "job_1",
-      docType: "title_commitment",
-      payload: JSON.stringify({
-        buyerFacts: ["Two liens require review"],
-        plainEnglishSummary: "Title commitment needs broker review.",
-      }),
-      overallSeverity: "critical",
-      overallConfidence: 0.74,
-      engineVersion: "1.0.0",
-      findings: [
-        {
-          rule: "lien_or_encumbrance",
-          severity: "critical",
-          label: "2 liens on title",
-          summary: "Two liens must be cleared before closing.",
-          confidence: 0.95,
-          requiresReview: true,
+      analysis: analysisResult({
+        docType: "title_commitment",
+        facts: {
+          docType: "title_commitment",
+          classifierConfidence: 0.74,
+          lienCount: 2,
+          titleExceptions: ["Lien for unpaid permit"],
         },
-      ],
+        findings: [
+          {
+            rule: "lien_or_encumbrance",
+            severity: "critical",
+            label: "2 liens on title",
+            summary: "Two liens must be cleared before closing.",
+            confidence: 0.95,
+            requiresReview: true,
+            citation: {
+              pageNumber: 2,
+              snippet: "Lien for unpaid permit",
+            },
+            observedData: {
+              lienCount: 2,
+            },
+          },
+        ],
+        overallSeverity: "critical",
+        overallConfidence: 0.74,
+        requiresBrokerReview: true,
+        plainEnglishSummary: "Title commitment needs broker review.",
+        buyerFacts: ["Two liens require review"],
+        pageClassifications: [
+          {
+            pageNumber: 1,
+            docType: "title_commitment",
+            confidence: 0.74,
+          },
+        ],
+      }),
     });
 
     expect(tables.fileAnalysisJobs[0]?.status).toBe("review_required");
+    expect(
+      tables.fileFacts.some(
+        (fact) => fact.factSlug === "title.lien_count" && fact.analysisRunId === "job_1",
+      ),
+    ).toBe(true);
 
     sessionMocks.requireAuth.mockResolvedValue(BUYER_USER);
     const buyerBeforeResolve = await invokeRegisteredHandler<{

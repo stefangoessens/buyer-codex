@@ -158,9 +158,46 @@ describe("documentSummaries", () => {
           docType: "hoa_document",
           status: "review_required",
           payload: JSON.stringify({
-            plainEnglishSummary: "HOA reserves are underfunded.",
-            pageClassifications: [
-              { pageNumber: 1, docType: "hoa_document", confidence: 0.9 },
+            schemaVersion: "file_analysis/v1",
+            analysis: {
+              docType: "hoa_document",
+              facts: {
+                docType: "hoa_document",
+                classifierConfidence: 0.9,
+                hoaReserveBalance: 5000,
+                hoaAnnualBudget: 100000,
+              },
+              findings: [
+                {
+                  rule: "hoa_reserves_adequate",
+                  severity: "high",
+                  label: "HOA reserves 5% of annual budget",
+                  summary: "HOA reserves are underfunded.",
+                  confidence: 0.85,
+                  requiresReview: true,
+                },
+              ],
+              overallSeverity: "high",
+              overallConfidence: 0.62,
+              requiresBrokerReview: true,
+              plainEnglishSummary: "HOA reserves are underfunded.",
+              buyerFacts: ["HOA reserves are underfunded."],
+              pageClassifications: [
+                { pageNumber: 1, docType: "hoa_document", confidence: 0.9 },
+              ],
+              promptKey: "default",
+              promptVersion: "doc-parser-v1",
+              engineVersion: "1.0.0",
+            },
+            factProjections: [
+              {
+                factSlug: "hoa.reserve_balance",
+                valueKind: "numeric",
+                valueNumeric: 5000,
+                valueNumericUnit: "USD",
+                confidence: 0.9,
+                internalOnly: false,
+              },
             ],
           }),
           overallSeverity: "high",
