@@ -354,15 +354,13 @@ describe("advisoryTelemetry", () => {
     const summary = buildBuyerSafeSummaryText(overview);
     const payload = buildAdvisorySummaryCopiedPayload(overview, summary);
 
-    expect(summary).toContain("Neighborhood reality: Overpriced for this market.");
-    expect(summary).toContain(
-      "Market context: Neighborhood · Coconut Grove; 6 sold / 10 total records; Fresh · 30m old; High reliability.",
-    );
-    expect(summary).toContain(
-      "Fallback geography: Using neighborhood data for Coconut Grove because the tighter market slice did not have enough sold homes.",
-    );
-    expect(summary).toContain("Recommended opener");
-    expect(summary).toContain("Broker-reviewed conclusion");
+    expect(summary).toContain("What matters most:");
+    expect(summary).toContain("What looks attractive:");
+    expect(summary).toContain("What looks risky or uncertain:");
+    expect(summary).toContain("Current recommendation:");
+    expect(summary).toContain("What the buyer should do next:");
+    expect(summary).toContain("Market reality: Overpriced for this market.");
+    expect(summary).toContain("Recommended opener: $615,000");
     expect(payload.summaryLength).toBe(summary.length);
     expect(payload.includesRecommendation).toBe(true);
   });

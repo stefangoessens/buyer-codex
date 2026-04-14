@@ -437,6 +437,10 @@ describe("buildPropertyRecommendation", () => {
             rationaleSummary: "Internal rationale",
             sections: [],
           },
+          clientReadySummaryDiff: {
+            summary: "No hidden items.",
+            hiddenItems: [],
+          },
           guardrails: [],
         },
       },
