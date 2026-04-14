@@ -1,6 +1,10 @@
+export const GATEWAY_PROVIDER_IDS = ["anthropic", "openai"] as const;
+
+export type GatewayProviderId = (typeof GATEWAY_PROVIDER_IDS)[number];
+
 export interface GatewayConfig {
-  primaryProvider: "anthropic" | "openai";
-  fallbackProvider?: "anthropic" | "openai";
+  primaryProvider: GatewayProviderId;
+  fallbackProvider?: GatewayProviderId;
   primaryModel: string;
   fallbackModel?: string;
   maxRetries?: number;
@@ -13,19 +17,43 @@ export interface GatewayMessage {
 }
 
 export interface GatewayRequest {
-  messages: GatewayMessage[];
   engineType: string;
   dealRoomId?: string;
+  prompt?: {
+    promptKey: string;
+    version: string;
+    model?: string;
+  };
+  messages: GatewayMessage[];
   maxTokens?: number;
   temperature?: number;
   config?: Partial<GatewayConfig>;
+}
+
+export interface GatewayExecutionMetadata {
+  engineType: string;
+  dealRoomId: string | null;
+  promptKey: string | null;
+  promptVersion: string | null;
+}
+
+export interface GatewayProviderRequest {
+  metadata: GatewayExecutionMetadata;
+  messages: GatewayMessage[];
+  model: string;
+  maxTokens: number;
+  temperature: number;
+  timeoutMs: number;
+  attempt: number;
+  isFallback: boolean;
+  fallbackFrom: GatewayProviderId | null;
 }
 
 export interface GatewayUsage {
   inputTokens: number;
   outputTokens: number;
   model: string;
-  provider: "anthropic" | "openai";
+  provider: GatewayProviderId;
   latencyMs: number;
   estimatedCost: number;
   fallbackUsed: boolean;
@@ -42,6 +70,18 @@ export interface GatewayError {
   provider?: string;
   statusCode?: number;
 }
+
+export interface GatewayProviderError extends Error, GatewayError {
+  provider: GatewayProviderId;
+  retryable: boolean;
+}
+
+export interface GatewayProvider {
+  id: GatewayProviderId;
+  execute(request: GatewayProviderRequest): Promise<GatewayResponse>;
+}
+
+export type GatewayProviderMap = Record<GatewayProviderId, GatewayProvider>;
 
 export type GatewayResult =
   | { success: true; data: GatewayResponse }

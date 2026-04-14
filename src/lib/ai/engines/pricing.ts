@@ -315,6 +315,9 @@ export async function executePricingAnalysis(args: {
   input: PricingInput;
   promptTemplate: string;
   systemPrompt?: string;
+  promptKey?: string;
+  promptVersion?: string;
+  promptModel?: string;
   dealRoomId?: string;
   gatewayDependencies?: Partial<GatewayDependencies>;
 }): Promise<{ output: PricingOutput; usage: GatewayUsage }> {
@@ -322,6 +325,9 @@ export async function executePricingAnalysis(args: {
     input,
     promptTemplate,
     systemPrompt,
+    promptKey,
+    promptVersion,
+    promptModel,
     dealRoomId,
     gatewayDependencies,
   } = args;
@@ -331,6 +337,14 @@ export async function executePricingAnalysis(args: {
     {
       ...request,
       dealRoomId,
+      prompt:
+        promptKey && promptVersion
+          ? {
+              promptKey,
+              version: promptVersion,
+              model: promptModel,
+            }
+          : undefined,
     },
     gatewayDependencies,
   );

@@ -5,7 +5,17 @@ import {
   summarizeGatewayObservationsByDealRoom,
   summarizeGatewayObservationsByEngine,
 } from "@/lib/ai/observability";
-import { MODEL_COSTS } from "@/lib/ai/types";
+import { MODEL_COSTS, type GatewayProvider, type GatewayProviderId } from "@/lib/ai/types";
+
+function mockProvider(
+  id: GatewayProviderId,
+  implementation: GatewayProvider["execute"],
+): GatewayProvider {
+  return {
+    id,
+    execute: vi.fn(implementation),
+  };
+}
 
 describe("Gateway config", () => {
   it("defaults to Anthropic primary with OpenAI fallback", () => {
@@ -45,25 +55,27 @@ describe("gateway failover", () => {
   };
 
   it("returns the primary response when Anthropic succeeds", async () => {
-    const anthropic = vi.fn().mockResolvedValue({
+    const anthropic = mockProvider("anthropic", async () => ({
       content: "{\"fairValue\": 480000}",
       usage: {
         inputTokens: 100,
         outputTokens: 50,
         model: "claude-sonnet-4-20250514",
-        provider: "anthropic" as const,
+        provider: "anthropic",
         latencyMs: 120,
         estimatedCost: 0.0045,
         fallbackUsed: false,
       },
+    }));
+    const openai = mockProvider("openai", async () => {
+      throw new Error("should not be called");
     });
-    const openai = vi.fn();
 
     const result = await gateway(request, { anthropic, openai });
 
     expect(result.success).toBe(true);
-    expect(anthropic).toHaveBeenCalledTimes(1);
-    expect(openai).not.toHaveBeenCalled();
+    expect(anthropic.execute).toHaveBeenCalledTimes(1);
+    expect(openai.execute).not.toHaveBeenCalled();
     if (result.success) {
       expect(result.data.usage.provider).toBe("anthropic");
       expect(result.data.usage.fallbackUsed).toBe(false);
@@ -71,37 +83,90 @@ describe("gateway failover", () => {
   });
 
   it("fails over to OpenAI on retryable transport errors", async () => {
-    const anthropic = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("429 rate limit"))
-      .mockRejectedValueOnce(new Error("429 rate limit"));
-    const openai = vi.fn().mockResolvedValue({
+    const anthropic = mockProvider("anthropic", async () => {
+      throw new Error("429 rate limit");
+    });
+    const openai = mockProvider("openai", async () => ({
       content: "{\"fairValue\": 481000}",
       usage: {
         inputTokens: 110,
         outputTokens: 55,
         model: "gpt-4o",
-        provider: "openai" as const,
+        provider: "openai",
         latencyMs: 180,
         estimatedCost: 0.0032,
         fallbackUsed: false,
       },
-    });
+    }));
 
     const result = await gateway(request, { anthropic, openai });
 
     expect(result.success).toBe(true);
-    expect(anthropic).toHaveBeenCalledTimes(2);
-    expect(openai).toHaveBeenCalledTimes(1);
+    expect(anthropic.execute).toHaveBeenCalledTimes(2);
+    expect(openai.execute).toHaveBeenCalledTimes(1);
     if (result.success) {
       expect(result.data.usage.provider).toBe("openai");
       expect(result.data.usage.fallbackUsed).toBe(true);
     }
   });
 
+  it("uses the prompt-selected model and provider for primary execution", async () => {
+    const anthropic = mockProvider("anthropic", async () => {
+      throw new Error("should not be called");
+    });
+    const openai = mockProvider("openai", async (providerRequest) => ({
+      content: "classified",
+      usage: {
+        inputTokens: providerRequest.maxTokens,
+        outputTokens: 12,
+        model: providerRequest.model,
+        provider: "openai",
+        latencyMs: 85,
+        estimatedCost: 0.001,
+        fallbackUsed: false,
+      },
+    }));
+
+    const result = await gateway(
+      {
+        engineType: "copilot",
+        dealRoomId: "deal_456",
+        prompt: {
+          promptKey: "classifier",
+          version: "v-openai",
+          model: "gpt-4o",
+        },
+        messages: [{ role: "user", content: "What should I offer?" }],
+        maxTokens: 64,
+      },
+      { anthropic, openai },
+    );
+
+    expect(result.success).toBe(true);
+    expect(anthropic.execute).not.toHaveBeenCalled();
+    expect(openai.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "gpt-4o",
+        attempt: 1,
+        isFallback: false,
+        fallbackFrom: null,
+        metadata: {
+          engineType: "copilot",
+          dealRoomId: "deal_456",
+          promptKey: "classifier",
+          promptVersion: "v-openai",
+        },
+      }),
+    );
+  });
+
   it("returns a combined failure when both providers fail", async () => {
-    const anthropic = vi.fn().mockRejectedValue(new Error("503 upstream"));
-    const openai = vi.fn().mockRejectedValue(new Error("timeout"));
+    const anthropic = mockProvider("anthropic", async () => {
+      throw new Error("503 upstream");
+    });
+    const openai = mockProvider("openai", async () => {
+      throw new Error("timeout");
+    });
 
     const result = await gateway(request, { anthropic, openai });
 
