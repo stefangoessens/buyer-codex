@@ -68,7 +68,7 @@ export function PasteLinkInput({
     }
 
     if (!convex) {
-      setErrorMessage("Listing intake is temporarily unavailable. Try again in a moment.");
+      onSubmit?.(submission);
       return;
     }
 
