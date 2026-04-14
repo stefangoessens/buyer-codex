@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReference } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
-import { AdminShell, type AdminShellSession } from "@/components/admin/AdminShell";
+import { AdminShell, useAdminShellSession } from "@/components/admin/AdminShell";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { PromptRegistrySettings } from "@/components/admin/PromptRegistrySettings";
@@ -148,10 +148,7 @@ export default function SettingsPage() {
 }
 
 function SettingsContent() {
-  const session = useQuery(api.adminShell.getCurrentSession) as
-    | AdminShellSession
-    | null
-    | undefined;
+  const session = useAdminShellSession();
   const settings = useQuery(settingsApi.listAll) as
     | SettingsListEntry[]
     | undefined;
@@ -242,10 +239,9 @@ function SettingsContent() {
   const initialDraft = liveValue ? formatDraftValue(liveValue) : "";
   const isDirty = selectedSetting !== null && draftValue !== initialDraft;
   const validationMessages = getValidationMessages(draftParse, clientValidation);
-  const canWriteSelected =
-    selectedSetting && session?.user.role
-      ? canWriteSetting(selectedSetting.key, session.user.role).ok
-      : false;
+  const canWriteSelected = selectedSetting
+    ? canWriteSetting(selectedSetting.key, session.user.role).ok
+    : false;
 
   const stats = useMemo(() => {
     const total = settings?.length ?? 0;
@@ -309,7 +305,7 @@ function SettingsContent() {
     });
   };
 
-  if (session === undefined || settings === undefined) {
+  if (settings === undefined) {
     return (
       <>
         <AdminPageHeader
@@ -325,7 +321,7 @@ function SettingsContent() {
     );
   }
 
-  if (session === null || session.user.role !== "admin") {
+  if (session.user.role !== "admin") {
     return (
       <>
         <AdminPageHeader

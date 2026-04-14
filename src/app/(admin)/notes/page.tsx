@@ -1,10 +1,7 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
-import { AdminShell, type AdminShellSession } from "@/components/admin/AdminShell";
+import { AdminShell, useAdminShellSession } from "@/components/admin/AdminShell";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { InternalNoteComposer } from "@/components/admin/InternalNoteComposer";
 import { InternalNotesList } from "@/components/admin/InternalNotesList";
 
@@ -17,35 +14,7 @@ export default function NotesPage() {
 }
 
 function NotesContent() {
-  const session = useQuery(api.adminShell.getCurrentSession) as
-    | AdminShellSession
-    | null
-    | undefined;
-
-  if (session === undefined) {
-    return (
-      <>
-        <AdminPageHeader
-          eyebrow="Ops tools"
-          title="Internal notes"
-          description="Buyer-hidden notes with role-aware access and retained history."
-        />
-        <AdminEmptyState title="Loading session…" />
-      </>
-    );
-  }
-  if (session === null) {
-    return (
-      <>
-        <AdminPageHeader
-          eyebrow="Ops tools"
-          title="Internal notes"
-          description="Buyer-hidden notes with role-aware access and retained history."
-        />
-        <AdminEmptyState title="Not authorized" />
-      </>
-    );
-  }
+  const session = useAdminShellSession();
 
   return (
     <>

@@ -11,74 +11,23 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "./lib/session";
-
-// ─── canonical static nav ────────────────────────────────────────────────────
-// Keep in sync with src/lib/admin/nav.ts (STATIC_NAV_ITEMS). We deliberately
-// duplicate the list here rather than cross-import — Convex server code runs
-// in a separate bundle and we do not want to pull in `@/lib/admin` via the
-// web alias. Schema is tiny and code review catches drift.
+import {
+  filterNavItemsForRole,
+  NAV_SECTION_ORDER,
+  STATIC_NAV_ITEMS,
+  type NavSection,
+} from "../src/lib/admin/nav";
+import { canAccessInternalConsole } from "../src/lib/admin/roles";
 
 type InternalRole = "broker" | "admin";
-
-interface StaticNavItem {
+type SessionNavItem = {
   slug: string;
   label: string;
   href: string;
-  section: "overview" | "queues" | "metrics" | "tools" | "settings";
+  section: NavSection;
   allowedRoles: InternalRole[];
   description?: string;
-}
-
-const STATIC_NAV: StaticNavItem[] = [
-  {
-    slug: "console",
-    label: "Console",
-    href: "/console",
-    section: "overview",
-    allowedRoles: ["broker", "admin"],
-    description: "Ops home — daily queue snapshot and recent activity",
-  },
-  {
-    slug: "queues",
-    label: "Review queues",
-    href: "/queues",
-    section: "queues",
-    allowedRoles: ["broker", "admin"],
-    description: "Intake, offer, contract, and escalation review queues",
-  },
-  {
-    slug: "metrics",
-    label: "KPI dashboard",
-    href: "/metrics",
-    section: "metrics",
-    allowedRoles: ["broker", "admin"],
-    description: "Funnel KPIs, deal room engagement, conversion metrics",
-  },
-  {
-    slug: "overrides",
-    label: "Manual overrides",
-    href: "/overrides",
-    section: "tools",
-    allowedRoles: ["admin"],
-    description: "Audited manual changes to buyer, offer, and contract state",
-  },
-  {
-    slug: "notes",
-    label: "Internal notes",
-    href: "/notes",
-    section: "tools",
-    allowedRoles: ["broker", "admin"],
-    description: "Buyer-hidden notes attached to properties and deals",
-  },
-  {
-    slug: "settings",
-    label: "Settings",
-    href: "/settings",
-    section: "settings",
-    allowedRoles: ["admin"],
-    description: "Feature flags, thresholds, and broker-tunable knobs",
-  },
-];
+};
 
 const navItemValidator = v.object({
   slug: v.string(),
@@ -131,37 +80,53 @@ export const getCurrentSession = query({
   handler: async (ctx) => {
     const user = await getCurrentUser(ctx);
     if (!user) return null;
-    if (user.role !== "broker" && user.role !== "admin") return null;
+    if (!canAccessInternalConsole(user.role)) return null;
     const role: InternalRole = user.role;
 
-    // Filter the static canonical list to this user's role.
-    const staticFiltered = STATIC_NAV.filter((item) =>
-      item.allowedRoles.includes(role),
+    const staticFiltered = filterNavItemsForRole(STATIC_NAV_ITEMS, role).map(
+      (item): SessionNavItem => ({
+        ...item,
+        allowedRoles: [...item.allowedRoles],
+      }),
     );
 
     // Merge dynamic nav items persisted in `adminNavItems` (empty by default).
-    // We read the full table — ops sets are small (< 50 rows expected) — and
-    // skip items the caller's role cannot see.
+    // We keep the static catalog canonical, then append dynamic items within
+    // their declared section order so the shell contract remains predictable.
     const dynamic = await ctx.db.query("adminNavItems").collect();
     const dynamicFiltered = dynamic
       .filter((row) => !row.hidden)
       .filter((row) => row.allowedRoles.includes(role))
-      .map((row): StaticNavItem => ({
-        slug: row.slug,
-        label: row.label,
-        href: row.href,
-        section: row.section,
-        allowedRoles: row.allowedRoles,
-      }))
-      // Stable order: by section order, then by the row's `order` field.
-      .sort((a, b) => a.label.localeCompare(b.label));
+      .sort((a, b) => {
+        const sectionDelta =
+          NAV_SECTION_ORDER.indexOf(a.section as NavSection) -
+          NAV_SECTION_ORDER.indexOf(b.section as NavSection);
+        if (sectionDelta !== 0) return sectionDelta;
+        if (a.order !== b.order) return a.order - b.order;
+        return a.label.localeCompare(b.label);
+      })
+      .map(
+        (row): SessionNavItem => ({
+          slug: row.slug,
+          label: row.label,
+          href: row.href,
+          section: row.section,
+          allowedRoles: row.allowedRoles,
+        }),
+      );
 
-    const mergedBySlug = new Map<string, StaticNavItem>();
-    for (const item of staticFiltered) mergedBySlug.set(item.slug, item);
+    const staticSlugs = new Set(staticFiltered.map((item) => item.slug));
+    const dynamicBySection = new Map<NavSection, SessionNavItem[]>();
     for (const item of dynamicFiltered) {
-      if (!mergedBySlug.has(item.slug)) mergedBySlug.set(item.slug, item);
+      if (staticSlugs.has(item.slug)) continue;
+      const bucket = dynamicBySection.get(item.section) ?? [];
+      bucket.push(item);
+      dynamicBySection.set(item.section, bucket);
     }
-    const navItems = Array.from(mergedBySlug.values());
+    const navItems = NAV_SECTION_ORDER.flatMap((section) => [
+      ...staticFiltered.filter((item) => item.section === section),
+      ...(dynamicBySection.get(section) ?? []),
+    ]);
 
     // Snapshot — cheap aggregates that power the topbar badge + overview
     // hero. Each lookup is O(index hit) and bounded.
