@@ -62,6 +62,24 @@ function buildBasePayload(
 export function buildBuyerSafeSummaryText(
   overview: PropertyCaseOverviewSurface,
 ): string {
+  const strongEvidence = Array.from(
+    new Set(overview.confidenceSections.flatMap((section) => section.strongEvidence)),
+  ).slice(0, 3);
+  const cautionEvidence = Array.from(
+    new Set(
+      overview.confidenceSections.flatMap((section) => [
+        ...section.missingEvidence,
+        ...section.contradictoryEvidence,
+      ]),
+    ),
+  ).slice(0, 3);
+  const nextSteps = Array.from(
+    new Set(
+      overview.confidenceSections.flatMap(
+        (section) => section.whatWouldIncreaseConfidence,
+      ),
+    ),
+  ).slice(0, 2);
   const lines = [
     `${overview.propertyAddress}`,
     `${overview.status.label}. ${overview.headerDescription}`,
@@ -89,12 +107,24 @@ export function buildBuyerSafeSummaryText(
     );
   }
 
+  if (strongEvidence.length > 0) {
+    lines.push(`Strong evidence: ${strongEvidence.join(", ")}.`);
+  }
+
   if (overview.missingStates.length > 0) {
     lines.push(
       `Still verifying: ${overview.missingStates
         .map((state) => state.label)
         .join(", ")}.`,
     );
+  }
+
+  if (cautionEvidence.length > 0) {
+    lines.push(`Missing or conflicting evidence: ${cautionEvidence.join(", ")}.`);
+  }
+
+  if (nextSteps.length > 0) {
+    lines.push(`What would increase confidence: ${nextSteps.join(" ")}`);
   }
 
   return lines.join("\n");

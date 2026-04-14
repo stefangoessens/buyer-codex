@@ -4,6 +4,15 @@ import type {
   PropertyCase,
 } from "@/lib/ai/engines/caseSynthesis";
 import {
+  RECOMMENDATION_EVIDENCE_SECTION_KEYS,
+  type DossierSourceCategory,
+  type PropertyEvidenceGraph,
+  type RecommendationConfidenceBand,
+  type RecommendationConfidenceReasonCode,
+  type RecommendationEvidenceSection,
+  type RecommendationEvidenceSectionKey,
+} from "@/lib/dossier/types";
+import {
   assessEngineOutputGuardrail,
   guardrailStateLabel,
   type AdvisoryApprovalPath,
@@ -65,6 +74,10 @@ export interface BuildPropertyCaseOverviewInput {
     | null;
   coverage: PropertyCaseCoverageInput[];
   citations?: PropertyCaseCitationInput[];
+  evidenceGraph?: Pick<
+    PropertyEvidenceGraph,
+    "fingerprint" | "replayKey" | "sections"
+  > | null;
   viewerRole: "buyer" | "broker" | "admin";
 }
 
@@ -104,6 +117,35 @@ export interface PropertyCaseActionView {
   reviewedConclusion: string | null;
   buyerExplanation: string | null;
   isBrokerReviewed: boolean;
+}
+
+export interface PropertyCaseConfidenceSectionView {
+  key: RecommendationEvidenceSectionKey;
+  title: string;
+  band: RecommendationConfidenceBand;
+  bandLabel: string;
+  score: number | null;
+  scoreLabel: string;
+  tone: "strong" | "mixed" | "weak";
+  status: RecommendationEvidenceSection["status"];
+  statusLabel: string;
+  buyerHeadline: string;
+  buyerExplanation: string;
+  strongEvidence: string[];
+  missingEvidence: string[];
+  contradictoryEvidence: string[];
+  whatWouldIncreaseConfidence: string[];
+  dependsOnInference: boolean;
+}
+
+export interface InternalPropertyCaseConfidenceSectionView
+  extends PropertyCaseConfidenceSectionView {
+  internalSummary: string;
+  sourceCategories: DossierSourceCategory[];
+  reasonCodes: RecommendationConfidenceReasonCode[];
+  supportingNodeIds: string[];
+  missingNodeIds: string[];
+  conflictingNodeIds: string[];
 }
 
 export interface PropertyCaseMissingState {
@@ -211,12 +253,15 @@ interface PropertyCaseOverviewBase {
   viewState: PropertyCaseOverviewViewState;
   generatedAt: string | null;
   generatedAtLabel: string;
+  confidenceFingerprint: string | null;
+  confidenceReplayKey: string | null;
   overallConfidence: number | null;
   overallConfidenceLabel: string;
   overallConfidenceTone: "strong" | "mixed" | "weak";
   coverageStats: PropertyCaseCoverageStats;
   coverageSummary: string;
   headerDescription: string;
+  confidenceSections: PropertyCaseConfidenceSectionView[];
   claims: PropertyCaseClaimView[];
   keyTakeaways: PropertyCaseTakeaway[];
   action: PropertyCaseActionView | null;
@@ -243,6 +288,7 @@ export interface InternalPropertyCaseOverview
     hitCount: number;
     adjudicationSummary: PropertyCaseAdjudicationSummary;
     adjudicationItems: PropertyCaseAdjudicationItem[];
+    confidenceSections: InternalPropertyCaseConfidenceSectionView[];
     guardrails: Array<{
       citationId: string;
       engineLabel: string;
@@ -311,6 +357,10 @@ export function buildPropertyCaseOverview(
     offerGuardrail,
     (input.citations ?? []).find((citation) => citation.engineType === "offer"),
   );
+  const confidenceSections = buildConfidenceSections(input.evidenceGraph?.sections);
+  const internalConfidenceSections = isInternal
+    ? buildInternalConfidenceSections(input.evidenceGraph?.sections)
+    : [];
   const missingStates = buildMissingStates(
     input.coverage,
     payload,
@@ -359,12 +409,15 @@ export function buildPropertyCaseOverview(
     generatedAtLabel: input.caseRecord?.generatedAt
       ? `Updated ${formatShortDate(input.caseRecord.generatedAt)}`
       : "Awaiting first synthesis",
+    confidenceFingerprint: input.evidenceGraph?.fingerprint ?? null,
+    confidenceReplayKey: input.evidenceGraph?.replayKey ?? null,
     overallConfidence,
     overallConfidenceLabel,
     overallConfidenceTone,
     coverageStats,
     coverageSummary,
     headerDescription,
+    confidenceSections,
     claims,
     keyTakeaways,
     action,
@@ -392,6 +445,7 @@ export function buildPropertyCaseOverview(
       hitCount: input.caseRecord?.hitCount ?? 0,
       adjudicationSummary,
       adjudicationItems,
+      confidenceSections: internalConfidenceSections,
       guardrails: Array.from(citationGuardrails.entries())
         .map(([citationId, assessment]) => ({
           citationId,
@@ -768,6 +822,68 @@ function buildAdjudicationItems(
     });
 }
 
+function buildConfidenceSections(
+  sections: PropertyEvidenceGraph["sections"] | undefined,
+): PropertyCaseConfidenceSectionView[] {
+  if (!sections) return [];
+
+  return RECOMMENDATION_EVIDENCE_SECTION_KEYS.map((key) =>
+    projectConfidenceSection(sections[key]),
+  );
+}
+
+function buildInternalConfidenceSections(
+  sections: PropertyEvidenceGraph["sections"] | undefined,
+): InternalPropertyCaseConfidenceSectionView[] {
+  if (!sections) return [];
+
+  return RECOMMENDATION_EVIDENCE_SECTION_KEYS.map((key) => {
+    const section = sections[key];
+    const base = projectConfidenceSection(section);
+    return {
+      ...base,
+      internalSummary:
+        section.internalTrace?.summary ??
+        `${section.title} confidence derived without an internal trace summary.`,
+      sourceCategories: [...section.confidenceInputs.sourceCategories],
+      reasonCodes: [
+        ...(section.internalTrace?.reasonCodes ??
+          section.confidenceInputs.reasonCodes ??
+          []),
+      ],
+      supportingNodeIds: [...section.supportingNodeIds],
+      missingNodeIds: [...section.missingNodeIds],
+      conflictingNodeIds: [...section.conflictingNodeIds],
+    };
+  });
+}
+
+function projectConfidenceSection(
+  section: RecommendationEvidenceSection,
+): PropertyCaseConfidenceSectionView {
+  return {
+    key: section.key,
+    title: section.title,
+    band: section.confidenceInputs.band,
+    bandLabel: confidenceBandLabel(section.confidenceInputs.band),
+    score: section.confidenceInputs.score,
+    scoreLabel:
+      typeof section.confidenceInputs.score === "number"
+        ? `${formatPercent(section.confidenceInputs.score)} confidence`
+        : confidenceBandEmptyLabel(section.confidenceInputs.band),
+    tone: confidenceToneFromBand(section.confidenceInputs.band),
+    status: section.status,
+    statusLabel: evidenceStatusLabel(section.status),
+    buyerHeadline: section.buyerSummary.headline,
+    buyerExplanation: buildBuyerConfidenceExplanation(section),
+    strongEvidence: [...section.confidenceInputs.supportLabels],
+    missingEvidence: [...section.confidenceInputs.missingLabels],
+    contradictoryEvidence: [...section.confidenceInputs.conflictingLabels],
+    whatWouldIncreaseConfidence: buildConfidenceNextSteps(section),
+    dependsOnInference: section.confidenceInputs.dependsOnInference,
+  };
+}
+
 function summarizeAdjudication(
   items: PropertyCaseAdjudicationItem[],
 ): PropertyCaseAdjudicationSummary {
@@ -953,6 +1069,98 @@ function confidenceTone(value: number): "strong" | "mixed" | "weak" {
   if (value >= 0.75) return "strong";
   if (value >= 0.6) return "mixed";
   return "weak";
+}
+
+function confidenceToneFromBand(
+  band: RecommendationConfidenceBand,
+): "strong" | "mixed" | "weak" {
+  switch (band) {
+    case "high":
+      return "strong";
+    case "medium":
+      return "mixed";
+    case "low":
+    case "waiting":
+      return "weak";
+  }
+}
+
+function confidenceBandLabel(band: RecommendationConfidenceBand): string {
+  switch (band) {
+    case "high":
+      return "High confidence";
+    case "medium":
+      return "Moderate confidence";
+    case "low":
+      return "Low confidence";
+    case "waiting":
+      return "Waiting on evidence";
+  }
+}
+
+function confidenceBandEmptyLabel(band: RecommendationConfidenceBand): string {
+  switch (band) {
+    case "waiting":
+      return "Waiting on evidence";
+    case "low":
+      return "Low confidence";
+    case "medium":
+      return "Moderate confidence";
+    case "high":
+      return "High confidence";
+  }
+}
+
+function evidenceStatusLabel(status: RecommendationEvidenceSection["status"]): string {
+  switch (status) {
+    case "supported":
+      return "Supported";
+    case "mixed":
+      return "Mixed evidence";
+    case "waiting_on_evidence":
+      return "Waiting on evidence";
+    case "conflicting_evidence":
+      return "Conflicting evidence";
+  }
+}
+
+function buildBuyerConfidenceExplanation(
+  section: RecommendationEvidenceSection,
+): string {
+  const parts = [section.buyerSummary.headline];
+
+  if (section.buyerSummary.caution) {
+    parts.push(section.buyerSummary.caution);
+  } else if (section.confidenceInputs.dependsOnInference) {
+    parts.push("Some of this still depends on inferred signals instead of fully verified records.");
+  } else if (section.status === "supported") {
+    parts.push("The current evidence is aligned enough to show this in the buyer-safe view.");
+  }
+
+  return parts.join(" ");
+}
+
+function buildConfidenceNextSteps(
+  section: RecommendationEvidenceSection,
+): string[] {
+  const steps = [
+    ...section.confidenceInputs.missingLabels.map(
+      (label) => `Add ${label}.`,
+    ),
+    ...section.confidenceInputs.conflictingLabels.map(
+      (label) => `Resolve the conflict around ${label}.`,
+    ),
+  ];
+
+  if (steps.length === 0 && section.confidenceInputs.dependsOnInference) {
+    steps.push("Replace inferred signals with verified source data.");
+  }
+
+  if (steps.length === 0 && section.status === "supported") {
+    steps.push("Keep the cited evidence fresh before finalizing the decision.");
+  }
+
+  return steps.slice(0, 3);
 }
 
 function formatPercent(value: number): string {

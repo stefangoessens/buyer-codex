@@ -502,6 +502,83 @@ function PropertyCaseOverviewBody({
         </section>
       )}
 
+      {overview.confidenceSections.length > 0 && (
+        <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
+          <CardHeader>
+            <CardTitle>Confidence behind the recommendation</CardTitle>
+            <CardDescription>
+              Each section shows what is well supported, what is missing or contradictory,
+              and what would make the recommendation more reliable.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 xl:grid-cols-2">
+            {overview.confidenceSections.map((section) => (
+              <article
+                key={section.key}
+                className="rounded-[22px] border border-neutral-200/80 bg-neutral-50/78 p-5"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-900">
+                      {section.title}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-neutral-600">
+                      {section.buyerExplanation}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <ConfidenceBadge tone={section.tone}>
+                      {section.bandLabel}
+                    </ConfidenceBadge>
+                    <Badge variant="outline" className="border-neutral-200 bg-white text-neutral-700">
+                      {section.statusLabel}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge variant="outline" className="border-neutral-200 bg-white text-neutral-700">
+                    {section.scoreLabel}
+                  </Badge>
+                  {section.dependsOnInference ? (
+                    <Badge variant="outline" className="border-warning-200 bg-warning-50 text-warning-700">
+                      Inference-heavy
+                    </Badge>
+                  ) : null}
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                  <ConfidenceSectionEvidenceList
+                    title="Strong evidence"
+                    items={section.strongEvidence}
+                    emptyState="No strong evidence is carrying this section yet."
+                    tone="strong"
+                  />
+                  <ConfidenceSectionEvidenceList
+                    title="Missing evidence"
+                    items={section.missingEvidence}
+                    emptyState="No major gaps are weakening this section right now."
+                    tone="missing"
+                  />
+                  <ConfidenceSectionEvidenceList
+                    title="Contradictory evidence"
+                    items={section.contradictoryEvidence}
+                    emptyState="No contradictory evidence is currently flagged."
+                    tone="contradictory"
+                  />
+                  <ConfidenceSectionEvidenceList
+                    title="What would increase confidence"
+                    items={section.whatWouldIncreaseConfidence}
+                    emptyState="Keep the current evidence fresh before relying on this section."
+                    tone="next_step"
+                  />
+                </div>
+              </article>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-6 xl:grid-cols-[1.55fr_0.95fr]">
         <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
           <CardHeader>
@@ -840,6 +917,70 @@ function PropertyCaseOverviewBody({
                   </div>
                 </div>
 
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/55">
+                    Internal confidence breakdown
+                  </p>
+                  <div className="mt-3 grid gap-3">
+                    {overview.internal.confidenceSections.map((section) => (
+                      <div
+                        key={section.key}
+                        className="rounded-xl border border-white/10 bg-white/5 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-white">
+                              {section.title}
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-white/78">
+                              {section.internalSummary}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge className="bg-white/10 text-white">
+                              {section.bandLabel}
+                            </Badge>
+                            <Badge className="bg-white/10 text-white">
+                              {section.statusLabel}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                          <MetricTile
+                            label="Supporting nodes"
+                            value={String(section.supportingNodeIds.length)}
+                          />
+                          <MetricTile
+                            label="Missing nodes"
+                            value={String(section.missingNodeIds.length)}
+                          />
+                          <MetricTile
+                            label="Conflicting nodes"
+                            value={String(section.conflictingNodeIds.length)}
+                          />
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                          <InternalBadgeList
+                            title="Source categories"
+                            items={section.sourceCategories.map((item) =>
+                              item.replaceAll("_", " "),
+                            )}
+                            emptyState="No source categories recorded."
+                          />
+                          <InternalBadgeList
+                            title="Reason codes"
+                            items={section.reasonCodes}
+                            emptyState="No reason codes emitted."
+                            monospace
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <BrokerAdjudicationSection
                   overview={overview}
                   telemetryEnabled={telemetryEnabled}
@@ -1033,6 +1174,80 @@ function RiskBadge({
     >
       {children}
     </Badge>
+  );
+}
+
+function ConfidenceSectionEvidenceList({
+  title,
+  items,
+  emptyState,
+  tone,
+}: {
+  title: string;
+  items: string[];
+  emptyState: string;
+  tone: "strong" | "missing" | "contradictory" | "next_step";
+}) {
+  return (
+    <div className="rounded-2xl border border-neutral-200/80 bg-white p-4">
+      <p
+        className={cn(
+          "text-xs font-semibold uppercase tracking-[0.18em]",
+          tone === "strong" && "text-success-700",
+          tone === "missing" && "text-neutral-500",
+          tone === "contradictory" && "text-warning-700",
+          tone === "next_step" && "text-primary",
+        )}
+      >
+        {title}
+      </p>
+      {items.length > 0 ? (
+        <ul className="mt-3 space-y-2 text-sm leading-6 text-neutral-700">
+          {items.map((item) => (
+            <li key={`${title}-${item}`}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-sm leading-6 text-neutral-500">{emptyState}</p>
+      )}
+    </div>
+  );
+}
+
+function InternalBadgeList({
+  title,
+  items,
+  emptyState,
+  monospace = false,
+}: {
+  title: string;
+  items: string[];
+  emptyState: string;
+  monospace?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/55">
+        {title}
+      </p>
+      {items.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {items.map((item) => (
+            <Badge
+              key={`${title}-${item}`}
+              className={cn(
+                "bg-white/10 text-white",
+                monospace && "font-mono text-[11px]",
+              )}
+            >
+              {item}
+            </Badge>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-white/70">{emptyState}</p>
+      )}
+    </div>
   );
 }
 

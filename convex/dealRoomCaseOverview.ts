@@ -13,6 +13,7 @@ import {
   type PropertyCaseCitationInput,
   type PropertyCaseCoverageInput,
 } from "../src/lib/dealroom/property-case-overview";
+import type { PropertyDossier } from "../src/lib/dossier/types";
 
 export const getOverview = query({
   args: { dealRoomId: v.id("dealRooms") },
@@ -31,7 +32,7 @@ export const getOverview = query({
     const property = await ctx.db.get(dealRoom.propertyId);
     if (!property) return null;
 
-    const [engineDocs, offerDocs, caseDocs] = await Promise.all([
+    const [engineDocs, offerDocs, caseDocs, dossierDocs] = await Promise.all([
       ctx.db
         .query("aiEngineOutputs")
         .withIndex("by_propertyId_and_engineType", (q) =>
@@ -45,6 +46,10 @@ export const getOverview = query({
       ctx.db
         .query("propertyCases")
         .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", args.dealRoomId))
+        .collect(),
+      ctx.db
+        .query("propertyDossiers")
+        .withIndex("by_propertyId", (q) => q.eq("propertyId", dealRoom.propertyId))
         .collect(),
     ]);
 
@@ -136,6 +141,10 @@ export const getOverview = query({
     const latestCase = caseDocs
       .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
       .at(0);
+    const latestDossier = dossierDocs
+      .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+      .map((doc) => parsePropertyDossier(doc.payload))
+      .find((doc): doc is PropertyDossier => Boolean(doc));
 
     const coverage: PropertyCaseCoverageInput[] = [
       {
@@ -198,6 +207,7 @@ export const getOverview = query({
         : null,
       coverage,
       citations,
+      evidenceGraph: latestDossier?.evidenceGraph ?? null,
       viewerRole:
         user.role === "broker" || user.role === "admin" ? user.role : "buyer",
     });
@@ -289,6 +299,18 @@ function parsePropertyCase(payload: string): PropertyCase | null {
           )
         : [],
     };
+  } catch {
+    return null;
+  }
+}
+
+function parsePropertyDossier(payload: string): PropertyDossier | null {
+  try {
+    const parsed = JSON.parse(payload) as PropertyDossier;
+    if (!parsed?.evidenceGraph?.sections || !parsed?.evidenceGraph?.fingerprint) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
