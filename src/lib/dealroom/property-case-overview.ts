@@ -5,6 +5,7 @@ import type {
 } from "@/lib/ai/engines/caseSynthesis";
 import {
   RECOMMENDATION_EVIDENCE_SECTION_KEYS,
+  type DossierPropertyRecord,
   type DossierSourceCategory,
   type PropertyEvidenceGraph,
   type RecommendationConfidenceBand,
@@ -41,6 +42,12 @@ import {
   type AdvisoryAdjudicationStatus,
   type AdvisoryAdjudicationVisibility,
 } from "@/lib/advisory/adjudication";
+import {
+  buildLocalMarketReality,
+  type InternalLocalMarketRealityView,
+  type LocalMarketRealityView,
+} from "@/lib/dealroom/local-market-reality";
+import type { PropertyMarketContext } from "@/lib/enrichment/types";
 
 export type CoverageEngineKey = "pricing" | "comps" | "leverage" | "offer";
 export type PropertyCaseOverviewVariant = "buyer_safe" | "internal";
@@ -83,6 +90,11 @@ export interface BuildPropertyCaseOverviewInput {
   evidenceGraph?: Pick<
     PropertyEvidenceGraph,
     "fingerprint" | "replayKey" | "sections"
+  > | null;
+  marketContext?: PropertyMarketContext | null;
+  propertyFacts?: Pick<
+    DossierPropertyRecord,
+    "daysOnMarket" | "sqftLiving" | "priceReductions" | "updatedAt"
   > | null;
   viewerRole: "buyer" | "broker" | "admin";
 }
@@ -274,6 +286,7 @@ interface PropertyCaseOverviewBase {
   coverageStats: PropertyCaseCoverageStats;
   coverageSummary: string;
   headerDescription: string;
+  marketReality: LocalMarketRealityView | null;
   confidenceSections: PropertyCaseConfidenceSectionView[];
   artifacts: PropertyCaseArtifactStates;
   claims: PropertyCaseClaimView[];
@@ -302,6 +315,7 @@ export interface InternalPropertyCaseOverview
     hitCount: number;
     adjudicationSummary: PropertyCaseAdjudicationSummary;
     adjudicationItems: PropertyCaseAdjudicationItem[];
+    marketReality: InternalLocalMarketRealityView | null;
     confidenceSections: InternalPropertyCaseConfidenceSectionView[];
     guardrails: Array<{
       citationId: string;
@@ -352,6 +366,11 @@ export function buildPropertyCaseOverview(
   const citationById = new Map(
     (input.citations ?? []).map((citation) => [citation.citationId, citation]),
   );
+  const marketReality = buildLocalMarketReality({
+    listPrice: input.listPrice,
+    propertyFacts: input.propertyFacts,
+    marketContext: input.marketContext,
+  });
   const citationGuardrails = buildCitationGuardrails(input.citations ?? []);
   const offerGuardrail = findOfferGuardrail(input.citations ?? []);
   const claims = (payload?.claims ?? [])
@@ -482,6 +501,7 @@ export function buildPropertyCaseOverview(
     coverageStats,
     coverageSummary,
     headerDescription,
+    marketReality: marketReality.buyer,
     confidenceSections,
     artifacts,
     claims,
@@ -511,6 +531,7 @@ export function buildPropertyCaseOverview(
       hitCount: input.caseRecord?.hitCount ?? 0,
       adjudicationSummary,
       adjudicationItems,
+      marketReality: marketReality.internal,
       confidenceSections: internalConfidenceSections,
       guardrails: Array.from(citationGuardrails.entries())
         .map(([citationId, assessment]) => ({

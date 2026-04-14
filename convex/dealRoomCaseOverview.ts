@@ -201,6 +201,14 @@ export const getOverview = query({
       listPrice: property.listPrice ?? null,
       photoUrl: property.photoUrls?.[0] ?? null,
       dealStatus: dealRoom.status,
+      marketContext:
+        latestDossier?.sections.marketContext.data.marketContext ?? null,
+      propertyFacts:
+        latestDossier?.sections.propertyFacts.data.facts ?? {
+          daysOnMarket: property.daysOnMarket,
+          sqftLiving: property.sqftLiving,
+          updatedAt: property.updatedAt,
+        },
       caseRecord: latestCase
         ? {
             generatedAt: latestCase.generatedAt,
