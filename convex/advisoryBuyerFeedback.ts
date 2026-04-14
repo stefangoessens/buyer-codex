@@ -15,6 +15,7 @@ import {
   type AdvisoryFeedbackReasonCode,
   type AdvisoryFeedbackResponse,
 } from "../src/lib/dealroom/advisory-feedback";
+import { rebuildBuyerPreferenceMemory } from "./lib/buyerPreferenceMemory";
 
 function buildReasonCodeKey(reasonCodes: AdvisoryFeedbackReasonCode[]): string {
   return reasonCodes.length > 0 ? reasonCodes.join("|") : "none";
@@ -160,6 +161,8 @@ export const submit = mutation({
         user._id,
       );
     }
+
+    await rebuildBuyerPreferenceMemory(ctx, user._id);
 
     return feedbackId;
   },

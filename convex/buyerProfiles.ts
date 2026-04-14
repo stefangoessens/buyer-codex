@@ -15,6 +15,7 @@ import {
   mergeBuyerProfileSections,
   normalizeBuyerProfileSections,
 } from "./lib/buyerProfile";
+import { rebuildBuyerPreferenceMemory } from "./lib/buyerPreferenceMemory";
 import { financingType } from "./lib/validators";
 
 type SessionCtx = QueryCtx | MutationCtx;
@@ -386,6 +387,14 @@ async function upsertProfileRecord(
       }),
       timestamp: now,
     });
+  }
+
+  if (
+    params.existingProfile === null ||
+    JSON.stringify(baseSections.searchPreferences) !==
+      JSON.stringify(nextSections.searchPreferences)
+  ) {
+    await rebuildBuyerPreferenceMemory(ctx, params.targetUser._id);
   }
 
   return profileId;

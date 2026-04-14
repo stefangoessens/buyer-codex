@@ -50,6 +50,13 @@ import {
   type LocalMarketRealityView,
 } from "@/lib/dealroom/local-market-reality";
 import type { PropertyMarketContext } from "@/lib/enrichment/types";
+import {
+  buildBuyerPreferenceFitView,
+  buildEmptyBuyerPreferenceMemory,
+  type BuyerPreferenceFitView,
+  type BuyerPreferenceMemorySnapshot,
+  type BuyerPreferencePropertyInput,
+} from "@/lib/buyerPreferenceMemory";
 
 export type CoverageEngineKey = "pricing" | "comps" | "leverage" | "offer";
 export type PropertyCaseOverviewVariant = "buyer_safe" | "internal";
@@ -98,6 +105,8 @@ export interface BuildPropertyCaseOverviewInput {
     DossierPropertyRecord,
     "daysOnMarket" | "sqftLiving" | "priceReductions" | "updatedAt"
   > | null;
+  buyerPreferenceMemory?: BuyerPreferenceMemorySnapshot | null;
+  buyerPreferenceProperty?: BuyerPreferencePropertyInput | null;
   viewerRole: "buyer" | "broker" | "admin";
 }
 
@@ -257,6 +266,8 @@ export interface PropertyCaseSourceView {
   approvalPath: AdvisoryApprovalPath;
 }
 
+export type PropertyCaseBuyerFitView = BuyerPreferenceFitView;
+
 export interface PropertyCaseCoverageStats {
   availableCount: number;
   pendingCount: number;
@@ -353,6 +364,7 @@ interface PropertyCaseOverviewBase {
   coverageSummary: string;
   headerDescription: string;
   marketReality: LocalMarketRealityView | null;
+  buyerFit: PropertyCaseBuyerFitView;
   decisionMemo: BuyerSafeDecisionMemoView;
   confidenceSections: PropertyCaseConfidenceSectionView[];
   artifacts: PropertyCaseArtifactStates;
@@ -441,6 +453,15 @@ export function buildPropertyCaseOverview(
     listPrice: input.listPrice,
     propertyFacts: input.propertyFacts,
     marketContext: input.marketContext,
+  });
+  const buyerFit = buildBuyerPreferenceFitView({
+    snapshot:
+      input.buyerPreferenceMemory ??
+      buildEmptyBuyerPreferenceMemory(undefined, input.caseRecord?.generatedAt ?? undefined),
+    property:
+      input.buyerPreferenceProperty ?? {
+        id: input.propertyId,
+      },
   });
   const citationGuardrails = buildCitationGuardrails(input.citations ?? []);
   const offerGuardrail = findOfferGuardrail(input.citations ?? []);
@@ -538,6 +559,7 @@ export function buildPropertyCaseOverview(
     action,
     missingStates,
     confidenceSections,
+    buyerFit,
     recommendationState: artifacts.recommendation,
     evidenceGraph: input.evidenceGraph ?? null,
   });
@@ -590,6 +612,7 @@ export function buildPropertyCaseOverview(
     coverageSummary,
     headerDescription,
     marketReality: marketReality.buyer,
+    buyerFit,
     decisionMemo,
     confidenceSections,
     artifacts,
@@ -694,6 +717,7 @@ function buildDecisionMemo(args: {
   action: PropertyCaseActionView | null;
   missingStates: PropertyCaseMissingState[];
   confidenceSections: PropertyCaseConfidenceSectionView[];
+  buyerFit: PropertyCaseBuyerFitView;
   recommendationState: AdvisorySurfaceState;
   evidenceGraph: BuildPropertyCaseOverviewInput["evidenceGraph"];
 }): BuyerSafeDecisionMemoView {
@@ -806,7 +830,12 @@ function buildDecisionMemo(args: {
 
   return {
     title: "Why this home / why not this home",
-    summary: buildDecisionMemoSummary(args.status, args.viewState, args.missingStates),
+    summary: buildDecisionMemoSummary(
+      args.status,
+      args.viewState,
+      args.missingStates,
+      args.buyerFit,
+    ),
     upside: {
       title: "Why this home could be worth pursuing",
       summary:
@@ -841,6 +870,7 @@ function buildDecisionMemo(args: {
     },
     recommendation: buildDecisionMemoRecommendation({
       action: args.action,
+      buyerFit: args.buyerFit,
       recommendationState: args.recommendationState,
       evidenceContext,
       offerSection:
@@ -878,13 +908,17 @@ function buildDecisionMemoSummary(
   status: StatusBadge,
   viewState: PropertyCaseOverviewViewState,
   missingStates: PropertyCaseMissingState[],
+  buyerFit: PropertyCaseBuyerFitView,
 ): string {
   if (viewState === "ready") {
+    if (buyerFit.shouldInfluenceRecommendations) {
+      return `${status.label}. The current memo has enough evidence to show the upside, the downside, a clear recommendation, and how this home fits the buyer's repeated patterns.`;
+    }
     return `${status.label}. The current memo has enough evidence to show the upside, the downside, and a clear recommendation in one place.`;
   }
 
   if (viewState === "partial") {
-    return `${status.label}. The current memo is usable, but ${missingStates.length} signal${missingStates.length === 1 ? "" : "s"} still change how decisive the case should feel.`;
+    return `${status.label}. The current memo is usable, but ${missingStates.length} signal${missingStates.length === 1 ? "" : "s"} still change how decisive the case should feel${buyerFit.memoryState === "thin_history" ? ", and fit memory is still thin" : ""}.`;
   }
 
   return `${status.label}. The memo stays explicit about what is missing instead of pretending the case is settled.`;
@@ -972,6 +1006,7 @@ function buildMissingStateDecisionMemoItem(
 
 function buildDecisionMemoRecommendation(args: {
   action: PropertyCaseActionView | null;
+  buyerFit: PropertyCaseBuyerFitView;
   recommendationState: AdvisorySurfaceState;
   evidenceContext: DecisionMemoEvidenceContext;
   offerSection: RecommendationEvidenceSection | null;
@@ -990,6 +1025,15 @@ function buildDecisionMemoRecommendation(args: {
   );
 
   if (args.action && !args.recommendationState.withholdOutput) {
+    const fitSentence = args.buyerFit.shouldInfluenceRecommendations
+      ? args.buyerFit.score !== null && args.buyerFit.score >= 0.3
+        ? " It also looks like a stronger fit than the homes this buyer usually favors."
+        : args.buyerFit.score !== null && args.buyerFit.score <= -0.3
+          ? " It also repeats patterns this buyer has usually moved away from."
+          : " The buyer's fit history is mixed, so keep the recommendation explicit about tradeoffs."
+      : args.buyerFit.memoryState === "thin_history"
+        ? " The fit memory is still thin, so the recommendation should not pretend personalization is settled."
+        : "";
     return {
       verdict:
         args.missingStates.length > 0 || args.action.riskLevel !== "low"
@@ -998,7 +1042,7 @@ function buildDecisionMemoRecommendation(args: {
       label: "Current recommendation",
       body:
         args.action.reviewedConclusion ??
-        `Treat the home as worth pursuing only with a disciplined opener around ${args.action.openingPriceLabel}. ${args.action.guardrailExplanation}`,
+        `Treat the home as worth pursuing only with a disciplined opener around ${args.action.openingPriceLabel}. ${args.action.guardrailExplanation}${fitSentence}`,
       confidenceLabel: args.action.confidenceLabel,
       riskLabel: args.action.riskLabel,
       openingPriceLabel: args.action.openingPriceLabel,
