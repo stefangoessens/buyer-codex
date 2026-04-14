@@ -78,6 +78,10 @@ describe("buildTrustProofSurfaceReadModel", () => {
     expect(result.sectionBadge).toBe("Illustrative example");
     expect(result.caseStudies[0]?.badge).toBe("Illustrative example");
     expect(result.stats[0]?.badge).toBe("Illustrative example");
+    expect(result.caseStudies[0]?.highlights).toEqual([
+      { value: "$18K", label: "Buyer savings" },
+      { value: "$500K", label: "Purchase price" },
+    ]);
   });
 
   it("keeps mixed-state surfaces distinct", () => {
@@ -107,6 +111,12 @@ describe("buildTrustProofSurfaceReadModel", () => {
       result.caseStudies.find((study) => !study.isIllustrative)?.badge,
     ).toBeNull();
     expect(result.summary.liveCaseStudies).toBe(1);
+    expect(
+      result.caseStudies.find((study) => !study.isIllustrative)?.highlights,
+    ).toEqual([
+      { value: "$14.5K", label: "Buyer savings" },
+      { value: "$650K", label: "Purchase price" },
+    ]);
   });
 
   it("drops missing-proof records from the public surface", () => {

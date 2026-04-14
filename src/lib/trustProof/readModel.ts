@@ -10,6 +10,11 @@ import {
 } from "./policy";
 import type { CaseStudy, LabeledCaseStudy, LabeledProofBlock, ProofBlock } from "./types";
 
+export interface TrustProofHighlightReadModel {
+  value: string;
+  label: string;
+}
+
 export interface TrustProofStatReadModel {
   id: string;
   value: string;
@@ -25,7 +30,8 @@ export interface TrustProofCaseStudyReadModel {
   headline: string;
   summary: string;
   buyerDisplayName: string;
-  buyerRole: string;
+  buyerContext: string;
+  highlights: TrustProofHighlightReadModel[];
   isIllustrative: boolean;
   badge: string | null;
   badgeAriaLabel: string | null;
@@ -52,13 +58,58 @@ function toStatReadModel(block: LabeledProofBlock): TrustProofStatReadModel {
   };
 }
 
+function formatUsdCompact(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: value >= 100_000 ? 0 : 1,
+  }).format(value);
+}
+
+function formatPercent(value: number): string {
+  const normalized = Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
+  return `${normalized}%`;
+}
+
+function toCaseStudyHighlights(study: CaseStudy): TrustProofHighlightReadModel[] {
+  const highlights: TrustProofHighlightReadModel[] = [
+    {
+      value: formatUsdCompact(study.outcomes.buyerSavings),
+      label: "Buyer savings",
+    },
+  ];
+
+  if (study.outcomes.daysToClose !== undefined) {
+    highlights.push({
+      value: `${study.outcomes.daysToClose} days`,
+      label: "Time to close",
+    });
+  }
+
+  if (study.outcomes.effectiveCommissionPct !== undefined) {
+    highlights.push({
+      value: formatPercent(study.outcomes.effectiveCommissionPct),
+      label: "Effective commission",
+    });
+  } else {
+    highlights.push({
+      value: formatUsdCompact(study.outcomes.purchasePrice),
+      label: "Purchase price",
+    });
+  }
+
+  return highlights;
+}
+
 function toCaseStudyReadModel(study: LabeledCaseStudy): TrustProofCaseStudyReadModel {
   return {
     id: study.case.id,
     headline: study.case.headline,
     summary: study.case.summary,
     buyerDisplayName: study.case.buyer.displayName,
-    buyerRole: study.case.buyer.location,
+    buyerContext: study.case.buyer.location,
+    highlights: toCaseStudyHighlights(study.case),
     isIllustrative: study.isIllustrative,
     badge: study.label,
     badgeAriaLabel: study.ariaLabel,

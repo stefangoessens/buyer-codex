@@ -30,7 +30,11 @@ export function HeroSection({ children }: HeroSectionProps) {
             </p>
             <div className="mt-8">{children}</div>
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-neutral-500">
-              {["500+ buyers served", "$2.1M total savings", "Analysis in <5s"].map((text) => (
+              {[
+                "Licensed Florida brokerage",
+                "AI analysis in seconds",
+                "Buyer-credit path explained before closing",
+              ].map((text) => (
                 <div key={text} className="flex items-center gap-2">
                   <svg className="size-4 shrink-0 text-primary-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                     <path
