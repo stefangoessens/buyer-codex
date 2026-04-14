@@ -13,6 +13,10 @@ export {
 
 export type {
   AdvisoryActorRole,
+  AdvisoryFeedbackArtifact,
+  AdvisoryFeedbackDimension,
+  AdvisoryFeedbackReasonCode,
+  AdvisoryFeedbackSentiment,
   AdvisoryNextActionTarget,
   AdvisoryRecommendationDecision,
   AdvisorySourceStatus,

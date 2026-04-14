@@ -19,12 +19,12 @@ import {
 } from "@/components/ui/card";
 import type { BrokerOverrideReasonCategory } from "@/lib/analyticsEvents/contract";
 import {
+  buildAdvisoryBuyerFeedbackSubmissionInput,
   buildBuyerSafeSummaryText,
   trackAdvisoryBrokerAdjudicationOpened,
   trackAdvisoryConfidenceDetailsExpanded,
   trackAdvisoryMemoViewed,
   trackAdvisoryNextBestActionClicked,
-  trackAdvisoryRecommendationFeedback,
   trackAdvisoryRecommendationViewed,
   trackAdvisorySourceTraceOpened,
   trackAdvisorySummaryCopied,
@@ -49,6 +49,11 @@ import type {
   AdvisoryAdjudicationAction,
   AdvisoryAdjudicationVisibility,
 } from "@/lib/advisory/adjudication";
+import type {
+  AdvisoryFeedbackReasonCode,
+  AdvisoryFeedbackResponse,
+} from "@/lib/dealroom/advisory-feedback";
+import { AdvisoryArtifactFeedbackCard } from "./AdvisoryArtifactFeedbackCard";
 import { BuyerReadinessCard } from "./BuyerReadinessCard";
 import { previewPropertyCaseOverview } from "./preview-data";
 
@@ -111,6 +116,9 @@ function LivePropertyCaseOverview({
 }: PropertyCaseOverviewProps) {
   const trackedDealRoomId = useRef<string | null>(null);
   const submitAdjudication = useMutation(api.aiEngineOutputs.submitAdjudication);
+  const submitBuyerFeedback = useMutation(
+    (api as any).advisoryBuyerFeedback.submit,
+  );
   const overview = useQuery(api.dealRoomCaseOverview.getOverview, {
     dealRoomId,
   }) as PropertyCaseOverviewSurface | null | undefined;
@@ -186,6 +194,11 @@ function LivePropertyCaseOverview({
           internalNotes: internalNotes?.trim() || undefined,
         });
       }}
+      onSubmitBuyerFeedback={async (input) => {
+        await submitBuyerFeedback(
+          buildAdvisoryBuyerFeedbackSubmissionInput(overview, input),
+        );
+      }}
     />
   );
 }
@@ -196,19 +209,22 @@ function PropertyCaseOverviewBody({
   riskSummary,
   telemetryEnabled = false,
   onSubmitAdjudication,
+  onSubmitBuyerFeedback,
 }: {
   overview: PropertyCaseOverviewSurface;
   readiness?: BuyerReadinessSurface | null;
   riskSummary?: DealRoomRiskSummary | null;
   telemetryEnabled?: boolean;
   onSubmitAdjudication?: (input: SubmitSourceAdjudicationInput) => Promise<void>;
+  onSubmitBuyerFeedback?: (input: {
+    artifact: "memo" | "recommendation" | "summary";
+    responses: AdvisoryFeedbackResponse[];
+    reasonCodes: AdvisoryFeedbackReasonCode[];
+  }) => Promise<void>;
 }) {
   const memoViewKey = useRef<string | null>(null);
   const recommendationViewKey = useRef<string | null>(null);
   const [summaryStatus, setSummaryStatus] = useState<string | null>(null);
-  const [feedbackDecision, setFeedbackDecision] = useState<
-    "accepted" | "dismissed" | "deferred" | null
-  >(null);
   const canNativeShare =
     typeof navigator !== "undefined" && typeof navigator.share === "function";
   const summaryText = buildBuyerSafeSummaryText(overview);
@@ -308,15 +324,6 @@ function PropertyCaseOverviewBody({
       setSummaryStatus("Summary shared");
     } catch {
       // User-cancelled shares are not analytics-worthy.
-    }
-  }
-
-  function handleRecommendationFeedback(
-    decision: "accepted" | "dismissed" | "deferred",
-  ) {
-    setFeedbackDecision(decision);
-    if (telemetryEnabled) {
-      trackAdvisoryRecommendationFeedback(overview, decision);
     }
   }
 
@@ -537,6 +544,12 @@ function PropertyCaseOverviewBody({
                   {summaryStatus}
                 </p>
               ) : null}
+              {overview.viewerRole === "buyer" && onSubmitBuyerFeedback ? (
+                <AdvisoryArtifactFeedbackCard
+                  artifact="summary"
+                  onSubmit={onSubmitBuyerFeedback}
+                />
+              ) : null}
             </div>
           </div>
         </div>
@@ -589,6 +602,13 @@ function PropertyCaseOverviewBody({
                   onSourceTraceClick={handleSourceTraceClick}
                 />
               </div>
+
+              {overview.viewerRole === "buyer" && onSubmitBuyerFeedback ? (
+                <AdvisoryArtifactFeedbackCard
+                  artifact="memo"
+                  onSubmit={onSubmitBuyerFeedback}
+                />
+              ) : null}
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <DecisionMemoSectionCard
@@ -1253,6 +1273,12 @@ function PropertyCaseOverviewBody({
                       </div>
                     </div>
                   )}
+                  {overview.viewerRole === "buyer" && onSubmitBuyerFeedback ? (
+                    <AdvisoryArtifactFeedbackCard
+                      artifact="recommendation"
+                      onSubmit={onSubmitBuyerFeedback}
+                    />
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1340,39 +1366,12 @@ function PropertyCaseOverviewBody({
                 </details>
               ) : null}
 
-              <div className="rounded-xl border border-dashed border-neutral-200 p-3">
-                <p className="text-sm font-semibold text-neutral-900">
-                  How are you using this recommendation?
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    variant={feedbackDecision === "accepted" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleRecommendationFeedback("accepted")}
-                  >
-                    Using it
-                  </Button>
-                  <Button
-                    variant={feedbackDecision === "deferred" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleRecommendationFeedback("deferred")}
-                  >
-                    Not yet
-                  </Button>
-                  <Button
-                    variant={feedbackDecision === "dismissed" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleRecommendationFeedback("dismissed")}
-                  >
-                    Not useful
-                  </Button>
-                </div>
-                {feedbackDecision ? (
-                  <p className="mt-3 text-xs font-medium text-neutral-500">
-                    Saved as a calibration signal for this recommendation.
-                  </p>
-                ) : null}
-              </div>
+              {overview.viewerRole === "buyer" && onSubmitBuyerFeedback ? (
+                <AdvisoryArtifactFeedbackCard
+                  artifact="recommendation"
+                  onSubmit={onSubmitBuyerFeedback}
+                />
+              ) : null}
             </CardContent>
           </Card>
 

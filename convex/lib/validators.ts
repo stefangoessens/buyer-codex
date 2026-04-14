@@ -134,6 +134,36 @@ export const brokerOverrideReasonCategory = v.union(
   v.literal("other")
 );
 
+export const advisoryFeedbackArtifact = v.union(
+  v.literal("memo"),
+  v.literal("recommendation"),
+  v.literal("summary")
+);
+
+export const advisoryFeedbackDimension = v.union(
+  v.literal("usefulness"),
+  v.literal("trust"),
+  v.literal("clarity"),
+  v.literal("actionability")
+);
+
+export const advisoryFeedbackSentiment = v.union(
+  v.literal("positive"),
+  v.literal("negative")
+);
+
+export const advisoryFeedbackReasonCode = v.union(
+  v.literal("too_vague"),
+  v.literal("missing_context"),
+  v.literal("missing_evidence"),
+  v.literal("hard_to_verify"),
+  v.literal("does_not_fit_my_plan"),
+  v.literal("missing_next_step"),
+  v.literal("too_aggressive"),
+  v.literal("too_conservative"),
+  v.literal("not_relevant")
+);
+
 export const aiOutputAdjudicationAction = v.union(
   v.literal("approve"),
   v.literal("adjust"),

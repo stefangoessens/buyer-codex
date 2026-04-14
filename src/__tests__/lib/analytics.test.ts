@@ -289,6 +289,33 @@ describe("track() — deal_room category", () => {
         recommendationConfidence: 0.78,
       }),
     ).not.toThrow();
+
+    expect(() =>
+      track("advisory_buyer_feedback_submitted", {
+        dealRoomId: "dr_1",
+        propertyId: "prop_1",
+        actorRole: "buyer",
+        surface: "deal_room_overview",
+        variant: "buyer_safe",
+        viewState: "partial",
+        claimCount: 3,
+        sourceCount: 3,
+        missingSignalCount: 1,
+        coverageAvailableCount: 3,
+        coveragePendingCount: 1,
+        coverageUncertainCount: 0,
+        coverageMissingCount: 0,
+        artifact: "recommendation",
+        synthesisVersion: "1.0.0",
+        artifactGeneratedAt: "2026-04-13T19:00:00.000Z",
+        dimension: "clarity",
+        sentiment: "negative",
+        responseCount: 2,
+        reasonCount: 2,
+        reasonCodeKey: "missing_evidence|too_vague",
+        recommendationConfidence: 0.78,
+      }),
+    ).not.toThrow();
   });
 });
 
