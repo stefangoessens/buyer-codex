@@ -315,6 +315,8 @@ describe("advisoryTelemetry", () => {
           reviewState: "approved",
         },
       ],
+      marketContext: marketContextFixture(),
+      propertyFacts: propertyFactsFixture(),
       viewerRole: "buyer",
     });
     const summary = buildBuyerSafeSummaryText(overview);
