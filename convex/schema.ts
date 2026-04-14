@@ -6,10 +6,15 @@ import {
   agreementAccessScope,
   agreementAuditEventType,
   agreementAuditVisibility,
+  aiOutputAdjudicationAction,
+  aiOutputAdjudicationStatus,
+  aiOutputAdjudicationVisibility,
+  aiReviewState,
   agreementDocumentSource,
   assignmentStatus,
   availabilityOwnerType,
   availabilityStatus,
+  brokerOverrideReasonCategory,
   buyerEventPriority,
   buyerEventResolvedBy,
   buyerEventState,
@@ -677,19 +682,51 @@ export default defineSchema({
     inputSnapshot: v.optional(v.string()),
     confidence: v.number(),
     citations: v.array(v.string()),
-    reviewState: v.union(
-      v.literal("pending"),
-      v.literal("approved"),
-      v.literal("rejected")
-    ),
+    reviewState: aiReviewState,
     output: v.string(),
     modelId: v.string(),
     generatedAt: v.string(),
     reviewedBy: v.optional(v.id("users")),
     reviewedAt: v.optional(v.string()),
+    adjudication: v.optional(
+      v.object({
+        status: aiOutputAdjudicationStatus,
+        action: aiOutputAdjudicationAction,
+        visibility: aiOutputAdjudicationVisibility,
+        rationale: v.string(),
+        reasonCategory: v.optional(brokerOverrideReasonCategory),
+        reviewedConclusion: v.optional(v.string()),
+        buyerExplanation: v.optional(v.string()),
+        internalNotes: v.optional(v.string()),
+        actorUserId: v.id("users"),
+        actedAt: v.string(),
+      })
+    ),
   })
     .index("by_propertyId_and_engineType", ["propertyId", "engineType"])
     .index("by_reviewState", ["reviewState"]),
+
+  aiOutputAdjudications: defineTable({
+    engineOutputId: v.id("aiEngineOutputs"),
+    propertyId: v.id("properties"),
+    dealRoomId: v.optional(v.id("dealRooms")),
+    engineType: v.string(),
+    action: aiOutputAdjudicationAction,
+    status: aiOutputAdjudicationStatus,
+    visibility: aiOutputAdjudicationVisibility,
+    rationale: v.string(),
+    reasonCategory: v.optional(brokerOverrideReasonCategory),
+    reviewedConclusion: v.optional(v.string()),
+    buyerExplanation: v.optional(v.string()),
+    internalNotes: v.optional(v.string()),
+    actorUserId: v.id("users"),
+    actedAt: v.string(),
+    reviewStateBefore: aiReviewState,
+    reviewStateAfter: aiReviewState,
+  })
+    .index("by_engineOutputId_and_actedAt", ["engineOutputId", "actedAt"])
+    .index("by_propertyId_and_actedAt", ["propertyId", "actedAt"])
+    .index("by_dealRoomId_and_actedAt", ["dealRoomId", "actedAt"]),
 
   pricingCalibrationRecords: defineTable({
     propertyId: v.id("properties"),

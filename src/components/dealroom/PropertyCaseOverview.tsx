@@ -34,16 +34,25 @@ import { isConfigured } from "@/lib/env";
 import type { PropertyCaseOverviewSurface } from "@/lib/dealroom/property-case-overview";
 import { trackDealRoomUnlocked } from "@/lib/intake/pasteLinkFunnel";
 import { cn } from "@/lib/utils";
+import type {
+  AdvisoryAdjudicationAction,
+  AdvisoryAdjudicationVisibility,
+} from "@/lib/advisory/adjudication";
 import { previewPropertyCaseOverview } from "./preview-data";
 
 interface PropertyCaseOverviewProps {
   dealRoomId: Id<"dealRooms">;
 }
 
-interface RejectSourceInput {
+interface SubmitSourceAdjudicationInput {
   citationId: string;
-  reasonCategory: BrokerOverrideReasonCategory;
-  reasonDetail?: string;
+  action: AdvisoryAdjudicationAction;
+  visibility: AdvisoryAdjudicationVisibility;
+  rationale: string;
+  reasonCategory?: BrokerOverrideReasonCategory;
+  reviewedConclusion?: string;
+  buyerExplanation?: string;
+  internalNotes?: string;
 }
 
 const BROKER_OVERRIDE_REASON_OPTIONS: Array<{
@@ -56,6 +65,23 @@ const BROKER_OVERRIDE_REASON_OPTIONS: Array<{
   { value: "market_context_shift", label: "Market context shifted" },
   { value: "human_judgment", label: "Human judgment" },
   { value: "other", label: "Other" },
+];
+
+const ADJUDICATION_ACTION_OPTIONS: Array<{
+  value: AdvisoryAdjudicationAction;
+  label: string;
+}> = [
+  { value: "approve", label: "Approve as-is" },
+  { value: "adjust", label: "Adjust for buyer" },
+  { value: "override", label: "Override conclusion" },
+];
+
+const ADJUDICATION_VISIBILITY_OPTIONS: Array<{
+  value: AdvisoryAdjudicationVisibility;
+  label: string;
+}> = [
+  { value: "buyer_safe", label: "Buyer-safe" },
+  { value: "internal_only", label: "Internal only" },
 ];
 
 export function PropertyCaseOverview({
@@ -72,8 +98,7 @@ function LivePropertyCaseOverview({
   dealRoomId,
 }: PropertyCaseOverviewProps) {
   const trackedDealRoomId = useRef<string | null>(null);
-  const approveOutput = useMutation(api.aiEngineOutputs.approveOutput);
-  const rejectOutput = useMutation(api.aiEngineOutputs.rejectOutput);
+  const submitAdjudication = useMutation(api.aiEngineOutputs.submitAdjudication);
   const overview = useQuery(api.dealRoomCaseOverview.getOverview, {
     dealRoomId,
   }) as PropertyCaseOverviewSurface | null | undefined;
@@ -108,18 +133,27 @@ function LivePropertyCaseOverview({
     <PropertyCaseOverviewBody
       overview={overview}
       telemetryEnabled
-      onApproveSource={async (citationId) => {
-        await approveOutput({
-          outputId: citationId as Id<"aiEngineOutputs">,
-        });
-      }}
-      onRejectSource={async ({ citationId, reasonCategory, reasonDetail }) => {
-        await rejectOutput({
+      onSubmitAdjudication={async ({
+        citationId,
+        action,
+        visibility,
+        rationale,
+        reasonCategory,
+        reviewedConclusion,
+        buyerExplanation,
+        internalNotes,
+      }) => {
+        await submitAdjudication({
           outputId: citationId as Id<"aiEngineOutputs">,
           dealRoomId,
           surface: "deal_room_overview",
+          action,
+          visibility,
+          rationale: rationale.trim(),
           reasonCategory,
-          reasonDetail: reasonDetail?.trim() || undefined,
+          reviewedConclusion: reviewedConclusion?.trim() || undefined,
+          buyerExplanation: buyerExplanation?.trim() || undefined,
+          internalNotes: internalNotes?.trim() || undefined,
         });
       }}
     />
@@ -129,13 +163,11 @@ function LivePropertyCaseOverview({
 function PropertyCaseOverviewBody({
   overview,
   telemetryEnabled = false,
-  onApproveSource,
-  onRejectSource,
+  onSubmitAdjudication,
 }: {
   overview: PropertyCaseOverviewSurface;
   telemetryEnabled?: boolean;
-  onApproveSource?: (citationId: string) => Promise<void>;
-  onRejectSource?: (input: RejectSourceInput) => Promise<void>;
+  onSubmitAdjudication?: (input: SubmitSourceAdjudicationInput) => Promise<void>;
 }) {
   const memoViewKey = useRef<string | null>(null);
   const recommendationViewKey = useRef<string | null>(null);
@@ -981,8 +1013,7 @@ function PropertyCaseOverviewBody({
                 <BrokerAdjudicationSection
                   overview={overview}
                   telemetryEnabled={telemetryEnabled}
-                  onApproveSource={onApproveSource}
-                  onRejectSource={onRejectSource}
+                  onSubmitAdjudication={onSubmitAdjudication}
                   onSourceTraceClick={handleSourceTraceClick}
                 />
               </CardContent>
@@ -1038,6 +1069,14 @@ function PropertyCaseOverviewBody({
                   </span>
                   <span className="text-neutral-300">•</span>
                   <span>{source.guardrailLabel}</span>
+                  <span className="text-neutral-300">•</span>
+                  <span>{source.adjudicationLabel}</span>
+                  {source.visibilityLabel ? (
+                    <>
+                      <span className="text-neutral-300">•</span>
+                      <span>{source.visibilityLabel}</span>
+                    </>
+                  ) : null}
                   {source.generatedAtLabel && (
                     <>
                       <span className="text-neutral-300">•</span>
@@ -1045,6 +1084,26 @@ function PropertyCaseOverviewBody({
                     </>
                   )}
                 </div>
+                {source.reviewedConclusion || source.buyerExplanation ? (
+                  <div className="mt-4 rounded-2xl border border-neutral-200/80 bg-white p-3 text-sm text-neutral-700">
+                    {source.reviewedConclusion ? (
+                      <p>
+                        <span className="font-semibold text-neutral-900">
+                          Reviewed conclusion:
+                        </span>{" "}
+                        {source.reviewedConclusion}
+                      </p>
+                    ) : null}
+                    {source.buyerExplanation ? (
+                      <p className={cn(source.reviewedConclusion ? "mt-2" : "")}>
+                        <span className="font-semibold text-neutral-900">
+                          Buyer-safe explanation:
+                        </span>{" "}
+                        {source.buyerExplanation}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
               </article>
             ))
           ) : (
@@ -1224,64 +1283,90 @@ function InternalBadgeList({
 function BrokerAdjudicationSection({
   overview,
   telemetryEnabled,
-  onApproveSource,
-  onRejectSource,
+  onSubmitAdjudication,
   onSourceTraceClick,
 }: {
   overview: Extract<PropertyCaseOverviewSurface, { variant: "internal" }>;
   telemetryEnabled: boolean;
-  onApproveSource?: (citationId: string) => Promise<void>;
-  onRejectSource?: (input: RejectSourceInput) => Promise<void>;
+  onSubmitAdjudication?: (input: SubmitSourceAdjudicationInput) => Promise<void>;
   onSourceTraceClick: (
     citationId: string,
     trigger: "claim_link" | "broker_adjudication",
   ) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [rejectCategoryById, setRejectCategoryById] = useState<
+  const [actionById, setActionById] = useState<
+    Record<string, AdvisoryAdjudicationAction>
+  >({});
+  const [visibilityById, setVisibilityById] = useState<
+    Record<string, AdvisoryAdjudicationVisibility>
+  >({});
+  const [reasonCategoryById, setReasonCategoryById] = useState<
     Record<string, BrokerOverrideReasonCategory>
   >({});
-  const [rejectDetailById, setRejectDetailById] = useState<Record<string, string>>(
+  const [rationaleById, setRationaleById] = useState<Record<string, string>>({});
+  const [reviewedConclusionById, setReviewedConclusionById] = useState<
+    Record<string, string>
+  >({});
+  const [buyerExplanationById, setBuyerExplanationById] = useState<
+    Record<string, string>
+  >({});
+  const [internalNotesById, setInternalNotesById] = useState<Record<string, string>>(
     {},
   );
   const [submittingById, setSubmittingById] = useState<Record<string, boolean>>({});
   const [errorById, setErrorById] = useState<Record<string, string>>({});
 
-  async function handleApprove(citationId: string) {
-    if (!onApproveSource) return;
-    setSubmittingById((current) => ({ ...current, [citationId]: true }));
-    setErrorById((current) => ({ ...current, [citationId]: "" }));
+  async function handleSubmit(citationId: string) {
+    if (!onSubmitAdjudication) return;
+    const action = actionById[citationId] ?? "approve";
+    const visibility = visibilityById[citationId] ?? "buyer_safe";
+    const rationale = rationaleById[citationId]?.trim() ?? "";
+    const reviewedConclusion = reviewedConclusionById[citationId]?.trim();
+    const buyerExplanation = buyerExplanationById[citationId]?.trim();
+    const internalNotes = internalNotesById[citationId]?.trim();
+    const reasonCategory = reasonCategoryById[citationId];
 
-    try {
-      await onApproveSource(citationId);
-    } catch {
+    if (!rationale) {
       setErrorById((current) => ({
         ...current,
-        [citationId]: "Approval failed. Try again.",
+        [citationId]: "Rationale is required.",
       }));
-    } finally {
-      setSubmittingById((current) => ({ ...current, [citationId]: false }));
+      return;
     }
-  }
 
-  async function handleReject(citationId: string) {
-    if (!onRejectSource) return;
-    const reasonCategory =
-      rejectCategoryById[citationId] ?? "unsupported_evidence";
+    if (
+      visibility === "buyer_safe" &&
+      action !== "approve" &&
+      !reviewedConclusion &&
+      !buyerExplanation
+    ) {
+      setErrorById((current) => ({
+        ...current,
+        [citationId]:
+          "Buyer-safe adjustments and overrides need reviewed conclusion or buyer-safe explanation.",
+      }));
+      return;
+    }
 
     setSubmittingById((current) => ({ ...current, [citationId]: true }));
     setErrorById((current) => ({ ...current, [citationId]: "" }));
 
     try {
-      await onRejectSource({
+      await onSubmitAdjudication({
         citationId,
+        action,
+        visibility,
+        rationale,
         reasonCategory,
-        reasonDetail: rejectDetailById[citationId],
+        reviewedConclusion,
+        buyerExplanation,
+        internalNotes,
       });
     } catch {
       setErrorById((current) => ({
         ...current,
-        [citationId]: "Override failed. Try again.",
+        [citationId]: "Adjudication failed. Try again.",
       }));
     } finally {
       setSubmittingById((current) => ({ ...current, [citationId]: false }));
@@ -1314,12 +1399,12 @@ function BrokerAdjudicationSection({
           value={String(overview.internal.adjudicationSummary.pendingCount)}
         />
         <MetricTile
-          label="Approved"
-          value={String(overview.internal.adjudicationSummary.approvedCount)}
+          label="Buyer-safe"
+          value={String(overview.internal.adjudicationSummary.buyerSafeCount)}
         />
         <MetricTile
-          label="Rejected"
-          value={String(overview.internal.adjudicationSummary.rejectedCount)}
+          label="Internal only"
+          value={String(overview.internal.adjudicationSummary.internalOnlyCount)}
         />
       </div>
 
@@ -1327,8 +1412,13 @@ function BrokerAdjudicationSection({
         {overview.internal.adjudicationItems.length > 0 ? (
           overview.internal.adjudicationItems.map((item) => {
             const isSubmitting = submittingById[item.citationId] === true;
+            const selectedAction = actionById[item.citationId] ?? "approve";
+            const selectedVisibility =
+              visibilityById[item.citationId] ??
+              item.visibility ??
+              "buyer_safe";
             const selectedReason =
-              rejectCategoryById[item.citationId] ?? "unsupported_evidence";
+              reasonCategoryById[item.citationId] ?? "unsupported_evidence";
 
             return (
               <div
@@ -1362,6 +1452,19 @@ function BrokerAdjudicationSection({
                 <div className="mt-3 flex flex-wrap gap-3 text-sm text-white/70">
                   <span>{item.confidenceLabel}</span>
                   <span className="text-white/25">•</span>
+                  <span>{item.adjudicationLabel}</span>
+                  {item.visibilityLabel ? (
+                    <>
+                      <span className="text-white/25">•</span>
+                      <span>{item.visibilityLabel}</span>
+                    </>
+                  ) : null}
+                  {item.actorName ? (
+                    <>
+                      <span className="text-white/25">•</span>
+                      <span>Last by {item.actorName}</span>
+                    </>
+                  ) : null}
                   <span>
                     {item.linkedClaimCount} linked claim
                     {item.linkedClaimCount === 1 ? "" : "s"}
@@ -1392,35 +1495,110 @@ function BrokerAdjudicationSection({
                   </p>
                 )}
 
-                {(onApproveSource || onRejectSource) && (
-                  <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={isSubmitting || !onApproveSource}
-                        onClick={() => handleApprove(item.citationId)}
-                      >
-                        Approve source
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isSubmitting || !onRejectSource}
-                        onClick={() => handleReject(item.citationId)}
-                      >
-                        Override source
-                      </Button>
-                    </div>
+                {item.reviewedConclusion || item.buyerExplanation ? (
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
+                    {item.reviewedConclusion ? (
+                      <p>
+                        <span className="font-semibold text-white">
+                          Reviewed conclusion:
+                        </span>{" "}
+                        {item.reviewedConclusion}
+                      </p>
+                    ) : null}
+                    {item.buyerExplanation ? (
+                      <p className={cn(item.reviewedConclusion ? "mt-2" : "")}>
+                        <span className="font-semibold text-white">
+                          Buyer-safe explanation:
+                        </span>{" "}
+                        {item.buyerExplanation}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
 
-                    <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,220px)_1fr]">
+                {item.internalNotes ? (
+                  <div className="mt-3 rounded-xl border border-white/10 bg-black/15 p-3 text-sm text-white/65">
+                    <span className="font-semibold text-white">Internal notes:</span>{" "}
+                    {item.internalNotes}
+                  </div>
+                ) : null}
+
+                {item.auditTrail.length > 0 ? (
+                  <div className="mt-3 rounded-xl border border-white/10 bg-black/15 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/45">
+                      Audit trail
+                    </p>
+                    <div className="mt-3 space-y-3">
+                      {item.auditTrail.map((entry, index) => (
+                        <div
+                          key={`${item.citationId}-${entry.actedAt}-${index}`}
+                          className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/70"
+                        >
+                          <p className="font-medium text-white">
+                            {entry.actionLabel} • {entry.visibilityLabel}
+                          </p>
+                          <p className="mt-1 text-white/55">
+                            {entry.actorName ?? "Unknown actor"} • {entry.actedAtLabel}
+                          </p>
+                          <p className="mt-2">{entry.rationale}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {onSubmitAdjudication && (
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
+                        Action
+                        <select
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
+                          value={selectedAction}
+                          onChange={(event) =>
+                            setActionById((current) => ({
+                              ...current,
+                              [item.citationId]:
+                                event.target.value as AdvisoryAdjudicationAction,
+                            }))
+                          }
+                        >
+                          {ADJUDICATION_ACTION_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
+                        Visibility
+                        <select
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
+                          value={selectedVisibility}
+                          onChange={(event) =>
+                            setVisibilityById((current) => ({
+                              ...current,
+                              [item.citationId]:
+                                event.target.value as AdvisoryAdjudicationVisibility,
+                            }))
+                          }
+                        >
+                          {ADJUDICATION_VISIBILITY_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
                       <label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
                         Reason category
                         <select
                           className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
                           value={selectedReason}
                           onChange={(event) =>
-                            setRejectCategoryById((current) => ({
+                            setReasonCategoryById((current) => ({
                               ...current,
                               [item.citationId]:
                                 event.target.value as BrokerOverrideReasonCategory,
@@ -1434,21 +1612,91 @@ function BrokerAdjudicationSection({
                           ))}
                         </select>
                       </label>
+                    </div>
 
-                      <label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
-                        Detail (optional)
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55 sm:col-span-2">
+                        Rationale
                         <textarea
                           className="mt-2 min-h-24 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
-                          value={rejectDetailById[item.citationId] ?? ""}
+                          value={rationaleById[item.citationId] ?? item.rationale ?? ""}
                           onChange={(event) =>
-                            setRejectDetailById((current) => ({
+                            setRationaleById((current) => ({
                               ...current,
                               [item.citationId]: event.target.value,
                             }))
                           }
-                          placeholder="Add optional broker context for this override."
+                          placeholder="Why is this the right adjudication for this output?"
                         />
                       </label>
+
+                      <label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
+                        Reviewed conclusion
+                        <textarea
+                          className="mt-2 min-h-24 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
+                          value={
+                            reviewedConclusionById[item.citationId] ??
+                            item.reviewedConclusion ??
+                            ""
+                          }
+                          onChange={(event) =>
+                            setReviewedConclusionById((current) => ({
+                              ...current,
+                              [item.citationId]: event.target.value,
+                            }))
+                          }
+                          placeholder="Buyer-facing reviewed conclusion, if this source should change the memo."
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
+                        Buyer-safe explanation
+                        <textarea
+                          className="mt-2 min-h-24 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
+                          value={
+                            buyerExplanationById[item.citationId] ??
+                            item.buyerExplanation ??
+                            ""
+                          }
+                          onChange={(event) =>
+                            setBuyerExplanationById((current) => ({
+                              ...current,
+                              [item.citationId]: event.target.value,
+                            }))
+                          }
+                          placeholder="Optional buyer-safe explanation kept separate from internal notes."
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55 sm:col-span-2">
+                        Internal notes
+                        <textarea
+                          className="mt-2 min-h-24 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
+                          value={
+                            internalNotesById[item.citationId] ??
+                            item.internalNotes ??
+                            ""
+                          }
+                          onChange={(event) =>
+                            setInternalNotesById((current) => ({
+                              ...current,
+                              [item.citationId]: event.target.value,
+                            }))
+                          }
+                          placeholder="Optional internal-only notes for compliance or audit context."
+                        />
+                      </label>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={isSubmitting}
+                        onClick={() => handleSubmit(item.citationId)}
+                      >
+                        Save adjudication
+                      </Button>
                     </div>
 
                     {errorById[item.citationId] ? (

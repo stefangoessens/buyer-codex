@@ -31,6 +31,16 @@ import {
   type SectionStatus,
   type StatusBadge,
 } from "@/lib/dealroom/overview";
+import {
+  adjudicationActionLabel,
+  adjudicationStatusLabel,
+  adjudicationVisibilityLabel,
+  type AdvisoryAdjudicationAction,
+  type AdvisoryAdjudicationHistoryEntry,
+  type AdvisoryAdjudicationSnapshot,
+  type AdvisoryAdjudicationStatus,
+  type AdvisoryAdjudicationVisibility,
+} from "@/lib/advisory/adjudication";
 
 export type CoverageEngineKey = "pricing" | "comps" | "leverage" | "offer";
 export type PropertyCaseOverviewVariant = "buyer_safe" | "internal";
@@ -50,6 +60,8 @@ export interface PropertyCaseCitationInput {
   confidence?: number;
   generatedAt?: string;
   reviewState?: "pending" | "approved" | "rejected";
+  adjudication?: AdvisoryAdjudicationSnapshot | null;
+  adjudicationHistory?: AdvisoryAdjudicationHistoryEntry[];
 }
 
 export interface BuildPropertyCaseOverviewInput {
@@ -108,6 +120,9 @@ export interface PropertyCaseActionView {
   guardrailState: AdvisoryGuardrailState;
   guardrailLabel: string;
   guardrailExplanation: string;
+  reviewedConclusion: string | null;
+  buyerExplanation: string | null;
+  isBrokerReviewed: boolean;
 }
 
 export interface PropertyCaseConfidenceSectionView {
@@ -154,6 +169,14 @@ export interface PropertyCaseSourceView {
   engineLabel: string;
   status: "available" | "pending" | "unavailable";
   reviewState: "pending" | "approved" | "rejected" | null;
+  adjudicationStatus: AdvisoryAdjudicationStatus;
+  adjudicationLabel: string;
+  visibility: AdvisoryAdjudicationVisibility | null;
+  visibilityLabel: string | null;
+  reviewedConclusion: string | null;
+  buyerExplanation: string | null;
+  reviewedByLabel: string | null;
+  reviewedAtLabel: string | null;
   confidenceLabel: string;
   generatedAtLabel: string | null;
   claimCount: number;
@@ -173,6 +196,27 @@ export interface PropertyCaseAdjudicationSummary {
   pendingCount: number;
   approvedCount: number;
   rejectedCount: number;
+  buyerSafeCount: number;
+  internalOnlyCount: number;
+  adjustedCount: number;
+  overriddenCount: number;
+}
+
+export interface PropertyCaseAdjudicationAuditEntry {
+  action: AdvisoryAdjudicationAction;
+  actionLabel: string;
+  status: AdvisoryAdjudicationStatus;
+  statusLabel: string;
+  visibility: AdvisoryAdjudicationVisibility;
+  visibilityLabel: string;
+  rationale: string;
+  reviewedConclusion: string | null;
+  buyerExplanation: string | null;
+  internalNotes: string | null;
+  actorName: string | null;
+  actorId: string;
+  actedAt: string;
+  actedAtLabel: string;
 }
 
 export interface PropertyCaseAdjudicationItem {
@@ -180,11 +224,26 @@ export interface PropertyCaseAdjudicationItem {
   engineType: string;
   engineLabel: string;
   reviewState: "pending" | "approved" | "rejected";
+  adjudicationStatus: AdvisoryAdjudicationStatus;
+  adjudicationLabel: string;
+  action: AdvisoryAdjudicationAction | null;
+  actionLabel: string | null;
+  visibility: AdvisoryAdjudicationVisibility | null;
+  visibilityLabel: string | null;
+  rationale: string | null;
+  reviewedConclusion: string | null;
+  buyerExplanation: string | null;
+  internalNotes: string | null;
+  actorName: string | null;
+  actorId: string | null;
+  actedAt: string | null;
+  actedAtLabel: string | null;
   confidence: number | null;
   confidenceLabel: string;
   generatedAt: string | null;
   generatedAtLabel: string | null;
   linkedClaimCount: number;
+  auditTrail: PropertyCaseAdjudicationAuditEntry[];
 }
 
 export interface PropertyCaseArtifactStates {
@@ -290,17 +349,32 @@ export function buildPropertyCaseOverview(
   const coverageByKey = new Map(
     input.coverage.map((entry) => [entry.key, entry]),
   );
+  const citationById = new Map(
+    (input.citations ?? []).map((citation) => [citation.citationId, citation]),
+  );
   const citationGuardrails = buildCitationGuardrails(input.citations ?? []);
   const offerGuardrail = findOfferGuardrail(input.citations ?? []);
   const claims = (payload?.claims ?? [])
     .filter((claim) => isClaimCoverageAvailable(claim, coverageByKey))
-    .map((claim) => projectClaim(claim, citationGuardrails.get(claim.citation)))
+    .map((claim) =>
+      projectClaim(
+        claim,
+        citationGuardrails.get(claim.citation),
+        citationById.get(claim.citation),
+      ),
+    )
     .filter((claim): claim is PropertyCaseClaimView => Boolean(claim));
+  const action = buildAction(
+    payload,
+    claims,
+    coverageByKey,
+    offerGuardrail,
+    (input.citations ?? []).find((citation) => citation.engineType === "offer"),
+  );
   const confidenceSections = buildConfidenceSections(input.evidenceGraph?.sections);
   const internalConfidenceSections = isInternal
     ? buildInternalConfidenceSections(input.evidenceGraph?.sections)
     : [];
-  const action = buildAction(payload, claims, coverageByKey, offerGuardrail);
   const missingStates = buildMissingStates(
     input.coverage,
     payload,
@@ -457,6 +531,7 @@ export function buildPropertyCaseOverview(
 function projectClaim(
   claim: ComparativeClaim,
   assessment: AdvisoryGuardrailAssessment | undefined,
+  citation: PropertyCaseCitationInput | undefined,
 ): PropertyCaseClaimView | null {
   if (
     assessment?.state === "review_required" ||
@@ -466,11 +541,12 @@ function projectClaim(
   }
 
   const guardrailState = assessment?.state ?? "can_say";
+  const buyerFacingAdjudication = resolveBuyerFacingAdjudication(citation);
   return {
     id: claim.id,
     topic: claim.topic,
     topicLabel: topicLabels[claim.topic],
-    narrative: claim.narrative,
+    narrative: buyerFacingAdjudication?.reviewedConclusion ?? claim.narrative,
     deltaLabel:
       claim.direction === "at"
         ? `In line with ${claim.marketReferenceLabel}`
@@ -501,6 +577,7 @@ function buildAction(
   claims: PropertyCaseClaimView[],
   coverageByKey: Map<CoverageEngineKey, PropertyCaseCoverageInput>,
   offerGuardrail: AdvisoryGuardrailAssessment | undefined,
+  offerCitation: PropertyCaseCitationInput | undefined,
 ): PropertyCaseActionView | null {
   if (!payload?.recommendedAction) return null;
   if (coverageByKey.get("offer")?.status !== "available") return null;
@@ -518,6 +595,7 @@ function buildAction(
       title: claim.topicLabel,
       body: claim.narrative,
     }));
+  const buyerFacingAdjudication = resolveBuyerFacingAdjudication(offerCitation);
 
   return {
     openingPrice: payload.recommendedAction.openingPrice,
@@ -533,8 +611,12 @@ function buildAction(
     guardrailState: offerGuardrail?.state ?? "can_say",
     guardrailLabel: guardrailStateLabel(offerGuardrail?.state ?? "can_say"),
     guardrailExplanation:
+      buyerFacingAdjudication?.buyerExplanation ??
       offerGuardrail?.buyerExplanation ??
       "This recommendation cleared the buyer-safe advisory guardrail.",
+    reviewedConclusion: buyerFacingAdjudication?.reviewedConclusion ?? null,
+    buyerExplanation: buyerFacingAdjudication?.buyerExplanation ?? null,
+    isBrokerReviewed: Boolean(buyerFacingAdjudication),
   };
 }
 
@@ -663,6 +745,8 @@ function buildSources(
   return Array.from(claimsByCitation.entries())
     .map(([citationId, claimCount]) => {
       const citation = byCitation.get(citationId);
+      const adjudication = resolveCurrentAdjudication(citation);
+      const buyerFacingAdjudication = resolveBuyerFacingAdjudication(citation);
       const guardrail = assessEngineOutputGuardrail({
         engineType: citation?.engineType ?? "other",
         confidence: citation?.confidence,
@@ -684,6 +768,18 @@ function buildSources(
         engineLabel: humanizeEngineType(citation?.engineType),
         status,
         reviewState: citation?.reviewState ?? null,
+        adjudicationStatus: adjudication.status,
+        adjudicationLabel: adjudicationStatusLabel(adjudication.status),
+        visibility: adjudication.visibility ?? null,
+        visibilityLabel: adjudication.visibility
+          ? adjudicationVisibilityLabel(adjudication.visibility)
+          : null,
+        reviewedConclusion: buyerFacingAdjudication?.reviewedConclusion ?? null,
+        buyerExplanation: buyerFacingAdjudication?.buyerExplanation ?? null,
+        reviewedByLabel: adjudication.actorName ?? null,
+        reviewedAtLabel: adjudication.actedAt
+          ? formatShortDate(adjudication.actedAt)
+          : null,
         confidenceLabel:
           typeof citation?.confidence === "number"
             ? `${formatPercent(citation.confidence)} source confidence`
@@ -720,30 +816,75 @@ function buildAdjudicationItems(
         reviewState: "pending" | "approved" | "rejected";
       } => citation.reviewState != null,
     )
-    .map((citation) => ({
-      citationId: citation.citationId,
-      engineType: citation.engineType,
-      engineLabel: humanizeEngineType(citation.engineType),
-      reviewState: citation.reviewState,
-      confidence:
-        typeof citation.confidence === "number" ? citation.confidence : null,
-      confidenceLabel:
-        typeof citation.confidence === "number"
-          ? `${formatPercent(citation.confidence)} source confidence`
-          : "Confidence unavailable",
-      generatedAt: citation.generatedAt ?? null,
-      generatedAtLabel: citation.generatedAt
-        ? formatShortDate(citation.generatedAt)
-        : null,
-      linkedClaimCount: linkedClaimsByCitation.get(citation.citationId) ?? 0,
-    }))
+    .map((citation) => {
+      const adjudication = resolveCurrentAdjudication(citation);
+
+      return {
+        citationId: citation.citationId,
+        engineType: citation.engineType,
+        engineLabel: humanizeEngineType(citation.engineType),
+        reviewState: citation.reviewState,
+        adjudicationStatus: adjudication.status,
+        adjudicationLabel: adjudicationStatusLabel(adjudication.status),
+        action: adjudication.action ?? null,
+        actionLabel: adjudication.action
+          ? adjudicationActionLabel(adjudication.action)
+          : null,
+        visibility: adjudication.visibility ?? null,
+        visibilityLabel: adjudication.visibility
+          ? adjudicationVisibilityLabel(adjudication.visibility)
+          : null,
+        rationale: adjudication.rationale ?? null,
+        reviewedConclusion: adjudication.reviewedConclusion ?? null,
+        buyerExplanation: adjudication.buyerExplanation ?? null,
+        internalNotes: adjudication.internalNotes ?? null,
+        actorName: adjudication.actorName ?? null,
+        actorId: adjudication.actorUserId ?? null,
+        actedAt: adjudication.actedAt ?? null,
+        actedAtLabel: adjudication.actedAt
+          ? formatShortDate(adjudication.actedAt)
+          : null,
+        confidence:
+          typeof citation.confidence === "number" ? citation.confidence : null,
+        confidenceLabel:
+          typeof citation.confidence === "number"
+            ? `${formatPercent(citation.confidence)} source confidence`
+            : "Confidence unavailable",
+        generatedAt: citation.generatedAt ?? null,
+        generatedAtLabel: citation.generatedAt
+          ? formatShortDate(citation.generatedAt)
+          : null,
+        linkedClaimCount: linkedClaimsByCitation.get(citation.citationId) ?? 0,
+        auditTrail: (citation.adjudicationHistory ?? []).map((entry) => ({
+          action: entry.action,
+          actionLabel: adjudicationActionLabel(entry.action),
+          status: entry.status,
+          statusLabel: adjudicationStatusLabel(entry.status),
+          visibility: entry.visibility,
+          visibilityLabel: adjudicationVisibilityLabel(entry.visibility),
+          rationale: entry.rationale,
+          reviewedConclusion: entry.reviewedConclusion ?? null,
+          buyerExplanation: entry.buyerExplanation ?? null,
+          internalNotes: entry.internalNotes ?? null,
+          actorName: entry.actorName ?? null,
+          actorId: entry.actorUserId,
+          actedAt: entry.actedAt,
+          actedAtLabel: formatShortDate(entry.actedAt),
+        })),
+      };
+    })
     .sort((a, b) => {
-      if (a.reviewState === b.reviewState) {
+      if (a.adjudicationStatus === b.adjudicationStatus) {
         return a.engineLabel.localeCompare(b.engineLabel);
       }
 
-      const rank = { pending: 0, rejected: 1, approved: 2 } as const;
-      return rank[a.reviewState] - rank[b.reviewState];
+      const rank = {
+        pending: 0,
+        overridden: 1,
+        adjusted: 2,
+        approved: 3,
+      } as const;
+      return rank[a.adjudicationStatus] - rank[b.adjudicationStatus];
     });
 }
 
@@ -817,12 +958,20 @@ function summarizeAdjudication(
       if (item.reviewState === "pending") summary.pendingCount += 1;
       if (item.reviewState === "approved") summary.approvedCount += 1;
       if (item.reviewState === "rejected") summary.rejectedCount += 1;
+      if (item.visibility === "buyer_safe") summary.buyerSafeCount += 1;
+      if (item.visibility === "internal_only") summary.internalOnlyCount += 1;
+      if (item.adjudicationStatus === "adjusted") summary.adjustedCount += 1;
+      if (item.adjudicationStatus === "overridden") summary.overriddenCount += 1;
       return summary;
     },
     {
       pendingCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
+      buyerSafeCount: 0,
+      internalOnlyCount: 0,
+      adjustedCount: 0,
+      overriddenCount: 0,
     },
   );
 }
@@ -880,6 +1029,57 @@ function buildHeaderDescription(
   }
 
   return `${status.label}. We only surface a case once the inputs are safe to show, so this view stays explicit about what is still missing.`;
+}
+
+function resolveCurrentAdjudication(
+  citation: PropertyCaseCitationInput | undefined,
+): (AdvisoryAdjudicationSnapshot & { actorName?: string | null }) | {
+  status: AdvisoryAdjudicationStatus;
+  action: AdvisoryAdjudicationAction | null;
+  visibility: AdvisoryAdjudicationVisibility | null;
+  rationale?: string;
+  reviewedConclusion?: string;
+  buyerExplanation?: string;
+  internalNotes?: string;
+  actorUserId?: string;
+  actorName?: string | null;
+  actedAt?: string;
+} {
+  if (citation?.adjudication) {
+    return citation.adjudication;
+  }
+
+  if (citation?.reviewState === "approved") {
+    return {
+      status: "approved",
+      action: "approve",
+      visibility: "buyer_safe",
+    };
+  }
+
+  if (citation?.reviewState === "rejected") {
+    return {
+      status: "overridden",
+      action: "override",
+      visibility: "internal_only",
+    };
+  }
+
+  return {
+    status: "pending",
+    action: null,
+    visibility: null,
+  };
+}
+
+function resolveBuyerFacingAdjudication(
+  citation: PropertyCaseCitationInput | undefined,
+): AdvisoryAdjudicationSnapshot | undefined {
+  if (citation?.adjudication?.visibility !== "buyer_safe") {
+    return undefined;
+  }
+
+  return citation.adjudication;
 }
 
 function buildCitationGuardrails(

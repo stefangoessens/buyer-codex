@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { getCurrentUser } from "./lib/session";
 import {
   composeOverview,
@@ -52,6 +52,39 @@ export const getOverview = query({
         .withIndex("by_propertyId", (q) => q.eq("propertyId", dealRoom.propertyId))
         .collect(),
     ]);
+
+    const adjudicationHistoryEntries = await Promise.all(
+      engineDocs.map(
+        async (doc): Promise<[string, Array<Doc<"aiOutputAdjudications">>]> => [
+          String(doc._id),
+          await ctx.db
+            .query("aiOutputAdjudications")
+            .withIndex("by_engineOutputId_and_actedAt", (q) =>
+              q.eq("engineOutputId", doc._id),
+            )
+            .collect(),
+        ],
+      ),
+    );
+    const adjudicationHistoryByOutput = new Map(adjudicationHistoryEntries);
+    const actorIds = new Set<string>();
+    for (const doc of engineDocs) {
+      if (doc.adjudication?.actorUserId) {
+        actorIds.add(String(doc.adjudication.actorUserId));
+      }
+      for (const entry of adjudicationHistoryByOutput.get(String(doc._id)) ?? []) {
+        actorIds.add(String(entry.actorUserId));
+      }
+    }
+    const actorNameEntries = await Promise.all(
+      Array.from(actorIds).map(
+        async (actorId): Promise<[string, string | null]> => [
+          actorId,
+          (await ctx.db.get(actorId as Id<"users">))?.name ?? null,
+        ],
+      ),
+    );
+    const actorNameById = new Map(actorNameEntries);
 
     const latestByType = new Map<string, Doc<"aiEngineOutputs">>();
     for (const doc of engineDocs) {
@@ -145,6 +178,21 @@ export const getOverview = query({
       confidence: doc.confidence,
       generatedAt: doc.generatedAt,
       reviewState: doc.reviewState,
+      adjudication: doc.adjudication
+        ? {
+            ...doc.adjudication,
+            actorUserId: String(doc.adjudication.actorUserId),
+            actorName:
+              actorNameById.get(String(doc.adjudication.actorUserId)) ?? null,
+          }
+        : null,
+      adjudicationHistory: (
+        adjudicationHistoryByOutput.get(String(doc._id)) ?? []
+      ).map((entry) => ({
+        ...entry,
+        actorUserId: String(entry.actorUserId),
+        actorName: actorNameById.get(String(entry.actorUserId)) ?? null,
+      })),
     }));
     return buildPropertyCaseOverview({
       dealRoomId: dealRoom._id,
