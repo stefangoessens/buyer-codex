@@ -14,6 +14,10 @@ import {
   type PropertyCaseCoverageInput,
 } from "../src/lib/dealroom/property-case-overview";
 import type { PropertyDossier } from "../src/lib/dossier/types";
+import {
+  loadBuyerPreferenceMemorySnapshot,
+  toBuyerPreferencePropertyInput,
+} from "./lib/buyerPreferenceMemory";
 
 export const getOverview = query({
   args: { dealRoomId: v.id("dealRooms") },
@@ -149,6 +153,10 @@ export const getOverview = query({
       .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
       .map((doc) => parsePropertyDossier(doc.payload))
       .find((doc): doc is PropertyDossier => Boolean(doc));
+    const buyerPreferenceMemory = await loadBuyerPreferenceMemorySnapshot(
+      ctx,
+      dealRoom.buyerId,
+    );
 
     const coverage: PropertyCaseCoverageInput[] = [
       {
@@ -209,6 +217,8 @@ export const getOverview = query({
           sqftLiving: property.sqftLiving,
           updatedAt: property.updatedAt,
         },
+      buyerPreferenceMemory,
+      buyerPreferenceProperty: toBuyerPreferencePropertyInput(property),
       caseRecord: latestCase
         ? {
             generatedAt: latestCase.generatedAt,

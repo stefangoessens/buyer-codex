@@ -7,6 +7,7 @@ import {
   listInternalPostTourObservations,
   storePostTourObservation,
 } from "./lib/tourPostObservations";
+import { rebuildBuyerPreferenceMemory } from "./lib/buyerPreferenceMemory";
 
 const postTourSentimentValidator = v.union(
   v.literal("positive"),
@@ -235,6 +236,8 @@ export const submitPostTourObservation = mutation({
       }),
       timestamp: now,
     });
+
+    await rebuildBuyerPreferenceMemory(ctx, tour.buyerId);
 
     return observationId;
   },

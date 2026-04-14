@@ -495,6 +495,7 @@ export default defineSchema({
     .index("by_tourRequestId", ["tourRequestId"])
     .index("by_propertyId", ["propertyId"])
     .index("by_buyerId", ["buyerId"])
+    .index("by_buyerId_and_createdAt", ["buyerId", "createdAt"])
     .index("by_tourId_and_createdAt", ["tourId", "createdAt"]),
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2231,6 +2232,77 @@ export default defineSchema({
       "artifact",
       "submittedAt",
     ]),
+
+  buyerPreferenceMemories: defineTable({
+    buyerId: v.id("users"),
+    explicitPreferences: v.object({
+      preferredAreas: v.array(v.string()),
+      propertyTypes: v.array(v.string()),
+      mustHaves: v.array(v.string()),
+      dealbreakers: v.array(v.string()),
+    }),
+    history: v.object({
+      state: v.union(
+        v.literal("cold_start"),
+        v.literal("thin_history"),
+        v.literal("evolving"),
+        v.literal("durable"),
+      ),
+      eventCount: v.number(),
+      distinctPropertyCount: v.number(),
+      lastEventAt: v.optional(v.string()),
+      halfLifeDays: v.number(),
+      qualifyingSignalCount: v.number(),
+    }),
+    inferredSignals: v.array(
+      v.object({
+        key: v.string(),
+        category: v.union(
+          v.literal("property_type"),
+          v.literal("hoa_burden"),
+          v.literal("flood_risk"),
+          v.literal("price_band"),
+          v.literal("amenity"),
+          v.literal("area"),
+        ),
+        value: v.string(),
+        label: v.string(),
+        propertyLabel: v.string(),
+        direction: v.union(v.literal("prefer"), v.literal("avoid")),
+        status: v.union(
+          v.literal("suppressed"),
+          v.literal("emerging"),
+          v.literal("durable"),
+          v.literal("review"),
+        ),
+        confidence: v.number(),
+        decayWeight: v.number(),
+        netScore: v.number(),
+        positiveWeight: v.number(),
+        negativeWeight: v.number(),
+        distinctPropertyCount: v.number(),
+        firstObservedAt: v.string(),
+        lastObservedAt: v.string(),
+        statusReason: v.string(),
+        provenance: v.array(
+          v.object({
+            propertyId: v.id("properties"),
+            occurredAt: v.string(),
+            eventKind: v.union(
+              v.literal("watchlist_saved"),
+              v.literal("tour_feedback"),
+              v.literal("advisory_feedback"),
+            ),
+            sentiment: v.union(v.literal("positive"), v.literal("negative")),
+            weight: v.number(),
+            summary: v.string(),
+          }),
+        ),
+      }),
+    ),
+    updatedAt: v.string(),
+    modelVersion: v.string(),
+  }).index("by_buyerId", ["buyerId"]),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PROPERTY DOSSIERS (KIN-1021)

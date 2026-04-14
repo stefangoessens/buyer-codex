@@ -158,6 +158,8 @@ function summarizePropertyDirection(
   const downsideCount = overview.decisionMemo.downside.items.length;
   const upsideCount = overview.decisionMemo.upside.items.length;
   const marketPosition = overview.marketReality?.position.code ?? "unavailable";
+  const buyerFitScore = overview.buyerFit.score ?? 0;
+  const buyerFitActive = overview.buyerFit.shouldInfluenceRecommendations;
 
   if (
     confidence >= 0.72 &&
@@ -188,6 +190,32 @@ function summarizePropertyDirection(
     };
   }
 
+  if (buyerFitActive && buyerFitScore <= -0.3) {
+    return {
+      direction: confidence >= 0.68 ? "negative" : "caution",
+      primaryReason:
+        "The learned fit signal is leaning away from this home, even before you add more action pressure.",
+      secondaryReason:
+        "Recent buyer behavior keeps repeating against features that show up in this property.",
+      reasons: [
+        {
+          id: "buyer-fit-conflict",
+          title: "Repeated behavior leans away from this property",
+          body:
+            overview.buyerFit.conflictingReasons[0]?.explanation ??
+            overview.buyerFit.summary,
+          source: "property",
+        },
+        {
+          id: "buyer-fit-memory-state",
+          title: "The fit memory is strong enough to use",
+          body: `${overview.buyerFit.title}. ${overview.buyerFit.scoreLabel}.`,
+          source: "confidence",
+        },
+      ],
+    };
+  }
+
   if (verdict === "worth_pursuing" && confidence >= 0.68) {
     return {
       direction: "positive",
@@ -208,6 +236,18 @@ function summarizePropertyDirection(
           body: `The current case is at ${overview.overallConfidenceLabel.toLowerCase()}.`,
           source: "confidence",
         },
+        ...(buyerFitActive && buyerFitScore >= 0.3
+          ? [
+              {
+                id: "buyer-fit-supports",
+                title: "The buyer's repeated behavior also supports it",
+                body:
+                  overview.buyerFit.supportingReasons[0]?.explanation ??
+                  overview.buyerFit.summary,
+                source: "property" as const,
+              },
+            ]
+          : []),
       ],
     };
   }

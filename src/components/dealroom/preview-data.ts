@@ -259,10 +259,69 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       },
     ],
   },
+  buyerFit: {
+    memoryState: "durable",
+    title: "Fit memory is durable",
+    summary:
+      "This property lines up with patterns the buyer has repeatedly favored, so the recommendation can lean into that fit.",
+    score: 0.48,
+    scoreLabel: "Stronger fit than recent history",
+    explicitSignals: [
+      "single-family",
+      "Miami",
+      "Must have: pool",
+      "Dealbreaker: HOA",
+    ],
+    inferredSignals: [
+      {
+        key: "property_type:single_family",
+        label: "single-family homes",
+        direction: "prefer",
+        confidence: 0.78,
+        confidenceLabel: "High confidence",
+        status: "durable",
+        statusLabel: "Durable",
+        statusReason: "Repeated behavior keeps pointing prefer.",
+        evidenceCount: 3,
+        lastObservedAt: "2026-04-13T19:00:00.000Z",
+      },
+      {
+        key: "hoa_burden:none",
+        label: "no HOA fees",
+        direction: "prefer",
+        confidence: 0.63,
+        confidenceLabel: "Medium confidence",
+        status: "emerging",
+        statusLabel: "Emerging",
+        statusReason: "There is a directional pattern, but the history is still limited.",
+        evidenceCount: 2,
+        lastObservedAt: "2026-04-12T16:20:00.000Z",
+      },
+    ],
+    supportingReasons: [
+      {
+        source: "inferred",
+        kind: "supports",
+        label: "Usually prefers single-family homes",
+        explanation:
+          "Your recent behavior keeps leaning toward single-family homes.",
+        confidence: 0.78,
+        status: "durable",
+      },
+      {
+        source: "explicit",
+        kind: "supports",
+        label: "Matches an explicit must-have",
+        explanation: "You explicitly asked for a pool.",
+      },
+    ],
+    conflictingReasons: [],
+    shouldInfluenceRecommendations: true,
+  },
   decisionMemo: {
     title: "Why this home / why not this home",
     summary:
-      "Offer prep. The current memo has enough evidence to show the upside, the downside, and a clear recommendation in one place.",
+      "Offer prep. The current memo has enough evidence to show the upside, the downside, a clear recommendation, and how this home fits the buyer's repeated patterns.",
     upside: {
       title: "Why this home could be worth pursuing",
       summary: "These points are carrying the buyer-safe case right now.",
@@ -366,7 +425,7 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       verdict: "pursue_with_caution",
       label: "Current recommendation",
       body:
-        "Treat the home as worth pursuing only with a disciplined opener around $928,000. Use this as an illustrative starting point and confirm the final strategy with your broker.",
+        "Treat the home as worth pursuing only with a disciplined opener around $928,000. Use this as an illustrative starting point and confirm the final strategy with your broker. It also looks like a stronger fit than the homes this buyer usually favors.",
       confidenceLabel: "73% action confidence",
       riskLabel: "Medium risk",
       openingPriceLabel: "$928,000",
