@@ -286,6 +286,7 @@ export const ask = action({
         prompt: string;
         systemPrompt?: string;
         version: string;
+        model: string;
       } | null = await ctx.runQuery(internal.promptRegistry.getByVersion, {
         engineType: "copilot",
         promptKey,
@@ -297,6 +298,7 @@ export const ask = action({
           prompt: row.prompt,
           systemPrompt: row.systemPrompt ?? "",
           version: row.version,
+          model: row.model,
         };
       }
 
@@ -308,6 +310,7 @@ export const ask = action({
         prompt: fallback.prompt,
         systemPrompt: fallback.systemPrompt ?? "",
         version: fallback.version,
+        model: fallback.model,
       };
     };
 
@@ -327,6 +330,11 @@ export const ask = action({
     const llmClassify = async (question: string) => {
       const result = await gateway({
         engineType: "copilot",
+        prompt: {
+          promptKey: "classifier",
+          version: classifierPrompt.version,
+          model: classifierPrompt.model,
+        },
         messages: [
           { role: "system", content: classifierPrompt.systemPrompt },
           {
@@ -360,17 +368,28 @@ export const ask = action({
       engineRef: { snippet: string; engine: string },
       question: string,
     ) => {
-      const promptKeyByIntent: Record<string, keyof typeof responsePrompts> = {
+      const promptSlotByIntent: Record<string, keyof typeof responsePrompts> = {
         pricing: "pricing",
         comps: "comps",
         costs: "costs",
         leverage: "leverage",
         offer: "offer",
       };
-      const prompt =
-        responsePrompts[promptKeyByIntent[intent] ?? "pricing"];
+      const promptKeyByIntent: Record<string, string> = {
+        pricing: "response_pricing",
+        comps: "response_comps",
+        costs: "response_costs",
+        leverage: "response_leverage",
+        offer: "response_offer",
+      };
+      const prompt = responsePrompts[promptSlotByIntent[intent] ?? "pricing"];
       const result = await gateway({
         engineType: "copilot",
+        prompt: {
+          promptKey: promptKeyByIntent[intent] ?? "response_pricing",
+          version: prompt.version,
+          model: prompt.model,
+        },
         messages: [
           { role: "system", content: prompt.systemPrompt },
           {
@@ -396,6 +415,11 @@ export const ask = action({
     const llmGuardedGeneral = async (question: string, dealContext: string) => {
       const result = await gateway({
         engineType: "copilot",
+        prompt: {
+          promptKey: "guarded_general",
+          version: guardedGeneralPrompt.version,
+          model: guardedGeneralPrompt.model,
+        },
         messages: [
           { role: "system", content: guardedGeneralPrompt.systemPrompt },
           {

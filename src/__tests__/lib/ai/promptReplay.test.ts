@@ -85,6 +85,15 @@ describe("replayPromptExecution", () => {
     expect(result.modelId).toBe("claude-sonnet-4-20250514");
     expect(parsed.fairValue.value).toBe(480_000);
     expect(result.citations).toEqual(["zillow", "redfin"]);
+    expect(invokeGateway).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: {
+          promptKey: "default",
+          version: "v-pricing",
+          model: "claude-sonnet-4-20250514",
+        },
+      }),
+    );
   });
 });
 

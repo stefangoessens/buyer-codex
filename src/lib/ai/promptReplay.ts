@@ -90,7 +90,14 @@ export async function replayPromptExecution(args: {
     case "pricing": {
       const input = parseInputSnapshot<PricingInput>(args.inputSnapshot);
       const request = buildPricingRequest(input, prompt.prompt, prompt.systemPrompt);
-      const response = await args.invokeGateway(request);
+      const response = await args.invokeGateway({
+        ...request,
+        prompt: {
+          promptKey: prompt.promptKey,
+          version: prompt.version,
+          model: prompt.model,
+        },
+      });
       if (!response.success) {
         throw new Error(`Pricing replay failed: ${response.error.message}`);
       }

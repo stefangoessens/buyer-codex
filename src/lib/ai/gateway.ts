@@ -1,175 +1,318 @@
+import {
+  DEFAULT_GATEWAY_PROVIDERS,
+  createGatewayProviderError,
+  normalizeProviderError,
+} from "./providers";
 import type {
   GatewayConfig,
-  GatewayMessage,
+  GatewayError,
+  GatewayExecutionMetadata,
+  GatewayProvider,
+  GatewayProviderError,
+  GatewayProviderId,
+  GatewayProviderMap,
+  GatewayProviderRequest,
   GatewayRequest,
   GatewayResponse,
   GatewayResult,
 } from "./types";
 
+const DEFAULT_PROVIDER_MODELS: Record<GatewayProviderId, string> = {
+  anthropic: "claude-sonnet-4-20250514",
+  openai: "gpt-4o",
+};
+
 const DEFAULT_CONFIG: GatewayConfig = {
   primaryProvider: "anthropic",
   fallbackProvider: "openai",
-  primaryModel: "claude-sonnet-4-20250514",
-  fallbackModel: "gpt-4o",
+  primaryModel: DEFAULT_PROVIDER_MODELS.anthropic,
+  fallbackModel: DEFAULT_PROVIDER_MODELS.openai,
   maxRetries: 1,
   timeoutMs: 30000,
 };
 
 /** Per-engine config overrides */
 const ENGINE_CONFIGS: Partial<Record<string, Partial<GatewayConfig>>> = {
-  copilot: { primaryModel: "claude-sonnet-4-20250514", timeoutMs: 15000 },
-  doc_parser: { primaryModel: "claude-sonnet-4-20250514", timeoutMs: 60000 },
+  copilot: { primaryModel: DEFAULT_PROVIDER_MODELS.anthropic, timeoutMs: 15000 },
+  doc_parser: {
+    primaryModel: DEFAULT_PROVIDER_MODELS.anthropic,
+    timeoutMs: 60000,
+  },
 };
 
-type ProviderInvoker = (
-  messages: GatewayMessage[],
-  model: string,
-  maxTokens: number,
-  temperature: number,
-) => Promise<GatewayResponse>;
+export type GatewayDependencies = GatewayProviderMap;
 
-export interface GatewayDependencies {
-  anthropic: ProviderInvoker;
-  openai: ProviderInvoker;
+interface GatewayExecutionConfig {
+  primaryProvider: GatewayProviderId;
+  fallbackProvider?: GatewayProviderId;
+  primaryModel: string;
+  fallbackModel?: string;
+  maxRetries: number;
+  timeoutMs: number;
 }
 
-function isRetryableError(error: unknown): boolean {
-  if (error instanceof Error) {
-    const msg = error.message.toLowerCase();
-    return (
-      msg.includes("rate limit") ||
-      msg.includes("429") ||
-      msg.includes("500") ||
-      msg.includes("502") ||
-      msg.includes("503") ||
-      msg.includes("timeout") ||
-      msg.includes("econnreset") ||
-      msg.includes("fetch failed")
-    );
+interface GatewayExecutionTarget {
+  provider: GatewayProviderId;
+  model: string;
+  attempts: number;
+  isFallback: boolean;
+  fallbackFrom: GatewayProviderId | null;
+}
+
+function inferProviderFromModel(model: string | undefined): GatewayProviderId | null {
+  if (!model) {
+    return null;
   }
-  return false;
+
+  const normalized = model.toLowerCase();
+  if (normalized.startsWith("claude")) {
+    return "anthropic";
+  }
+  if (
+    normalized.startsWith("gpt") ||
+    normalized.startsWith("o1") ||
+    normalized.startsWith("o3") ||
+    normalized.startsWith("o4")
+  ) {
+    return "openai";
+  }
+  return null;
 }
 
-async function callWithTimeout(
-  provider: keyof GatewayDependencies,
-  model: string,
-  messages: GatewayRequest["messages"],
-  maxTokens: number,
-  temperature: number,
-  timeoutMs: number,
-  dependencies: GatewayDependencies,
-) {
-  const call = dependencies[provider](
-    messages,
-    model,
-    maxTokens,
-    temperature,
-  );
-
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`timeout after ${timeoutMs}ms`)), timeoutMs)
-  );
-
-  return Promise.race([call, timeout]);
+function alternateProvider(
+  provider: GatewayProviderId,
+): GatewayProviderId | undefined {
+  return provider === "anthropic" ? "openai" : "anthropic";
 }
 
-async function loadGatewayDependencies(): Promise<GatewayDependencies> {
-  const providers = await import("./providers");
+function resolveGatewayConfig(request: GatewayRequest): GatewayExecutionConfig {
+  const engineOverrides = ENGINE_CONFIGS[request.engineType] ?? {};
+  const merged = { ...DEFAULT_CONFIG, ...engineOverrides, ...request.config };
+  const promptModel = request.prompt?.model;
+  const promptProvider = inferProviderFromModel(promptModel);
+
+  const primaryProvider =
+    request.config?.primaryProvider ??
+    promptProvider ??
+    merged.primaryProvider;
+  const primaryModel =
+    request.config?.primaryModel ??
+    (request.config?.primaryProvider ? undefined : promptModel) ??
+    merged.primaryModel ??
+    DEFAULT_PROVIDER_MODELS[primaryProvider];
+
+  const requestedFallbackProvider =
+    request.config?.fallbackProvider ?? merged.fallbackProvider;
+  const fallbackProvider =
+    requestedFallbackProvider && requestedFallbackProvider !== primaryProvider
+      ? requestedFallbackProvider
+      : alternateProvider(primaryProvider);
+  const fallbackModel = fallbackProvider
+    ? request.config?.fallbackModel ??
+      (fallbackProvider === merged.fallbackProvider
+        ? merged.fallbackModel
+        : undefined) ??
+      DEFAULT_PROVIDER_MODELS[fallbackProvider]
+    : undefined;
+
   return {
-    anthropic: providers.callAnthropic,
-    openai: providers.callOpenAI,
+    primaryProvider,
+    fallbackProvider,
+    primaryModel,
+    fallbackModel,
+    maxRetries: merged.maxRetries ?? DEFAULT_CONFIG.maxRetries ?? 1,
+    timeoutMs: merged.timeoutMs ?? DEFAULT_CONFIG.timeoutMs ?? 30000,
   };
+}
+
+function buildExecutionTargets(
+  config: GatewayExecutionConfig,
+): GatewayExecutionTarget[] {
+  const targets: GatewayExecutionTarget[] = [
+    {
+      provider: config.primaryProvider,
+      model: config.primaryModel,
+      attempts: config.maxRetries + 1,
+      isFallback: false,
+      fallbackFrom: null,
+    },
+  ];
+
+  if (config.fallbackProvider && config.fallbackModel) {
+    targets.push({
+      provider: config.fallbackProvider,
+      model: config.fallbackModel,
+      attempts: 1,
+      isFallback: true,
+      fallbackFrom: config.primaryProvider,
+    });
+  }
+
+  return targets;
+}
+
+function executionMetadata(request: GatewayRequest): GatewayExecutionMetadata {
+  return {
+    engineType: request.engineType,
+    dealRoomId: request.dealRoomId ?? null,
+    promptKey: request.prompt?.promptKey ?? null,
+    promptVersion: request.prompt?.version ?? null,
+  };
+}
+
+function buildProviderRequest(args: {
+  request: GatewayRequest;
+  target: GatewayExecutionTarget;
+  attempt: number;
+  timeoutMs: number;
+}): GatewayProviderRequest {
+  return {
+    metadata: executionMetadata(args.request),
+    messages: args.request.messages,
+    model: args.target.model,
+    maxTokens: args.request.maxTokens ?? 4096,
+    temperature: args.request.temperature ?? 0,
+    timeoutMs: args.timeoutMs,
+    attempt: args.attempt,
+    isFallback: args.target.isFallback,
+    fallbackFrom: args.target.fallbackFrom,
+  };
+}
+
+async function executeWithTimeout(
+  provider: GatewayProvider,
+  request: GatewayProviderRequest,
+): Promise<GatewayResponse> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(
+        createGatewayProviderError({
+          provider: provider.id,
+          code: "timeout",
+          message: `timeout after ${request.timeoutMs}ms`,
+          retryable: true,
+        }),
+      );
+    }, request.timeoutMs);
+  });
+
+  try {
+    return await Promise.race([provider.execute(request), timeoutPromise]);
+  } catch (error) {
+    throw normalizeProviderError(provider.id, error);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
 }
 
 async function resolveGatewayDependencies(
   dependencies?: Partial<GatewayDependencies>,
 ): Promise<GatewayDependencies> {
-  if (dependencies?.anthropic && dependencies?.openai) {
-    return {
-      anthropic: dependencies.anthropic,
-      openai: dependencies.openai,
-    };
-  }
-
-  const defaults = await loadGatewayDependencies();
   return {
-    anthropic: dependencies?.anthropic ?? defaults.anthropic,
-    openai: dependencies?.openai ?? defaults.openai,
+    anthropic: dependencies?.anthropic ?? DEFAULT_GATEWAY_PROVIDERS.anthropic,
+    openai: dependencies?.openai ?? DEFAULT_GATEWAY_PROVIDERS.openai,
+  };
+}
+
+function withFallbackUsage(
+  response: GatewayResponse,
+  isFallback: boolean,
+): GatewayResponse {
+  return {
+    ...response,
+    usage: {
+      ...response.usage,
+      fallbackUsed: isFallback,
+    },
+  };
+}
+
+function providerFailureToGatewayError(
+  error: GatewayProviderError,
+): GatewayError {
+  return {
+    code: error.code,
+    message: error.message,
+    provider: error.provider,
+    statusCode: error.statusCode,
   };
 }
 
 /**
  * Send a request through the AI gateway.
- * Routes to primary provider, fails over to fallback on retryable errors.
+ * Routes to the prompt- or config-selected primary provider, retries it when
+ * allowed, then fails over to the alternate provider.
  * Returns typed result with usage/cost tracking.
  */
 export async function gateway(
   request: GatewayRequest,
   dependencies?: Partial<GatewayDependencies>,
 ): Promise<GatewayResult> {
-  const engineOverrides = ENGINE_CONFIGS[request.engineType] ?? {};
-  const config = { ...DEFAULT_CONFIG, ...engineOverrides, ...request.config };
   const resolvedDependencies = await resolveGatewayDependencies(dependencies);
+  const config = resolveGatewayConfig(request);
+  const targets = buildExecutionTargets(config);
 
-  const maxTokens = request.maxTokens ?? 4096;
-  const temperature = request.temperature ?? 0;
-  const timeoutMs = config.timeoutMs ?? 30000;
-  const maxRetries = config.maxRetries ?? 1;
+  let primaryFailure: GatewayProviderError | null = null;
+  let fallbackFailure: GatewayProviderError | null = null;
 
-  // Try primary provider with retries
-  let lastPrimaryError: unknown;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await callWithTimeout(
-        config.primaryProvider,
-        config.primaryModel,
-        request.messages,
-        maxTokens,
-        temperature,
-        timeoutMs,
-        resolvedDependencies,
-      );
-      return { success: true, data: response };
-    } catch (err) {
-      lastPrimaryError = err;
-      if (!isRetryableError(err) || attempt === maxRetries) break;
+  for (const target of targets) {
+    const provider = resolvedDependencies[target.provider];
+    let lastError: GatewayProviderError | null = null;
+
+    for (let attempt = 1; attempt <= target.attempts; attempt += 1) {
+      const providerRequest = buildProviderRequest({
+        request,
+        target,
+        attempt,
+        timeoutMs: config.timeoutMs,
+      });
+
+      try {
+        const response = await executeWithTimeout(provider, providerRequest);
+        return {
+          success: true,
+          data: withFallbackUsage(response, target.isFallback),
+        };
+      } catch (error) {
+        lastError = normalizeProviderError(target.provider, error);
+        if (!lastError.retryable || attempt === target.attempts) {
+          break;
+        }
+      }
+    }
+
+    if (target.isFallback) {
+      fallbackFailure = lastError;
+    } else {
+      primaryFailure = lastError;
     }
   }
 
-  // If no fallback configured, fail
-  if (!config.fallbackProvider || !config.fallbackModel) {
+  if (!fallbackFailure) {
     return {
       success: false,
-      error: {
-        code: "provider_error",
-        message: lastPrimaryError instanceof Error ? lastPrimaryError.message : "Unknown error",
-        provider: config.primaryProvider,
-      },
+      error: providerFailureToGatewayError(
+        primaryFailure ??
+          createGatewayProviderError({
+            provider: config.primaryProvider,
+            code: "provider_error",
+            message: "Gateway execution failed before reaching a provider",
+            retryable: false,
+          }),
+      ),
     };
   }
 
-  // Try fallback provider
-  try {
-    const response = await callWithTimeout(
-      config.fallbackProvider,
-      config.fallbackModel,
-      request.messages,
-      maxTokens,
-      temperature,
-      timeoutMs,
-      resolvedDependencies,
-    );
-    response.usage.fallbackUsed = true;
-    return { success: true, data: response };
-  } catch (fallbackError) {
-    return {
-      success: false,
-      error: {
-        code: "all_providers_failed",
-        message: `Primary (${config.primaryProvider}): ${lastPrimaryError instanceof Error ? lastPrimaryError.message : "unknown"}. Fallback (${config.fallbackProvider}): ${fallbackError instanceof Error ? fallbackError.message : "unknown"}`,
-      },
-    };
-  }
+  return {
+    success: false,
+    error: {
+      code: "all_providers_failed",
+      message: `Primary (${config.primaryProvider}): ${primaryFailure?.message ?? "unknown"}. Fallback (${config.fallbackProvider}): ${fallbackFailure.message}`,
+    },
+  };
 }
 
 export { DEFAULT_CONFIG, ENGINE_CONFIGS };

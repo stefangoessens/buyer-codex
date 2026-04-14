@@ -65,8 +65,14 @@ export const runPricingEngine = internalAction({
     const inputSnapshot = JSON.stringify(input);
 
     const request = buildPricingRequest(input, prompt.prompt, prompt.systemPrompt);
-    const result = await gateway(request);
-
+    const result = await gateway({
+      ...request,
+      prompt: {
+        promptKey: "default",
+        version: prompt.version,
+        model: prompt.model,
+      },
+    });
     if (!result.success) return null;
 
     const { consensus, spread, sources } = computeConsensus(input);

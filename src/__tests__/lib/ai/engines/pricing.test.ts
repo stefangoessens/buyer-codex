@@ -7,6 +7,17 @@ import {
   parsePricingResponse,
   spreadConfidenceAdjustment,
 } from "@/lib/ai/engines/pricing";
+import type { GatewayProvider } from "@/lib/ai/types";
+
+function mockProvider(
+  id: GatewayProvider["id"],
+  implementation: GatewayProvider["execute"],
+): GatewayProvider {
+  return {
+    id,
+    execute: implementation,
+  };
+}
 
 describe("computeConsensus", () => {
   it("computes median of all three estimates", () => {
@@ -197,6 +208,7 @@ describe("buildPricingRequest", () => {
 
 describe("executePricingAnalysis", () => {
   it("routes the pricing engine through the gateway and returns usage metadata", async () => {
+    let capturedRequest: Parameters<GatewayProvider["execute"]>[0] | null = null;
     const result = await executePricingAnalysis({
       input: {
         propertyId: "p1",
@@ -212,29 +224,44 @@ describe("executePricingAnalysis", () => {
       },
       promptTemplate:
         "{\"fairValue\": 480000, \"likelyAccepted\": 490000, \"strongOpener\": 470000, \"walkAway\": 460000}",
+      promptKey: "default",
+      promptVersion: "v-pricing",
+      promptModel: "claude-sonnet-4-20250514",
       dealRoomId: "deal_room_1",
       gatewayDependencies: {
-        anthropic: async () => ({
-          content:
-            "{\"fairValue\": 480000, \"likelyAccepted\": 490000, \"strongOpener\": 470000, \"walkAway\": 460000}",
-          usage: {
-            inputTokens: 50,
-            outputTokens: 20,
-            model: "claude-sonnet-4-20250514",
-            provider: "anthropic",
-            latencyMs: 90,
-            estimatedCost: 0.002,
-            fallbackUsed: false,
-          },
+        anthropic: mockProvider("anthropic", async (request) => {
+          capturedRequest = request;
+          return {
+            content:
+              "{\"fairValue\": 480000, \"likelyAccepted\": 490000, \"strongOpener\": 470000, \"walkAway\": 460000}",
+            usage: {
+              inputTokens: 50,
+              outputTokens: 20,
+              model: request.model,
+              provider: "anthropic",
+              latencyMs: 90,
+              estimatedCost: 0.002,
+              fallbackUsed: false,
+            },
+          };
         }),
-        openai: async () => {
+        openai: mockProvider("openai", async () => {
           throw new Error("should not be called");
-        },
+        }),
       },
     });
 
     expect(result.output.fairValue.value).toBe(480000);
     expect(result.usage.model).toBe("claude-sonnet-4-20250514");
     expect(result.usage.provider).toBe("anthropic");
+    expect(capturedRequest).toMatchObject({
+      model: "claude-sonnet-4-20250514",
+      metadata: {
+        engineType: "pricing",
+        dealRoomId: "deal_room_1",
+        promptKey: "default",
+        promptVersion: "v-pricing",
+      },
+    });
   });
 });
