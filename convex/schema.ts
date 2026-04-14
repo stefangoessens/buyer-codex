@@ -732,6 +732,70 @@ export default defineSchema({
     .index("by_propertyId_and_actedAt", ["propertyId", "actedAt"])
     .index("by_dealRoomId_and_actedAt", ["dealRoomId", "actedAt"]),
 
+  adjudicationCalibrationRecords: defineTable({
+    propertyId: v.id("properties"),
+    dealRoomId: v.union(v.id("dealRooms"), v.null()),
+    propertyCaseId: v.union(v.id("propertyCases"), v.null()),
+    engineOutputId: v.id("aiEngineOutputs"),
+    adjudicationId: v.id("aiOutputAdjudications"),
+    engineType: v.string(),
+    action: v.union(v.literal("adjust"), v.literal("override")),
+    visibility: aiOutputAdjudicationVisibility,
+    reasonCategory: v.union(brokerOverrideReasonCategory, v.null()),
+    outputConfidence: v.number(),
+    confidenceBucket: v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high"),
+    ),
+    promptVersion: v.string(),
+    modelId: v.string(),
+    reviewStateBefore: aiReviewState,
+    reviewStateAfter: aiReviewState,
+    confidenceSignal: v.union(
+      v.literal("review_required"),
+      v.literal("confidence_overstated"),
+    ),
+    recommendationSignal: v.union(
+      v.literal("not_applicable"),
+      v.literal("recommendation_adjusted"),
+      v.literal("recommendation_overridden"),
+    ),
+    revisionType: v.union(
+      v.literal("rationale_only"),
+      v.literal("buyer_explanation_only"),
+      v.literal("reviewed_conclusion"),
+    ),
+    calibrationTargets: v.array(
+      v.union(v.literal("confidence"), v.literal("recommendation")),
+    ),
+    linkedClaimCount: v.number(),
+    linkedClaimTopics: v.array(
+      v.union(
+        v.literal("pricing"),
+        v.literal("comps"),
+        v.literal("days_on_market"),
+        v.literal("leverage"),
+        v.literal("offer_recommendation"),
+      ),
+    ),
+    recommendationLinkedClaimCount: v.number(),
+    recommendationRelevant: v.boolean(),
+    reviewedConclusionPresent: v.boolean(),
+    buyerExplanationPresent: v.boolean(),
+    internalNotesPresent: v.boolean(),
+    generatedAt: v.string(),
+    adjudicatedAt: v.string(),
+    reviewLatencyMs: v.number(),
+  })
+    .index("by_propertyId_and_adjudicatedAt", ["propertyId", "adjudicatedAt"])
+    .index("by_dealRoomId_and_adjudicatedAt", ["dealRoomId", "adjudicatedAt"])
+    .index("by_engineOutputId_and_adjudicatedAt", [
+      "engineOutputId",
+      "adjudicatedAt",
+    ])
+    .index("by_adjudicationId", ["adjudicationId"]),
+
   pricingCalibrationRecords: defineTable({
     propertyId: v.id("properties"),
     engineOutputId: v.id("aiEngineOutputs"),
