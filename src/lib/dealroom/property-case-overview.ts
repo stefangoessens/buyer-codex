@@ -50,6 +50,13 @@ import {
   type LocalMarketRealityView,
 } from "@/lib/dealroom/local-market-reality";
 import type { PropertyMarketContext } from "@/lib/enrichment/types";
+import {
+  buildBuyerPreferenceFitView,
+  buildEmptyBuyerPreferenceMemory,
+  type BuyerPreferenceFitView,
+  type BuyerPreferenceMemorySnapshot,
+  type BuyerPreferencePropertyInput,
+} from "@/lib/buyerPreferenceMemory";
 
 export type CoverageEngineKey = "pricing" | "comps" | "leverage" | "offer";
 export type PropertyCaseOverviewVariant = "buyer_safe" | "internal";
@@ -98,6 +105,8 @@ export interface BuildPropertyCaseOverviewInput {
     DossierPropertyRecord,
     "daysOnMarket" | "sqftLiving" | "priceReductions" | "updatedAt"
   > | null;
+  buyerPreferenceMemory?: BuyerPreferenceMemorySnapshot | null;
+  buyerPreferenceProperty?: BuyerPreferencePropertyInput | null;
   viewerRole: "buyer" | "broker" | "admin";
 }
 
@@ -151,6 +160,45 @@ export interface BuyerSafeDecisionMemoView {
   unknowns: DecisionMemoSectionView;
   unresolvedRisks: DecisionMemoSectionView;
   recommendation: DecisionMemoRecommendationView;
+}
+
+export interface ClientReadySummarySectionView {
+  title: string;
+  summary: string;
+  items: DecisionMemoItemView[];
+}
+
+export interface ClientReadySummaryNextStepView
+  extends DecisionMemoItemView {}
+
+export interface ClientReadySummaryArtifact {
+  title: string;
+  summary: string;
+  whatMattersMost: ClientReadySummarySectionView;
+  attractive: ClientReadySummarySectionView;
+  riskyOrUncertain: ClientReadySummarySectionView;
+  recommendation: DecisionMemoRecommendationView;
+  nextSteps: {
+    title: string;
+    summary: string;
+    items: ClientReadySummaryNextStepView[];
+  };
+  renderedText: string;
+}
+
+export interface ClientReadySummaryExcludedItem {
+  id: string;
+  label: string;
+  source: "internal_rationale" | "guardrail" | "adjudication";
+  reason: string;
+  summary: string;
+  citationId: string | null;
+  sectionKey: RecommendationEvidenceSectionKey | null;
+}
+
+export interface ClientReadySummaryDiff {
+  summary: string;
+  hiddenItems: ClientReadySummaryExcludedItem[];
 }
 
 export interface InternalDecisionMemoRationaleSectionView {
@@ -257,6 +305,8 @@ export interface PropertyCaseSourceView {
   approvalPath: AdvisoryApprovalPath;
 }
 
+export type PropertyCaseBuyerFitView = BuyerPreferenceFitView;
+
 export interface PropertyCaseCoverageStats {
   availableCount: number;
   pendingCount: number;
@@ -353,7 +403,9 @@ interface PropertyCaseOverviewBase {
   coverageSummary: string;
   headerDescription: string;
   marketReality: LocalMarketRealityView | null;
+  buyerFit: PropertyCaseBuyerFitView;
   decisionMemo: BuyerSafeDecisionMemoView;
+  clientReadySummary: ClientReadySummaryArtifact;
   confidenceSections: PropertyCaseConfidenceSectionView[];
   artifacts: PropertyCaseArtifactStates;
   claims: PropertyCaseClaimView[];
@@ -388,6 +440,7 @@ export interface InternalPropertyCaseOverview
       rationaleSummary: string;
       sections: InternalDecisionMemoRationaleSectionView[];
     };
+    clientReadySummaryDiff: ClientReadySummaryDiff;
     guardrails: Array<{
       citationId: string;
       engineLabel: string;
@@ -441,6 +494,15 @@ export function buildPropertyCaseOverview(
     listPrice: input.listPrice,
     propertyFacts: input.propertyFacts,
     marketContext: input.marketContext,
+  });
+  const buyerFit = buildBuyerPreferenceFitView({
+    snapshot:
+      input.buyerPreferenceMemory ??
+      buildEmptyBuyerPreferenceMemory(undefined, input.caseRecord?.generatedAt ?? undefined),
+    property:
+      input.buyerPreferenceProperty ?? {
+        id: input.propertyId,
+      },
   });
   const citationGuardrails = buildCitationGuardrails(input.citations ?? []);
   const offerGuardrail = findOfferGuardrail(input.citations ?? []);
@@ -538,12 +600,22 @@ export function buildPropertyCaseOverview(
     action,
     missingStates,
     confidenceSections,
+    buyerFit,
     recommendationState: artifacts.recommendation,
     evidenceGraph: input.evidenceGraph ?? null,
   });
   const internalDecisionMemo = isInternal
     ? buildInternalDecisionMemo(internalConfidenceSections)
     : null;
+  const clientReadySummary = buildClientReadySummary({
+    propertyAddress: input.propertyAddress,
+    decisionMemo,
+    summaryState: artifacts.summary,
+    recommendationState: artifacts.recommendation,
+    marketReality: marketReality.buyer,
+    missingStates,
+    confidenceSections,
+  });
   const overallConfidence = payload ? payload.overallConfidence : null;
   const overallConfidenceLabel =
     overallConfidence === null
@@ -590,7 +662,9 @@ export function buildPropertyCaseOverview(
     coverageSummary,
     headerDescription,
     marketReality: marketReality.buyer,
+    buyerFit,
     decisionMemo,
+    clientReadySummary,
     confidenceSections,
     artifacts,
     claims,
@@ -607,6 +681,19 @@ export function buildPropertyCaseOverview(
       viewerRole: "buyer",
     };
   }
+
+  const guardrails = Array.from(citationGuardrails.entries())
+    .map(([citationId, assessment]) => ({
+      citationId,
+      engineLabel: humanizeEngineType(
+        input.citations?.find((citation) => citation.citationId === citationId)
+          ?.engineType,
+      ),
+      state: assessment.state,
+      approvalPath: assessment.approvalPath,
+      summary: assessment.internalSummary,
+    }))
+    .sort((a, b) => a.engineLabel.localeCompare(b.engineLabel));
 
   return {
     ...base,
@@ -627,18 +714,16 @@ export function buildPropertyCaseOverview(
           "Internal rationale is not available until the evidence sections are built.",
         sections: [],
       },
-      guardrails: Array.from(citationGuardrails.entries())
-        .map(([citationId, assessment]) => ({
-          citationId,
-          engineLabel: humanizeEngineType(
-            input.citations?.find((citation) => citation.citationId === citationId)
-              ?.engineType,
-          ),
-          state: assessment.state,
-          approvalPath: assessment.approvalPath,
-          summary: assessment.internalSummary,
-        }))
-        .sort((a, b) => a.engineLabel.localeCompare(b.engineLabel)),
+      clientReadySummaryDiff: buildClientReadySummaryDiff({
+        decisionMemo: internalDecisionMemo ?? {
+          rationaleSummary:
+            "Internal rationale is not available until the evidence sections are built.",
+          sections: [],
+        },
+        adjudicationItems,
+        guardrails,
+      }),
+      guardrails,
     },
   };
 }
@@ -694,6 +779,7 @@ function buildDecisionMemo(args: {
   action: PropertyCaseActionView | null;
   missingStates: PropertyCaseMissingState[];
   confidenceSections: PropertyCaseConfidenceSectionView[];
+  buyerFit: PropertyCaseBuyerFitView;
   recommendationState: AdvisorySurfaceState;
   evidenceGraph: BuildPropertyCaseOverviewInput["evidenceGraph"];
 }): BuyerSafeDecisionMemoView {
@@ -806,7 +892,12 @@ function buildDecisionMemo(args: {
 
   return {
     title: "Why this home / why not this home",
-    summary: buildDecisionMemoSummary(args.status, args.viewState, args.missingStates),
+    summary: buildDecisionMemoSummary(
+      args.status,
+      args.viewState,
+      args.missingStates,
+      args.buyerFit,
+    ),
     upside: {
       title: "Why this home could be worth pursuing",
       summary:
@@ -841,6 +932,7 @@ function buildDecisionMemo(args: {
     },
     recommendation: buildDecisionMemoRecommendation({
       action: args.action,
+      buyerFit: args.buyerFit,
       recommendationState: args.recommendationState,
       evidenceContext,
       offerSection:
@@ -874,17 +966,341 @@ function buildInternalDecisionMemo(
   };
 }
 
+function buildClientReadySummary(args: {
+  propertyAddress: string;
+  decisionMemo: BuyerSafeDecisionMemoView;
+  summaryState: AdvisorySurfaceState;
+  recommendationState: AdvisorySurfaceState;
+  marketReality: LocalMarketRealityView | null;
+  missingStates: PropertyCaseMissingState[];
+  confidenceSections: PropertyCaseConfidenceSectionView[];
+}): ClientReadySummaryArtifact {
+  const whatMattersMostItems: DecisionMemoItemView[] = [];
+
+  if (args.marketReality) {
+    whatMattersMostItems.push({
+      id: "client-summary-market-reality",
+      title: "Market reality",
+      body: `${args.marketReality.position.label}. ${args.marketReality.position.summary}`,
+      evidence: [],
+    });
+  }
+
+  whatMattersMostItems.push(
+    ...args.decisionMemo.upside.items.slice(0, 1),
+    ...args.decisionMemo.downside.items.slice(0, 1),
+    ...args.decisionMemo.unknowns.items.slice(0, 1),
+  );
+
+  if (args.summaryState.kind !== "ready") {
+    whatMattersMostItems.push({
+      id: "client-summary-status",
+      title: args.summaryState.title,
+      body: `${args.summaryState.description} ${args.summaryState.recoveryDescription}`.trim(),
+      evidence: [],
+    });
+  }
+
+  const attractiveItems = dedupeDecisionMemoItems(
+    args.decisionMemo.upside.items,
+  ).slice(0, 3);
+  const riskyOrUncertainItems = dedupeDecisionMemoItems([
+    ...args.decisionMemo.downside.items,
+    ...args.decisionMemo.unknowns.items,
+    ...args.decisionMemo.unresolvedRisks.items,
+  ]).slice(0, 4);
+  const nextStepItems = buildClientReadySummaryNextSteps(args);
+
+  const artifactWithoutText = {
+    title: "Client-ready summary",
+    summary:
+      args.summaryState.kind === "ready"
+        ? args.decisionMemo.summary
+        : `${args.decisionMemo.summary} ${args.summaryState.recoveryDescription}`.trim(),
+    whatMattersMost: {
+      title: "What matters most",
+      summary:
+        "Start with the overall case before getting pulled into individual evidence rows.",
+      items: dedupeDecisionMemoItems(whatMattersMostItems).slice(0, 3),
+    },
+    attractive: {
+      title: "What looks attractive",
+      summary:
+        attractiveItems.length > 0
+          ? "These are the strongest buyer-safe reasons the property still looks promising."
+          : "No single upside is strong enough to headline without caveat right now.",
+      items: attractiveItems,
+    },
+    riskyOrUncertain: {
+      title: "What looks risky or uncertain",
+      summary:
+        riskyOrUncertainItems.length > 0
+          ? "These are the biggest reasons to stay disciplined or wait for more proof."
+          : "No major unresolved risk is currently carrying the case on its own.",
+      items: riskyOrUncertainItems,
+    },
+    recommendation: args.decisionMemo.recommendation,
+    nextSteps: {
+      title: "What the buyer should do next",
+      summary:
+        nextStepItems.length > 0
+          ? "The next move should stay consistent with both the recommendation and the current confidence gaps."
+          : "No next step is strong enough to recommend until more evidence lands.",
+      items: nextStepItems,
+    },
+    renderedText: "",
+  } satisfies Omit<ClientReadySummaryArtifact, "renderedText"> & {
+    renderedText: "";
+  };
+
+  return {
+    ...artifactWithoutText,
+    renderedText: renderClientReadySummaryText(
+      args.propertyAddress,
+      artifactWithoutText,
+    ),
+  };
+}
+
+function buildClientReadySummaryNextSteps(args: {
+  decisionMemo: BuyerSafeDecisionMemoView;
+  summaryState: AdvisorySurfaceState;
+  recommendationState: AdvisorySurfaceState;
+  missingStates: PropertyCaseMissingState[];
+  confidenceSections: PropertyCaseConfidenceSectionView[];
+}): ClientReadySummaryNextStepView[] {
+  const steps: ClientReadySummaryNextStepView[] = [];
+
+  if (!args.recommendationState.withholdOutput) {
+    steps.push({
+      id: "client-summary-step-recommendation",
+      title: "Use the current recommendation as the starting point",
+      body: args.decisionMemo.recommendation.body,
+      evidence: args.decisionMemo.recommendation.evidence,
+    });
+  } else {
+    steps.push({
+      id: "client-summary-step-recommendation-state",
+      title: args.recommendationState.title,
+      body: `${args.recommendationState.description} ${args.recommendationState.recoveryDescription}`.trim(),
+      evidence: [],
+    });
+  }
+
+  for (const section of args.confidenceSections) {
+    const guidance = section.whatWouldIncreaseConfidence[0];
+    if (!guidance) continue;
+    steps.push({
+      id: `client-summary-step-${section.key}`,
+      title: `Verify ${section.title.toLowerCase()}`,
+      body: guidance,
+      evidence: buildConfidenceSectionClientSummaryEvidence(section),
+    });
+    if (steps.length >= 3) break;
+  }
+
+  if (
+    steps.length < 3 &&
+    args.summaryState.kind !== "ready" &&
+    args.summaryState.recoveryDescription
+  ) {
+    steps.push({
+      id: "client-summary-step-summary-state",
+      title: "Wait for the remaining evidence",
+      body: args.summaryState.recoveryDescription,
+      evidence: [],
+    });
+  }
+
+  if (steps.length < 3) {
+    for (const state of args.missingStates) {
+      const section = missingStateToConfidenceSection(state.engine, args.confidenceSections);
+      steps.push({
+        id: `client-summary-step-missing-${state.engine}`,
+        title: `Resolve ${state.label.toLowerCase()}`,
+        body: state.description,
+        evidence: section ? buildConfidenceSectionClientSummaryEvidence(section) : [],
+      });
+      if (steps.length >= 3) break;
+    }
+  }
+
+  return dedupeDecisionMemoItems(steps).slice(0, 3);
+}
+
+function buildConfidenceSectionClientSummaryEvidence(
+  section: PropertyCaseConfidenceSectionView,
+): DecisionMemoEvidenceHook[] {
+  return [
+    {
+      id: `client-summary-confidence-${section.key}`,
+      label: section.title,
+      citationId: null,
+      sourceAnchorId: null,
+      nodeId: null,
+      confidenceLabel: section.scoreLabel,
+      statusLabel: section.statusLabel,
+      provenance: [],
+    },
+  ];
+}
+
+function missingStateToConfidenceSection(
+  engine: CoverageEngineKey,
+  sections: PropertyCaseConfidenceSectionView[],
+): PropertyCaseConfidenceSectionView | undefined {
+  const sectionKey: RecommendationEvidenceSectionKey =
+    engine === "offer" ? "offer_recommendation" : engine;
+  return sections.find((section) => section.key === sectionKey);
+}
+
+function buildClientReadySummaryDiff(args: {
+  decisionMemo: {
+    rationaleSummary: string;
+    sections: InternalDecisionMemoRationaleSectionView[];
+  };
+  adjudicationItems: PropertyCaseAdjudicationItem[];
+  guardrails: Array<{
+    citationId: string;
+    engineLabel: string;
+    state: AdvisoryGuardrailState;
+    approvalPath: AdvisoryApprovalPath;
+    summary: string;
+  }>;
+}): ClientReadySummaryDiff {
+  const hiddenItems: ClientReadySummaryExcludedItem[] = [];
+
+  for (const section of args.decisionMemo.sections) {
+    const hiddenCount =
+      section.reasonCodes.length +
+      section.supportingNodeIds.length +
+      section.missingNodeIds.length +
+      section.conflictingNodeIds.length;
+    if (hiddenCount === 0) continue;
+    hiddenItems.push({
+      id: `internal-rationale-${section.key}`,
+      label: `${section.title} internal rationale`,
+      source: "internal_rationale",
+      reason:
+        "Raw reason codes and evidence-graph identifiers stay internal, even when the buyer-safe summary stays aligned with this section.",
+      summary: section.summary,
+      citationId: null,
+      sectionKey: section.key,
+    });
+  }
+
+  for (const guardrail of args.guardrails) {
+    if (guardrail.state === "can_say") continue;
+    hiddenItems.push({
+      id: `guardrail-${guardrail.citationId}`,
+      label: `${guardrail.engineLabel} guardrail rationale`,
+      source: "guardrail",
+      reason:
+        "Internal guardrail rationale explains the policy path, but the buyer-safe summary only carries the reviewed outcome.",
+      summary: guardrail.summary,
+      citationId: guardrail.citationId,
+      sectionKey: engineTypeToEvidenceSectionKey(guardrail.engineLabel),
+    });
+  }
+
+  for (const item of args.adjudicationItems) {
+    if (item.visibility !== "internal_only" && !item.internalNotes) continue;
+    hiddenItems.push({
+      id: `adjudication-${item.citationId}`,
+      label: `${item.engineLabel} adjudication notes`,
+      source: "adjudication",
+      reason:
+        "Broker-only notes and internal-only visibility never flow into the client-ready summary.",
+      summary: item.internalNotes ?? item.rationale ?? item.adjudicationLabel,
+      citationId: item.citationId,
+      sectionKey: engineTypeToEvidenceSectionKey(item.engineType),
+    });
+  }
+
+  return {
+    summary:
+      hiddenItems.length > 0
+        ? `The buyer-safe summary stays aligned with the current case while withholding ${hiddenItems.length} internal-only rationale item${hiddenItems.length === 1 ? "" : "s"} by design.`
+        : "The buyer-safe summary currently matches the internal memo without additional hidden rationale items.",
+    hiddenItems,
+  };
+}
+
+function renderClientReadySummaryText(
+  propertyAddress: string,
+  artifact: Omit<ClientReadySummaryArtifact, "renderedText">,
+): string {
+  const lines = [propertyAddress, artifact.summary];
+
+  appendClientReadySummarySection(lines, artifact.whatMattersMost);
+  appendClientReadySummarySection(lines, artifact.attractive);
+  appendClientReadySummarySection(lines, artifact.riskyOrUncertain);
+  lines.push(
+    `${artifact.recommendation.label}: ${artifact.recommendation.body}`,
+  );
+  if (artifact.recommendation.openingPriceLabel) {
+    lines.push(`Recommended opener: ${artifact.recommendation.openingPriceLabel}`);
+  }
+  if (artifact.recommendation.confidenceLabel) {
+    lines.push(`Recommendation confidence: ${artifact.recommendation.confidenceLabel}`);
+  }
+  if (artifact.recommendation.riskLabel) {
+    lines.push(`Recommendation risk: ${artifact.recommendation.riskLabel}`);
+  }
+  appendClientReadySummarySection(lines, artifact.nextSteps);
+
+  return lines.join("\n");
+}
+
+function appendClientReadySummarySection(
+  lines: string[],
+  section: {
+    title: string;
+    summary: string;
+    items: Array<{ title: string; body: string }>;
+  },
+): void {
+  lines.push(`${section.title}: ${section.summary}`);
+  for (const item of section.items) {
+    lines.push(`- ${item.title}: ${item.body}`);
+  }
+}
+
+function engineTypeToEvidenceSectionKey(
+  engineType: string,
+): RecommendationEvidenceSectionKey | null {
+  switch (engineType.toLowerCase()) {
+    case "pricing":
+      return "pricing";
+    case "comps":
+    case "comparable sales":
+      return "comps";
+    case "leverage":
+    case "negotiation leverage":
+      return "leverage";
+    case "offer":
+    case "offer strategy":
+      return "offer_recommendation";
+    default:
+      return null;
+  }
+}
+
 function buildDecisionMemoSummary(
   status: StatusBadge,
   viewState: PropertyCaseOverviewViewState,
   missingStates: PropertyCaseMissingState[],
+  buyerFit: PropertyCaseBuyerFitView,
 ): string {
   if (viewState === "ready") {
+    if (buyerFit.shouldInfluenceRecommendations) {
+      return `${status.label}. The current memo has enough evidence to show the upside, the downside, a clear recommendation, and how this home fits the buyer's repeated patterns.`;
+    }
     return `${status.label}. The current memo has enough evidence to show the upside, the downside, and a clear recommendation in one place.`;
   }
 
   if (viewState === "partial") {
-    return `${status.label}. The current memo is usable, but ${missingStates.length} signal${missingStates.length === 1 ? "" : "s"} still change how decisive the case should feel.`;
+    return `${status.label}. The current memo is usable, but ${missingStates.length} signal${missingStates.length === 1 ? "" : "s"} still change how decisive the case should feel${buyerFit.memoryState === "thin_history" ? ", and fit memory is still thin" : ""}.`;
   }
 
   return `${status.label}. The memo stays explicit about what is missing instead of pretending the case is settled.`;
@@ -972,6 +1388,7 @@ function buildMissingStateDecisionMemoItem(
 
 function buildDecisionMemoRecommendation(args: {
   action: PropertyCaseActionView | null;
+  buyerFit: PropertyCaseBuyerFitView;
   recommendationState: AdvisorySurfaceState;
   evidenceContext: DecisionMemoEvidenceContext;
   offerSection: RecommendationEvidenceSection | null;
@@ -990,6 +1407,15 @@ function buildDecisionMemoRecommendation(args: {
   );
 
   if (args.action && !args.recommendationState.withholdOutput) {
+    const fitSentence = args.buyerFit.shouldInfluenceRecommendations
+      ? args.buyerFit.score !== null && args.buyerFit.score >= 0.3
+        ? " It also looks like a stronger fit than the homes this buyer usually favors."
+        : args.buyerFit.score !== null && args.buyerFit.score <= -0.3
+          ? " It also repeats patterns this buyer has usually moved away from."
+          : " The buyer's fit history is mixed, so keep the recommendation explicit about tradeoffs."
+      : args.buyerFit.memoryState === "thin_history"
+        ? " The fit memory is still thin, so the recommendation should not pretend personalization is settled."
+        : "";
     return {
       verdict:
         args.missingStates.length > 0 || args.action.riskLevel !== "low"
@@ -998,7 +1424,7 @@ function buildDecisionMemoRecommendation(args: {
       label: "Current recommendation",
       body:
         args.action.reviewedConclusion ??
-        `Treat the home as worth pursuing only with a disciplined opener around ${args.action.openingPriceLabel}. ${args.action.guardrailExplanation}`,
+        `Treat the home as worth pursuing only with a disciplined opener around ${args.action.openingPriceLabel}. ${args.action.guardrailExplanation}${fitSentence}`,
       confidenceLabel: args.action.confidenceLabel,
       riskLabel: args.action.riskLabel,
       openingPriceLabel: args.action.openingPriceLabel,

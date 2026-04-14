@@ -2,7 +2,7 @@
 
 import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import type {
   OfferInput,
   OfferLeverageContext,
@@ -42,7 +42,7 @@ export const runOfferEngine = internalAction({
 
     // Get latest pricing output for explicit offer dependencies.
     const pricingOutput: any = await ctx.runQuery(
-      api.aiEngineOutputs.getLatest,
+      internal.aiEngineOutputs.getLatest,
       {
         propertyId: args.propertyId,
         engineType: "pricing",
@@ -70,7 +70,7 @@ export const runOfferEngine = internalAction({
 
     // Get latest leverage output for explicit offer dependencies.
     const leverageOutput: any = await ctx.runQuery(
-      api.aiEngineOutputs.getLatest,
+      internal.aiEngineOutputs.getLatest,
       {
         propertyId: args.propertyId,
         engineType: "leverage",

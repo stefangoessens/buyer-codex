@@ -1,4 +1,4 @@
-import { query, internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
@@ -1511,7 +1511,7 @@ export const persistJobResult = internalMutation({
 // Queries
 // ─────────────────────────────────────────────────────────────────────────
 
-export const getJobsForProperty = query({
+export const getJobsForProperty = internalQuery({
   args: { propertyId: v.id("properties") },
   returns: v.array(v.any()),
   handler: async (ctx, args) => {
@@ -1527,7 +1527,7 @@ export const getJobsForProperty = query({
 
 /** Ready-to-run queue: queued + (no retry gate OR retry gate has passed).
  *  Ordered by priority asc. */
-export const getPendingJobs = query({
+export const getPendingJobs = internalQuery({
   args: { limit: v.optional(v.number()) },
   returns: v.array(v.any()),
   handler: async (ctx, args) => {
@@ -1547,7 +1547,7 @@ export const getPendingJobs = query({
   },
 });
 
-export const getEnrichmentSummaryForProperty = query({
+export const getEnrichmentSummaryForProperty = internalQuery({
   args: { propertyId: v.id("properties") },
   returns: v.object({
     totalJobs: v.number(),
@@ -1609,7 +1609,7 @@ export const getEnrichmentSummaryForProperty = query({
   },
 });
 
-export const getListingAgentByCanonicalId = query({
+export const getListingAgentByCanonicalId = internalQuery({
   args: { canonicalAgentId: v.string() },
   returns: v.any(),
   handler: async (ctx, args) => {
@@ -1622,7 +1622,7 @@ export const getListingAgentByCanonicalId = query({
   },
 });
 
-export const getListingAgentsForProperty = query({
+export const getListingAgentsForProperty = internalQuery({
   args: {
     propertyId: v.id("properties"),
     role: v.optional(v.union(v.literal("listing"), v.literal("buyer"))),
@@ -1652,7 +1652,7 @@ export const getListingAgentsForProperty = query({
   },
 });
 
-export const getNeighborhoodContext = query({
+export const getNeighborhoodContext = internalQuery({
   args: {
     geoKey: v.string(),
     geoKind: v.union(
@@ -1681,7 +1681,7 @@ export const getNeighborhoodContext = query({
 });
 
 /** Returns only the most-recent estimate per portal. */
-export const getPortalEstimates = query({
+export const getPortalEstimates = internalQuery({
   args: { propertyId: v.id("properties") },
   returns: v.array(v.any()),
   handler: async (ctx, args) => {

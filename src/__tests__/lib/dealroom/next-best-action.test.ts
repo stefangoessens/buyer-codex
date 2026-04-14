@@ -437,6 +437,10 @@ describe("buildPropertyRecommendation", () => {
             rationaleSummary: "Internal rationale",
             sections: [],
           },
+          clientReadySummaryDiff: {
+            summary: "No hidden items.",
+            hiddenItems: [],
+          },
           guardrails: [],
         },
       },
@@ -517,6 +521,49 @@ describe("buildPropertyRecommendation", () => {
     expect(recommendation.internal.brokerReviewRequired).toBe(true);
     expect(recommendation.internal.brokerReviewReasons).toContain(
       "Inspection review required",
+    );
+  });
+
+  it("uses a strong negative buyer-fit signal to keep the action skeptical", () => {
+    const recommendation = buildPropertyRecommendation({
+      overview: makeOverview({
+        overallConfidence: 0.78,
+        overallConfidenceLabel: "78% confidence",
+        buyerFit: {
+          ...previewPropertyCaseOverview.buyerFit,
+          score: -0.52,
+          scoreLabel: "Repeats patterns usually rejected",
+          summary:
+            "This property repeats patterns the buyer has usually moved away from, so the recommendation should stay skeptical.",
+          supportingReasons: [],
+          conflictingReasons: [
+            {
+              source: "inferred",
+              kind: "conflicts",
+              label: "Usually avoids high HOA fees",
+              explanation:
+                "Your recent behavior keeps leaning away from high HOA fees.",
+              confidence: 0.76,
+              status: "durable",
+            },
+          ],
+          shouldInfluenceRecommendations: true,
+        },
+      }),
+      readiness: makeBuyerReadiness({
+        currentStage: "offer",
+        currentStageLabel: "Offer",
+      }),
+      riskSummary: makeRiskSummary(),
+    });
+
+    expect(recommendation.kind).toBe("skip");
+    expect(recommendation.rationale).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Repeated behavior leans away from this property",
+        }),
+      ]),
     );
   });
 });

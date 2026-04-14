@@ -2,6 +2,7 @@ import {
   query,
   mutation,
   internalMutation,
+  internalQuery,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
@@ -28,6 +29,14 @@ import {
   type AdvisoryAdjudicationStatus,
   type AdvisoryAdjudicationVisibility,
 } from "../src/lib/advisory/adjudication";
+import type {
+  AdjudicationLinkedClaimTopic,
+} from "../src/lib/ai/engines/types";
+import type { PropertyCase } from "../src/lib/ai/engines/caseSynthesis";
+import {
+  buildAdjudicationCalibrationRecord,
+  recommendationRelevantFromEngineType,
+} from "../src/lib/ai/engines/adjudicationCalibration";
 
 const advisorySurfaceValidator = v.union(
   v.literal("deal_room_overview"),
@@ -49,6 +58,7 @@ const adjudicationSnapshotValidator = v.object({
 
 type AiOutputDoc = Doc<"aiEngineOutputs">;
 type AdjudicationHistoryDoc = Doc<"aiOutputAdjudications">;
+type PropertyCaseDoc = Doc<"propertyCases">;
 
 type SubmitAdjudicationArgs = {
   outputId: Id<"aiEngineOutputs">;
@@ -66,7 +76,7 @@ type SubmitAdjudicationArgs = {
 // ═══ Queries ═══
 
 /** Get a specific engine output by ID */
-export const get = query({
+export const get = internalQuery({
   args: { outputId: v.id("aiEngineOutputs") },
   returns: v.any(),
   handler: async (ctx, args) => {
@@ -75,7 +85,7 @@ export const get = query({
 });
 
 /** Get all outputs for a property + engine type */
-export const getByPropertyAndEngine = query({
+export const getByPropertyAndEngine = internalQuery({
   args: {
     propertyId: v.id("properties"),
     engineType: v.string(),
@@ -92,7 +102,7 @@ export const getByPropertyAndEngine = query({
 });
 
 /** Get the latest output for a property + engine type */
-export const getLatest = query({
+export const getLatest = internalQuery({
   args: {
     propertyId: v.id("properties"),
     engineType: v.string(),
@@ -326,6 +336,15 @@ async function submitAiOutputAdjudication(
     output: existing.output,
     reviewState: existing.reviewState,
   });
+  const learningContext =
+    normalized.action === "approve"
+      ? null
+      : await deriveAdjudicationLearningContext(
+          ctx,
+          args.dealRoomId,
+          String(args.outputId),
+          existing.engineType,
+        );
 
   await ctx.db.patch(args.outputId, {
     reviewState: reviewStateAfter,
@@ -334,7 +353,7 @@ async function submitAiOutputAdjudication(
     adjudication: snapshot,
   });
 
-  await ctx.db.insert("aiOutputAdjudications", {
+  const adjudicationId = await ctx.db.insert("aiOutputAdjudications", {
     engineOutputId: args.outputId,
     propertyId: existing.propertyId,
     dealRoomId: args.dealRoomId,
@@ -352,6 +371,48 @@ async function submitAiOutputAdjudication(
     reviewStateBefore: existing.reviewState,
     reviewStateAfter,
   });
+
+  if (normalized.action !== "approve" && learningContext) {
+    const calibrationRecord = buildAdjudicationCalibrationRecord({
+      propertyId: String(existing.propertyId),
+      dealRoomId: args.dealRoomId ? String(args.dealRoomId) : null,
+      propertyCaseId: learningContext.propertyCaseId,
+      engineOutputId: String(args.outputId),
+      adjudicationId: String(adjudicationId),
+      engineType: existing.engineType,
+      action: normalized.action,
+      visibility: normalized.visibility,
+      reasonCategory: normalized.reasonCategory ?? null,
+      outputConfidence: existing.confidence,
+      promptVersion: existing.promptVersion ?? "unknown",
+      modelId: existing.modelId,
+      reviewStateBefore: existing.reviewState,
+      reviewStateAfter,
+      linkedClaimCount: learningContext.linkedClaimCount,
+      linkedClaimTopics: learningContext.linkedClaimTopics,
+      recommendationLinkedClaimCount:
+        learningContext.recommendationLinkedClaimCount,
+      recommendationRelevant: learningContext.recommendationRelevant,
+      reviewedConclusionPresent: Boolean(normalized.reviewedConclusion),
+      buyerExplanationPresent: Boolean(normalized.buyerExplanation),
+      internalNotesPresent: Boolean(normalized.internalNotes),
+      generatedAt: existing.generatedAt,
+      adjudicatedAt: actedAt,
+      reviewLatencyMs: reviewLatencyMs(existing.generatedAt, actedAt),
+    });
+
+    await ctx.db.insert("adjudicationCalibrationRecords", {
+      ...calibrationRecord,
+      propertyId: existing.propertyId,
+      dealRoomId: args.dealRoomId ?? null,
+      propertyCaseId: learningContext.propertyCaseId
+        ? (learningContext.propertyCaseId as Id<"propertyCases">)
+        : null,
+      engineOutputId: args.outputId,
+      adjudicationId: adjudicationId as Id<"aiOutputAdjudications">,
+      reasonCategory: normalized.reasonCategory ?? null,
+    });
+  }
 
   await ctx.db.insert("auditLog", {
     userId: user._id,
@@ -379,13 +440,7 @@ async function submitAiOutputAdjudication(
     timestamp: actedAt,
   });
 
-  if (normalized.action !== "approve") {
-    const linkedClaimCount = await countClaimsLinkedToOutput(
-      ctx,
-      args.dealRoomId,
-      String(args.outputId),
-    );
-
+  if (normalized.action !== "approve" && learningContext) {
     await trackPosthogEvent(
       "advisory_broker_override_submitted",
       {
@@ -398,7 +453,7 @@ async function submitAiOutputAdjudication(
         reasonCategory: normalized.reasonCategory ?? "other",
         hasReasonDetail: Boolean(normalized.rationale),
         outputConfidence: existing.confidence,
-        linkedClaimCount,
+        linkedClaimCount: learningContext.linkedClaimCount,
         reviewLatencyMs: reviewLatencyMs(existing.generatedAt, actedAt),
         ...(args.dealRoomId ? { dealRoomId: String(args.dealRoomId) } : {}),
         ...(existing.generatedAt ? { generatedAt: existing.generatedAt } : {}),
@@ -471,33 +526,94 @@ async function expandAdjudicationSnapshot(
   };
 }
 
-async function countClaimsLinkedToOutput(
-  ctx: MutationCtx,
-  dealRoomId: Id<"dealRooms"> | undefined,
-  citationId: string,
-): Promise<number> {
-  if (!dealRoomId) return 0;
+function parsePropertyCase(payload: string): PropertyCase | null {
+  try {
+    return JSON.parse(payload) as PropertyCase;
+  } catch {
+    return null;
+  }
+}
 
-  const latestCase = (
+async function latestPropertyCaseForDealRoom(
+  ctx: MutationCtx,
+  dealRoomId: Id<"dealRooms">,
+): Promise<PropertyCaseDoc | null> {
+  return (
     await ctx.db
       .query("propertyCases")
       .withIndex("by_dealRoomId", (q) => q.eq("dealRoomId", dealRoomId))
       .collect()
   )
-    .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
-    .at(0);
+    .sort((left, right) => right.generatedAt.localeCompare(left.generatedAt))
+    .at(0) ?? null;
+}
 
-  if (!latestCase) return 0;
+async function deriveAdjudicationLearningContext(
+  ctx: MutationCtx,
+  dealRoomId: Id<"dealRooms"> | undefined,
+  citationId: string,
+  engineType: string,
+): Promise<{
+  propertyCaseId: string | null;
+  linkedClaimCount: number;
+  linkedClaimTopics: AdjudicationLinkedClaimTopic[];
+  recommendationLinkedClaimCount: number;
+  recommendationRelevant: boolean;
+}> {
+  const baseRecommendationRelevant = recommendationRelevantFromEngineType(engineType);
 
-  try {
-    const parsed = JSON.parse(latestCase.payload) as {
-      claims?: Array<{ citation?: string }>;
+  if (!dealRoomId) {
+    return {
+      propertyCaseId: null,
+      linkedClaimCount: 0,
+      linkedClaimTopics: [],
+      recommendationLinkedClaimCount: 0,
+      recommendationRelevant: baseRecommendationRelevant,
     };
-    if (!Array.isArray(parsed.claims)) return 0;
-    return parsed.claims.filter((claim) => claim?.citation === citationId).length;
-  } catch {
-    return 0;
   }
+
+  const latestCase = await latestPropertyCaseForDealRoom(ctx, dealRoomId);
+  if (!latestCase) {
+    return {
+      propertyCaseId: null,
+      linkedClaimCount: 0,
+      linkedClaimTopics: [],
+      recommendationLinkedClaimCount: 0,
+      recommendationRelevant: baseRecommendationRelevant,
+    };
+  }
+
+  const propertyCase = parsePropertyCase(latestCase.payload);
+  if (!propertyCase) {
+    return {
+      propertyCaseId: String(latestCase._id),
+      linkedClaimCount: 0,
+      linkedClaimTopics: [],
+      recommendationLinkedClaimCount: 0,
+      recommendationRelevant: baseRecommendationRelevant,
+    };
+  }
+
+  const linkedClaims = propertyCase.claims.filter(
+    (claim) => claim.citation === citationId,
+  );
+  const rationaleClaimIds = new Set(
+    propertyCase.recommendedAction?.rationaleClaimIds ?? [],
+  );
+  const recommendationLinkedClaimCount = linkedClaims.filter((claim) =>
+    rationaleClaimIds.has(claim.id),
+  ).length;
+
+  return {
+    propertyCaseId: String(latestCase._id),
+    linkedClaimCount: linkedClaims.length,
+    linkedClaimTopics: Array.from(
+      new Set(linkedClaims.map((claim) => claim.topic)),
+    ) as AdjudicationLinkedClaimTopic[],
+    recommendationLinkedClaimCount,
+    recommendationRelevant:
+      baseRecommendationRelevant || recommendationLinkedClaimCount > 0,
+  };
 }
 
 export async function listOutputAdjudicationHistory(

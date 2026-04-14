@@ -385,6 +385,51 @@ export const CALIBRATION_CONSUMERS = [
 
 export type CalibrationConsumer = (typeof CALIBRATION_CONSUMERS)[number];
 
+export const ADJUDICATION_CALIBRATION_TARGETS = [
+  "confidence",
+  "recommendation",
+] as const;
+
+export type AdjudicationCalibrationTarget =
+  (typeof ADJUDICATION_CALIBRATION_TARGETS)[number];
+
+export const ADJUDICATION_CONFIDENCE_SIGNALS = [
+  "review_required",
+  "confidence_overstated",
+] as const;
+
+export type AdjudicationConfidenceSignal =
+  (typeof ADJUDICATION_CONFIDENCE_SIGNALS)[number];
+
+export const ADJUDICATION_RECOMMENDATION_SIGNALS = [
+  "not_applicable",
+  "recommendation_adjusted",
+  "recommendation_overridden",
+] as const;
+
+export type AdjudicationRecommendationSignal =
+  (typeof ADJUDICATION_RECOMMENDATION_SIGNALS)[number];
+
+export const ADJUDICATION_REVISION_TYPES = [
+  "rationale_only",
+  "buyer_explanation_only",
+  "reviewed_conclusion",
+] as const;
+
+export type AdjudicationRevisionType =
+  (typeof ADJUDICATION_REVISION_TYPES)[number];
+
+export const ADJUDICATION_LINKED_CLAIM_TOPICS = [
+  "pricing",
+  "comps",
+  "days_on_market",
+  "leverage",
+  "offer_recommendation",
+] as const;
+
+export type AdjudicationLinkedClaimTopic =
+  (typeof ADJUDICATION_LINKED_CLAIM_TOPICS)[number];
+
 export const PRICING_ERROR_CATEGORIES = [
   "within_expected_range",
   "accepted_below_strong_opener",
@@ -523,6 +568,80 @@ export interface RecommendationCalibrationSummary {
   consumers: CalibrationConsumer[];
 }
 
+export interface AdjudicationCalibrationRecord {
+  propertyId: string;
+  dealRoomId: string | null;
+  propertyCaseId: string | null;
+  engineOutputId: string;
+  adjudicationId: string;
+  engineType: string;
+  action: "adjust" | "override";
+  visibility: "buyer_safe" | "internal_only";
+  reasonCategory: string | null;
+  outputConfidence: number;
+  confidenceBucket: ConfidenceBucket;
+  promptVersion: string;
+  modelId: string;
+  reviewStateBefore: "pending" | "approved" | "rejected";
+  reviewStateAfter: "pending" | "approved" | "rejected";
+  confidenceSignal: AdjudicationConfidenceSignal;
+  recommendationSignal: AdjudicationRecommendationSignal;
+  revisionType: AdjudicationRevisionType;
+  calibrationTargets: AdjudicationCalibrationTarget[];
+  linkedClaimCount: number;
+  linkedClaimTopics: AdjudicationLinkedClaimTopic[];
+  recommendationLinkedClaimCount: number;
+  recommendationRelevant: boolean;
+  reviewedConclusionPresent: boolean;
+  buyerExplanationPresent: boolean;
+  internalNotesPresent: boolean;
+  generatedAt: string;
+  adjudicatedAt: string;
+  reviewLatencyMs: number;
+}
+
+export interface AdjudicationCalibrationSummary {
+  kind: "adjudication_calibration";
+  target: AdjudicationCalibrationTarget | "all";
+  totalRecords: number;
+  uniqueOutputs: number;
+  averageOutputConfidence: number | null;
+  internalOnlyRate: number | null;
+  reviewedConclusionRate: number | null;
+  recommendationRelevantRate: number | null;
+  confidenceBuckets: CalibrationBucketSummary[];
+  engineTypeCounts: Array<{
+    engineType: string;
+    count: number;
+  }>;
+  reasonCategoryCounts: Array<{
+    reasonCategory: string;
+    count: number;
+  }>;
+  actionCounts: Array<{
+    action: AdjudicationCalibrationRecord["action"];
+    count: number;
+  }>;
+  confidenceSignalCounts: Array<{
+    signal: AdjudicationConfidenceSignal;
+    count: number;
+  }>;
+  recommendationSignalCounts: Array<{
+    signal: AdjudicationRecommendationSignal;
+    count: number;
+  }>;
+  revisionTypeCounts: Array<{
+    revisionType: AdjudicationRevisionType;
+    count: number;
+  }>;
+  linkedClaimTopicCounts: Array<{
+    topic: AdjudicationLinkedClaimTopic;
+    count: number;
+  }>;
+  consumers: CalibrationConsumer[];
+}
+
 export type CalibrationSummary =
   | PricingCalibrationSummary
-  | RecommendationCalibrationSummary;
+  | RecommendationCalibrationSummary
+  | AdjudicationCalibrationSummary;

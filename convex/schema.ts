@@ -495,6 +495,7 @@ export default defineSchema({
     .index("by_tourRequestId", ["tourRequestId"])
     .index("by_propertyId", ["propertyId"])
     .index("by_buyerId", ["buyerId"])
+    .index("by_buyerId_and_createdAt", ["buyerId", "createdAt"])
     .index("by_tourId_and_createdAt", ["tourId", "createdAt"]),
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -731,6 +732,70 @@ export default defineSchema({
     .index("by_engineOutputId_and_actedAt", ["engineOutputId", "actedAt"])
     .index("by_propertyId_and_actedAt", ["propertyId", "actedAt"])
     .index("by_dealRoomId_and_actedAt", ["dealRoomId", "actedAt"]),
+
+  adjudicationCalibrationRecords: defineTable({
+    propertyId: v.id("properties"),
+    dealRoomId: v.union(v.id("dealRooms"), v.null()),
+    propertyCaseId: v.union(v.id("propertyCases"), v.null()),
+    engineOutputId: v.id("aiEngineOutputs"),
+    adjudicationId: v.id("aiOutputAdjudications"),
+    engineType: v.string(),
+    action: v.union(v.literal("adjust"), v.literal("override")),
+    visibility: aiOutputAdjudicationVisibility,
+    reasonCategory: v.union(brokerOverrideReasonCategory, v.null()),
+    outputConfidence: v.number(),
+    confidenceBucket: v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high"),
+    ),
+    promptVersion: v.string(),
+    modelId: v.string(),
+    reviewStateBefore: aiReviewState,
+    reviewStateAfter: aiReviewState,
+    confidenceSignal: v.union(
+      v.literal("review_required"),
+      v.literal("confidence_overstated"),
+    ),
+    recommendationSignal: v.union(
+      v.literal("not_applicable"),
+      v.literal("recommendation_adjusted"),
+      v.literal("recommendation_overridden"),
+    ),
+    revisionType: v.union(
+      v.literal("rationale_only"),
+      v.literal("buyer_explanation_only"),
+      v.literal("reviewed_conclusion"),
+    ),
+    calibrationTargets: v.array(
+      v.union(v.literal("confidence"), v.literal("recommendation")),
+    ),
+    linkedClaimCount: v.number(),
+    linkedClaimTopics: v.array(
+      v.union(
+        v.literal("pricing"),
+        v.literal("comps"),
+        v.literal("days_on_market"),
+        v.literal("leverage"),
+        v.literal("offer_recommendation"),
+      ),
+    ),
+    recommendationLinkedClaimCount: v.number(),
+    recommendationRelevant: v.boolean(),
+    reviewedConclusionPresent: v.boolean(),
+    buyerExplanationPresent: v.boolean(),
+    internalNotesPresent: v.boolean(),
+    generatedAt: v.string(),
+    adjudicatedAt: v.string(),
+    reviewLatencyMs: v.number(),
+  })
+    .index("by_propertyId_and_adjudicatedAt", ["propertyId", "adjudicatedAt"])
+    .index("by_dealRoomId_and_adjudicatedAt", ["dealRoomId", "adjudicatedAt"])
+    .index("by_engineOutputId_and_adjudicatedAt", [
+      "engineOutputId",
+      "adjudicatedAt",
+    ])
+    .index("by_adjudicationId", ["adjudicationId"]),
 
   pricingCalibrationRecords: defineTable({
     propertyId: v.id("properties"),
@@ -2167,6 +2232,77 @@ export default defineSchema({
       "artifact",
       "submittedAt",
     ]),
+
+  buyerPreferenceMemories: defineTable({
+    buyerId: v.id("users"),
+    explicitPreferences: v.object({
+      preferredAreas: v.array(v.string()),
+      propertyTypes: v.array(v.string()),
+      mustHaves: v.array(v.string()),
+      dealbreakers: v.array(v.string()),
+    }),
+    history: v.object({
+      state: v.union(
+        v.literal("cold_start"),
+        v.literal("thin_history"),
+        v.literal("evolving"),
+        v.literal("durable"),
+      ),
+      eventCount: v.number(),
+      distinctPropertyCount: v.number(),
+      lastEventAt: v.optional(v.string()),
+      halfLifeDays: v.number(),
+      qualifyingSignalCount: v.number(),
+    }),
+    inferredSignals: v.array(
+      v.object({
+        key: v.string(),
+        category: v.union(
+          v.literal("property_type"),
+          v.literal("hoa_burden"),
+          v.literal("flood_risk"),
+          v.literal("price_band"),
+          v.literal("amenity"),
+          v.literal("area"),
+        ),
+        value: v.string(),
+        label: v.string(),
+        propertyLabel: v.string(),
+        direction: v.union(v.literal("prefer"), v.literal("avoid")),
+        status: v.union(
+          v.literal("suppressed"),
+          v.literal("emerging"),
+          v.literal("durable"),
+          v.literal("review"),
+        ),
+        confidence: v.number(),
+        decayWeight: v.number(),
+        netScore: v.number(),
+        positiveWeight: v.number(),
+        negativeWeight: v.number(),
+        distinctPropertyCount: v.number(),
+        firstObservedAt: v.string(),
+        lastObservedAt: v.string(),
+        statusReason: v.string(),
+        provenance: v.array(
+          v.object({
+            propertyId: v.id("properties"),
+            occurredAt: v.string(),
+            eventKind: v.union(
+              v.literal("watchlist_saved"),
+              v.literal("tour_feedback"),
+              v.literal("advisory_feedback"),
+            ),
+            sentiment: v.union(v.literal("positive"), v.literal("negative")),
+            weight: v.number(),
+            summary: v.string(),
+          }),
+        ),
+      }),
+    ),
+    updatedAt: v.string(),
+    modelVersion: v.string(),
+  }).index("by_buyerId", ["buyerId"]),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PROPERTY DOSSIERS (KIN-1021)

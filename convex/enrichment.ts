@@ -1,4 +1,4 @@
-import { query, internalQuery, internalMutation } from "./_generated/server";
+import { internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -288,58 +288,11 @@ async function buildEnrichmentPayload(ctx: any, propertyId: Id<"properties">) {
   };
 }
 
-function toBuyerSafeAgent(agent: any, includeContact: boolean) {
-  return {
-    canonicalAgentId: agent.canonicalAgentId,
-    name: agent.name,
-    brokerage: agent.brokerage,
-    zillowProfileUrl: agent.zillowProfileUrl,
-    redfinProfileUrl: agent.redfinProfileUrl,
-    realtorProfileUrl: agent.realtorProfileUrl,
-    activeListings: agent.activeListings,
-    soldCount: agent.soldCount,
-    avgDaysOnMarket: agent.avgDaysOnMarket,
-    medianListToSellRatio: agent.medianListToSellRatio,
-    priceCutFrequency: agent.priceCutFrequency,
-    recentActivityCount: agent.recentActivityCount,
-    provenance: agent.provenance,
-    lastRefreshedAt: agent.lastRefreshedAt,
-    phone: includeContact ? agent.phone : undefined,
-    email: includeContact ? agent.email : undefined,
-  };
-}
-
 export const getForPropertyInternal = internalQuery({
   args: { propertyId: v.id("properties") },
   returns: v.any(),
   handler: async (ctx, args) => {
     return await buildEnrichmentPayload(ctx, args.propertyId);
-  },
-});
-
-export const getForProperty = query({
-  args: {
-    propertyId: v.id("properties"),
-    includeInternal: v.optional(v.boolean()),
-  },
-  returns: v.any(),
-  handler: async (ctx, args) => {
-    const payload = await buildEnrichmentPayload(ctx, args.propertyId);
-    if (!payload) return null;
-
-    return {
-      summary: payload.summary,
-      marketContext: payload.marketContext,
-      neighborhoodContexts: payload.neighborhoodContexts,
-      portalEstimates: payload.portalEstimates,
-      recentSales: payload.recentSales,
-      listingAgents: payload.listingAgents.map((agent: any) =>
-        toBuyerSafeAgent(agent, args.includeInternal ?? false),
-      ),
-      browserUseRuns: args.includeInternal ? payload.browserUseRuns : undefined,
-      snapshots: args.includeInternal ? payload.snapshots : undefined,
-      engineInputs: args.includeInternal ? payload.engineInputs : undefined,
-    };
   },
 });
 

@@ -259,10 +259,69 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       },
     ],
   },
+  buyerFit: {
+    memoryState: "durable",
+    title: "Fit memory is durable",
+    summary:
+      "This property lines up with patterns the buyer has repeatedly favored, so the recommendation can lean into that fit.",
+    score: 0.48,
+    scoreLabel: "Stronger fit than recent history",
+    explicitSignals: [
+      "single-family",
+      "Miami",
+      "Must have: pool",
+      "Dealbreaker: HOA",
+    ],
+    inferredSignals: [
+      {
+        key: "property_type:single_family",
+        label: "single-family homes",
+        direction: "prefer",
+        confidence: 0.78,
+        confidenceLabel: "High confidence",
+        status: "durable",
+        statusLabel: "Durable",
+        statusReason: "Repeated behavior keeps pointing prefer.",
+        evidenceCount: 3,
+        lastObservedAt: "2026-04-13T19:00:00.000Z",
+      },
+      {
+        key: "hoa_burden:none",
+        label: "no HOA fees",
+        direction: "prefer",
+        confidence: 0.63,
+        confidenceLabel: "Medium confidence",
+        status: "emerging",
+        statusLabel: "Emerging",
+        statusReason: "There is a directional pattern, but the history is still limited.",
+        evidenceCount: 2,
+        lastObservedAt: "2026-04-12T16:20:00.000Z",
+      },
+    ],
+    supportingReasons: [
+      {
+        source: "inferred",
+        kind: "supports",
+        label: "Usually prefers single-family homes",
+        explanation:
+          "Your recent behavior keeps leaning toward single-family homes.",
+        confidence: 0.78,
+        status: "durable",
+      },
+      {
+        source: "explicit",
+        kind: "supports",
+        label: "Matches an explicit must-have",
+        explanation: "You explicitly asked for a pool.",
+      },
+    ],
+    conflictingReasons: [],
+    shouldInfluenceRecommendations: true,
+  },
   decisionMemo: {
     title: "Why this home / why not this home",
     summary:
-      "Offer prep. The current memo has enough evidence to show the upside, the downside, and a clear recommendation in one place.",
+      "Offer prep. The current memo has enough evidence to show the upside, the downside, a clear recommendation, and how this home fits the buyer's repeated patterns.",
     upside: {
       title: "Why this home could be worth pursuing",
       summary: "These points are carrying the buyer-safe case right now.",
@@ -366,6 +425,132 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       verdict: "pursue_with_caution",
       label: "Current recommendation",
       body:
+        "Treat the home as worth pursuing only with a disciplined opener around $928,000. Use this as an illustrative starting point and confirm the final strategy with your broker. It also looks like a stronger fit than the homes this buyer usually favors.",
+      confidenceLabel: "73% action confidence",
+      riskLabel: "Medium risk",
+      openingPriceLabel: "$928,000",
+      evidence: [
+        {
+          id: "preview-recommendation-evidence",
+          label: "pricing support",
+          citationId: null,
+          sourceAnchorId: null,
+          nodeId: null,
+          confidenceLabel: null,
+          statusLabel: "Waiting on evidence",
+          provenance: [],
+        },
+      ],
+    },
+  },
+  clientReadySummary: {
+    title: "Client-ready summary",
+    summary:
+      "This shareable recap stays tied to the current memo, recommendation, confidence, and source-trace layers.",
+    whatMattersMost: {
+      title: "What matters most",
+      summary:
+        "Start with the overall case before getting pulled into individual evidence rows.",
+      items: [
+        {
+          id: "preview-summary-case",
+          title: "Current case",
+          body:
+            "Offer prep. The current memo has enough evidence to show the upside, the downside, and a clear recommendation in one place.",
+          evidence: [
+            {
+              id: "preview-recommendation-evidence",
+              label: "pricing support",
+              citationId: null,
+              sourceAnchorId: null,
+              nodeId: null,
+              confidenceLabel: null,
+              statusLabel: "Waiting on evidence",
+              provenance: [],
+            },
+          ],
+        },
+        {
+          id: "preview-summary-market",
+          title: "Market reality",
+          body:
+            "Overpriced for this market. This listing is asking more per sqft than the local norm for the selected market slice.",
+          evidence: [],
+        },
+      ],
+    },
+    attractive: {
+      title: "What looks attractive",
+      summary:
+        "These are the strongest buyer-safe reasons the property still looks promising.",
+      items: [
+        {
+          id: "preview-upside-dom",
+          title: "Time on market",
+          body:
+            "Time on market and the latest price adjustment both suggest the seller is prioritizing momentum over waiting for a premium bid.",
+          evidence: [
+            {
+              id: "preview-upside-dom-evidence",
+              label: "39 days on market vs 28 day local median",
+              citationId: "dom-2026-04-13-01",
+              sourceAnchorId: "source-dom-2026-04-13-01",
+              nodeId: null,
+              confidenceLabel: "74% confidence",
+              statusLabel: null,
+              provenance: [],
+            },
+          ],
+        },
+      ],
+    },
+    riskyOrUncertain: {
+      title: "What looks risky or uncertain",
+      summary:
+        "These are the biggest reasons to stay disciplined or wait for more proof.",
+      items: [
+        {
+          id: "preview-downside-pricing",
+          title: "Pricing",
+          body:
+            "The listing is trending above the closest renovated comparable set, which creates room for a measured first offer instead of a full-price opener.",
+          evidence: [
+            {
+              id: "preview-downside-pricing-evidence",
+              label: "$965,000 vs $926,000 renovated comparable average",
+              citationId: "pricing-2026-04-13-01",
+              sourceAnchorId: "source-pricing-2026-04-13-01",
+              nodeId: null,
+              confidenceLabel: "82% confidence",
+              statusLabel: "Supported",
+              provenance: [],
+            },
+          ],
+        },
+        {
+          id: "preview-unknown-offer",
+          title: "Offer pack refresh is still running",
+          body:
+            "The refreshed counter-scenario set is still being prepared, so the buyer-safe case holds the current opener until the next pass lands.",
+          evidence: [
+            {
+              id: "preview-unknown-offer-evidence",
+              label: "Offer strategy",
+              citationId: null,
+              sourceAnchorId: null,
+              nodeId: null,
+              confidenceLabel: null,
+              statusLabel: "Waiting on evidence",
+              provenance: [],
+            },
+          ],
+        },
+      ],
+    },
+    recommendation: {
+      verdict: "pursue_with_caution",
+      label: "Current recommendation",
+      body:
         "Treat the home as worth pursuing only with a disciplined opener around $928,000. Use this as an illustrative starting point and confirm the final strategy with your broker.",
       confidenceLabel: "73% action confidence",
       riskLabel: "Medium risk",
@@ -383,6 +568,61 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
         },
       ],
     },
+    nextSteps: {
+      title: "What the buyer should do next",
+      summary:
+        "The next move should stay consistent with both the recommendation and the current confidence gaps.",
+      items: [
+        {
+          id: "preview-step-recommendation",
+          title: "Pressure-test the current recommendation",
+          body:
+            "Treat the home as worth pursuing only with a disciplined opener around $928,000. Use this as an illustrative starting point and confirm the final strategy with your broker.",
+          evidence: [
+            {
+              id: "preview-recommendation-evidence",
+              label: "pricing support",
+              citationId: null,
+              sourceAnchorId: null,
+              nodeId: null,
+              confidenceLabel: null,
+              statusLabel: "Waiting on evidence",
+              provenance: [],
+            },
+          ],
+        },
+        {
+          id: "preview-step-comps",
+          title: "Verify comparable sales",
+          body: "Add more verified local sold comps.",
+          evidence: [],
+        },
+        {
+          id: "preview-step-leverage",
+          title: "Verify negotiation leverage",
+          body: "Add fresh neighborhood baselines.",
+          evidence: [],
+        },
+      ],
+    },
+    renderedText: `123 Gulf Stream Ave, Miami Beach, FL 33139
+This shareable recap stays tied to the current memo, recommendation, confidence, and source-trace layers.
+What matters most: Start with the overall case before getting pulled into individual evidence rows.
+- Current case: Offer prep. The current memo has enough evidence to show the upside, the downside, and a clear recommendation in one place.
+- Market reality: Overpriced for this market. This listing is asking more per sqft than the local norm for the selected market slice.
+What looks attractive: These are the strongest buyer-safe reasons the property still looks promising.
+- Time on market: Time on market and the latest price adjustment both suggest the seller is prioritizing momentum over waiting for a premium bid.
+What looks risky or uncertain: These are the biggest reasons to stay disciplined or wait for more proof.
+- Pricing: The listing is trending above the closest renovated comparable set, which creates room for a measured first offer instead of a full-price opener.
+- Offer pack refresh is still running: The refreshed counter-scenario set is still being prepared, so the buyer-safe case holds the current opener until the next pass lands.
+Current recommendation: Treat the home as worth pursuing only with a disciplined opener around $928,000. Use this as an illustrative starting point and confirm the final strategy with your broker.
+Recommended opener: $928,000
+Recommendation confidence: 73% action confidence
+Recommendation risk: Medium risk
+What the buyer should do next: The next move should stay consistent with both the recommendation and the current confidence gaps.
+- Pressure-test the current recommendation: Treat the home as worth pursuing only with a disciplined opener around $928,000. Use this as an illustrative starting point and confirm the final strategy with your broker.
+- Verify comparable sales: Add more verified local sold comps.
+- Verify negotiation leverage: Add fresh neighborhood baselines.`,
   },
   confidenceSections: [
     {

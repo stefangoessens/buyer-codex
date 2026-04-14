@@ -23,6 +23,7 @@ import * as aiEngineOutputsModule from "../../../convex/aiEngineOutputs";
 type TableName =
   | "aiEngineOutputs"
   | "aiOutputAdjudications"
+  | "adjudicationCalibrationRecords"
   | "auditLog"
   | "propertyCases";
 
@@ -73,6 +74,9 @@ function createContext(initial: Partial<Tables> = {}) {
   const tables: Tables = {
     aiEngineOutputs: [...(initial.aiEngineOutputs ?? [])],
     aiOutputAdjudications: [...(initial.aiOutputAdjudications ?? [])],
+    adjudicationCalibrationRecords: [
+      ...(initial.adjudicationCalibrationRecords ?? []),
+    ],
     auditLog: [...(initial.auditLog ?? [])],
     propertyCases: [...(initial.propertyCases ?? [])],
   };
@@ -192,7 +196,16 @@ describe("aiEngineOutputs adjudication", () => {
           _id: "case_1",
           dealRoomId: "deal_1",
           payload: JSON.stringify({
-            claims: [{ citation: "output_1" }],
+            claims: [
+              {
+                id: "claim_offer_1",
+                topic: "offer_recommendation",
+                citation: "output_1",
+              },
+            ],
+            recommendedAction: {
+              rationaleClaimIds: ["claim_offer_1"],
+            },
           }),
           generatedAt: "2026-04-13T18:30:00.000Z",
         },
@@ -236,6 +249,22 @@ describe("aiEngineOutputs adjudication", () => {
       visibility: "buyer_safe",
       reviewStateBefore: "pending",
       reviewStateAfter: "approved",
+    });
+    expect(tables.adjudicationCalibrationRecords[0]).toMatchObject({
+      engineOutputId: "output_1",
+      adjudicationId: tables.aiOutputAdjudications[0]?._id,
+      action: "adjust",
+      visibility: "buyer_safe",
+      confidenceSignal: "review_required",
+      recommendationSignal: "recommendation_adjusted",
+      revisionType: "reviewed_conclusion",
+      calibrationTargets: ["confidence", "recommendation"],
+      linkedClaimCount: 1,
+      recommendationLinkedClaimCount: 1,
+      recommendationRelevant: true,
+      reviewedConclusionPresent: true,
+      buyerExplanationPresent: true,
+      internalNotesPresent: true,
     });
     expect(tables.auditLog[0]?.action).toBe("ai_output_adjudicated");
     expect(analyticsMocks.trackPosthogEvent).toHaveBeenCalledWith(

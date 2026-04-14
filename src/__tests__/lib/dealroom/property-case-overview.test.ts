@@ -724,6 +724,52 @@ describe("buildPropertyCaseOverview", () => {
     expect(surface.artifacts.recommendation.kind).toBe("partial");
     expect(surface.artifacts.summary.kind).toBe("conflicting");
     expect(surface.artifacts.summary.withholdOutput).toBe(true);
+    expect(surface.clientReadySummary.whatMattersMost.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Market reality",
+        }),
+        expect.objectContaining({
+          title: "Time on market",
+        }),
+        expect.objectContaining({
+          title: "Pricing",
+        }),
+      ]),
+    );
+    expect(surface.clientReadySummary.attractive.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Time on market",
+        }),
+      ]),
+    );
+    expect(surface.clientReadySummary.riskyOrUncertain.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Pricing",
+        }),
+        expect.objectContaining({
+          title: expect.stringContaining("still needs more evidence"),
+        }),
+      ]),
+    );
+    expect(surface.clientReadySummary.nextSteps.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: expect.stringContaining("recommendation"),
+        }),
+        expect.objectContaining({
+          title: "Verify pricing",
+        }),
+      ]),
+    );
+    expect(surface.clientReadySummary.renderedText).toContain(
+      "What matters most:",
+    );
+    expect(surface.clientReadySummary.renderedText).toContain(
+      "What looks risky or uncertain:",
+    );
     expect(surface.internal).toBeUndefined();
   });
 
@@ -897,6 +943,22 @@ describe("buildPropertyCaseOverview", () => {
         "missing_market_context",
       ]),
     });
+    expect(surface.clientReadySummary.title).toBe("Client-ready summary");
+    expect(surface.internal.clientReadySummaryDiff.summary).toContain(
+      "withholding",
+    );
+    expect(surface.internal.clientReadySummaryDiff.hiddenItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "internal_rationale",
+          sectionKey: "pricing",
+        }),
+        expect.objectContaining({
+          source: "guardrail",
+          citationId: "engineOut_pricing_1",
+        }),
+      ]),
+    );
   });
 
   it("marks recommendation artifacts conflicting when the evidence graph disagrees", () => {
@@ -1082,6 +1144,11 @@ describe("buildPropertyCaseOverview", () => {
       reviewedConclusion:
         "Open at $615,000 with clean terms and keep concession asks light.",
     });
+    if (surface.variant !== "internal") {
+      expect(surface.clientReadySummary.renderedText).not.toContain(
+        "Internal-only calibration note.",
+      );
+    }
   });
 
   it("updates confidence fingerprints and section guidance deterministically when evidence changes", () => {

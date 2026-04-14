@@ -511,49 +511,170 @@ function PropertyCaseOverviewBody({
 
             <div className="space-y-3 rounded-[20px] border border-neutral-200/80 bg-white/90 p-4">
               <p className="text-sm font-semibold text-neutral-900">
-                Buyer-safe summary
+                Client-ready summary
               </p>
               <p className="text-sm leading-6 text-neutral-600">
-                {summaryState.description}
+                {overview.clientReadySummary.summary}
               </p>
-              {summaryState.kind !== "ready" ? (
-                <p className="text-xs font-medium text-neutral-500">
-                  {summaryState.recoveryDescription}
-                </p>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopySummary}
-                  disabled={summaryState.withholdOutput}
-                >
-                  Copy summary
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleShareSummary}
-                  disabled={!canNativeShare || summaryState.withholdOutput}
-                >
-                  Share summary
-                </Button>
-              </div>
-              {summaryStatus ? (
-                <p className="text-xs font-medium text-neutral-500">
-                  {summaryStatus}
-                </p>
-              ) : null}
-              {overview.viewerRole === "buyer" && onSubmitBuyerFeedback ? (
-                <AdvisoryArtifactFeedbackCard
-                  artifact="summary"
-                  onSubmit={onSubmitBuyerFeedback}
-                />
-              ) : null}
+              <p className="text-xs font-medium text-neutral-500">
+                Built from the same memo, recommendation, confidence, and
+                source-trace layers the deal room already uses.
+              </p>
             </div>
           </div>
         </div>
       </section>
+
+      <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
+        <CardHeader className="gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>{overview.buyerFit.title}</CardTitle>
+              <CardDescription className="mt-2 max-w-3xl text-sm leading-6">
+                {overview.buyerFit.summary}
+              </CardDescription>
+            </div>
+            <Badge
+              variant="outline"
+              className="border-neutral-200 bg-neutral-50 text-neutral-700"
+            >
+              {overview.buyerFit.scoreLabel}
+            </Badge>
+          </div>
+
+          {overview.buyerFit.explicitSignals.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {overview.buyerFit.explicitSignals.map((signal) => (
+                <Badge
+                  key={signal}
+                  variant="outline"
+                  className="border-neutral-200 bg-neutral-50 text-neutral-700"
+                >
+                  {signal}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+        </CardHeader>
+        <CardContent className="grid gap-4 xl:grid-cols-2">
+          <article className="rounded-[22px] border border-success-200/70 bg-success-50/55 p-5">
+            <p className="text-sm font-semibold text-success-900">
+              What supports the fit
+            </p>
+            <div className="mt-3 space-y-3">
+              {overview.buyerFit.supportingReasons.length > 0 ? (
+                overview.buyerFit.supportingReasons.map((reason) => (
+                  <div key={reason.label} className="space-y-1">
+                    <p className="text-sm font-medium text-success-900">
+                      {reason.label}
+                    </p>
+                    <p className="text-sm leading-6 text-success-900/80">
+                      {reason.explanation}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm leading-6 text-success-900/80">
+                  No durable positive fit pattern is strong enough to surface yet.
+                </p>
+              )}
+            </div>
+          </article>
+
+          <article className="rounded-[22px] border border-warning-200/70 bg-warning-50/55 p-5">
+            <p className="text-sm font-semibold text-warning-900">
+              What conflicts with the fit
+            </p>
+            <div className="mt-3 space-y-3">
+              {overview.buyerFit.conflictingReasons.length > 0 ? (
+                overview.buyerFit.conflictingReasons.map((reason) => (
+                  <div key={reason.label} className="space-y-1">
+                    <p className="text-sm font-medium text-warning-900">
+                      {reason.label}
+                    </p>
+                    <p className="text-sm leading-6 text-warning-900/80">
+                      {reason.explanation}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm leading-6 text-warning-900/80">
+                  No durable conflicting pattern is strong enough to surface yet.
+                </p>
+              )}
+            </div>
+          </article>
+
+          {overview.variant === "internal" && (
+            <div className="xl:col-span-2 rounded-[22px] border border-neutral-200/80 bg-neutral-50/78 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900">
+                    Internal preference signals
+                  </p>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-600">
+                    Explicit profile inputs stay separate from inferred memory.
+                    Signals remain suppressed until repeated behavior spans more
+                    than one property.
+                  </p>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="border-neutral-200 bg-white text-neutral-700"
+                >
+                  Internal only
+                </Badge>
+              </div>
+              <div className="mt-5 grid gap-3 xl:grid-cols-2">
+                {overview.buyerFit.inferredSignals.map((signal) => (
+                  <article
+                    key={signal.key}
+                    className="rounded-2xl border border-neutral-200 bg-white p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-neutral-900">
+                          {signal.direction === "prefer"
+                            ? `Usually prefers ${signal.label.toLowerCase()}`
+                            : `Usually avoids ${signal.label.toLowerCase()}`}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-neutral-600">
+                          {signal.statusReason}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge
+                          variant="outline"
+                          className="border-neutral-200 bg-neutral-50 text-neutral-700"
+                        >
+                          {signal.statusLabel}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="border-neutral-200 bg-neutral-50 text-neutral-700"
+                        >
+                          {signal.confidenceLabel}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="border-neutral-200 bg-neutral-50 text-neutral-700"
+                        >
+                          {signal.evidenceCount} homes
+                        </Badge>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+                {overview.buyerFit.inferredSignals.length === 0 ? (
+                  <article className="rounded-2xl border border-dashed border-neutral-200 bg-white p-4 text-sm leading-6 text-neutral-600">
+                    No inferred signals are strong enough to surface yet.
+                  </article>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
         <CardHeader>
@@ -687,6 +808,162 @@ function PropertyCaseOverviewBody({
               )}
             </>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
+        <CardHeader className="gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>{overview.clientReadySummary.title}</CardTitle>
+              <CardDescription className="mt-2 max-w-3xl text-sm leading-6">
+                {overview.clientReadySummary.summary}
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopySummary}
+                disabled={summaryState.withholdOutput}
+              >
+                Copy summary
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleShareSummary}
+                disabled={!canNativeShare || summaryState.withholdOutput}
+              >
+                Share summary
+              </Button>
+            </div>
+          </div>
+          {summaryState.kind !== "ready" ? (
+            <div className="rounded-[18px] border border-warning-200 bg-warning-50/70 px-4 py-3 text-sm leading-6 text-warning-800">
+              {summaryState.title}. {summaryState.description}{" "}
+              {summaryState.recoveryDescription}
+            </div>
+          ) : null}
+          {summaryStatus ? (
+            <p className="text-xs font-medium text-neutral-500">
+              {summaryStatus}
+            </p>
+          ) : null}
+          {overview.viewerRole === "buyer" && onSubmitBuyerFeedback ? (
+            <AdvisoryArtifactFeedbackCard
+              artifact="summary"
+              onSubmit={onSubmitBuyerFeedback}
+            />
+          ) : null}
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="rounded-[22px] bg-neutral-950 p-5 text-white shadow-[0_24px_52px_-36px_rgba(3,14,29,0.4)]">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">
+                  {overview.clientReadySummary.recommendation.label}
+                </p>
+                <p className="mt-3 max-w-3xl text-base font-medium leading-7 text-white">
+                  {overview.clientReadySummary.recommendation.body}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {overview.clientReadySummary.recommendation.confidenceLabel ? (
+                  <Badge className="bg-white/10 text-white">
+                    {overview.clientReadySummary.recommendation.confidenceLabel}
+                  </Badge>
+                ) : null}
+                {overview.clientReadySummary.recommendation.riskLabel ? (
+                  <Badge className="bg-white/10 text-white">
+                    {overview.clientReadySummary.recommendation.riskLabel}
+                  </Badge>
+                ) : null}
+                {overview.clientReadySummary.recommendation.openingPriceLabel ? (
+                  <Badge className="bg-white/10 text-white">
+                    {overview.clientReadySummary.recommendation.openingPriceLabel}
+                  </Badge>
+                ) : null}
+              </div>
+            </div>
+            <DecisionMemoEvidenceHooks
+              hooks={overview.clientReadySummary.recommendation.evidence}
+              tone="dark"
+              onSourceTraceClick={handleSourceTraceClick}
+            />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <DecisionMemoSectionCard
+              section={overview.clientReadySummary.whatMattersMost}
+              tone="neutral"
+              onSourceTraceClick={handleSourceTraceClick}
+            />
+            <DecisionMemoSectionCard
+              section={overview.clientReadySummary.attractive}
+              tone="support"
+              onSourceTraceClick={handleSourceTraceClick}
+            />
+            <DecisionMemoSectionCard
+              section={overview.clientReadySummary.riskyOrUncertain}
+              tone="risk"
+              onSourceTraceClick={handleSourceTraceClick}
+            />
+            <DecisionMemoSectionCard
+              section={overview.clientReadySummary.nextSteps}
+              tone="unknown"
+              onSourceTraceClick={handleSourceTraceClick}
+            />
+          </div>
+
+          {overview.variant === "internal" ? (
+            <div className="rounded-[22px] border border-neutral-200/80 bg-neutral-50/78 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900">
+                    Internal-only content intentionally excluded
+                  </p>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-600">
+                    {overview.internal.clientReadySummaryDiff.summary}
+                  </p>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="border-neutral-200 bg-white text-neutral-700"
+                >
+                  Internal only
+                </Badge>
+              </div>
+              <div className="mt-5 grid gap-3 xl:grid-cols-2">
+                {overview.internal.clientReadySummaryDiff.hiddenItems.map((item) => (
+                  <article
+                    key={item.id}
+                    className="rounded-2xl border border-neutral-200 bg-white p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-neutral-900">
+                          {item.label}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-neutral-600">
+                          {item.summary}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className="border-neutral-200 bg-neutral-50 text-neutral-700"
+                      >
+                        {item.source.replaceAll("_", " ")}
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-xs leading-5 text-neutral-500">
+                      {item.reason}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -1690,7 +1967,7 @@ function DecisionMemoSectionCard({
   onSourceTraceClick,
 }: {
   section: DecisionMemoSectionView;
-  tone: "support" | "caution" | "unknown" | "risk";
+  tone: "support" | "caution" | "unknown" | "risk" | "neutral";
   onSourceTraceClick: (
     citationId: string,
     trigger?: "claim_link" | "broker_adjudication",
@@ -1704,6 +1981,7 @@ function DecisionMemoSectionCard({
         tone === "caution" && "border-warning-200 bg-warning-50/60",
         tone === "unknown" && "border-neutral-200 bg-neutral-50/80",
         tone === "risk" && "border-error-200 bg-error-50/55",
+        tone === "neutral" && "border-primary/15 bg-primary/5",
       )}
     >
       <p className="text-sm font-semibold text-neutral-900">{section.title}</p>

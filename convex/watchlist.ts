@@ -9,6 +9,7 @@ import {
   type WatchlistEntry,
   type WatchlistPropertyInput,
 } from "./lib/watchlist";
+import { rebuildBuyerPreferenceMemory } from "./lib/buyerPreferenceMemory";
 
 /**
  * Convex queries + mutations for the buyer watchlist (KIN-849).
@@ -194,6 +195,7 @@ export const addToWatchlist = mutation({
       addedAt: now,
       updatedAt: now,
     });
+    await rebuildBuyerPreferenceMemory(ctx, user._id);
     return { kind: "added" as const, entryId: inserted };
   },
 });
@@ -244,6 +246,7 @@ export const removeFromWatchlist = mutation({
         });
       }
     }
+    await rebuildBuyerPreferenceMemory(ctx, user._id);
     return { kind: "removed" as const };
   },
 });
