@@ -336,8 +336,64 @@ export interface OfferOutput {
 
 // ═══ Calibration ═══
 
-/** Calibration record for accuracy tracking */
-export interface CalibrationRecord {
+export const CONFIDENCE_BUCKETS = ["low", "medium", "high"] as const;
+
+export type ConfidenceBucket = (typeof CONFIDENCE_BUCKETS)[number];
+
+export const CALIBRATION_CONSUMERS = [
+  "confidence",
+  "telemetry",
+  "override_learning",
+] as const;
+
+export type CalibrationConsumer = (typeof CALIBRATION_CONSUMERS)[number];
+
+export const PRICING_ERROR_CATEGORIES = [
+  "within_expected_range",
+  "accepted_below_strong_opener",
+  "accepted_below_fair_value",
+  "accepted_above_likely_accepted",
+  "accepted_above_walk_away",
+  "confidence_overstated",
+  "required_heavy_negotiation",
+] as const;
+
+export type PricingCalibrationErrorCategory =
+  (typeof PRICING_ERROR_CATEGORIES)[number];
+
+export const RECOMMENDATION_OUTCOMES = [
+  "accepted",
+  "rejected",
+  "withdrawn",
+  "expired",
+] as const;
+
+export type RecommendationBacktestOutcome =
+  (typeof RECOMMENDATION_OUTCOMES)[number];
+
+export const RECOMMENDATION_ERROR_CATEGORIES = [
+  "followed_recommendation",
+  "opened_above_recommendation",
+  "opened_below_recommendation",
+  "contingencies_mismatch",
+  "followed_but_unsuccessful",
+  "accepted_after_override",
+  "confidence_overstated",
+] as const;
+
+export type RecommendationBacktestErrorCategory =
+  (typeof RECOMMENDATION_ERROR_CATEGORIES)[number];
+
+export interface CalibrationBucketSummary {
+  bucket: ConfidenceBucket;
+  totalRecords: number;
+  averageConfidence: number | null;
+  averageRealizedScore: number | null;
+  averageConfidenceDelta: number | null;
+}
+
+/** Pricing calibration record for accuracy tracking against accepted deals. */
+export interface PricingCalibrationRecord {
   propertyId: string;
   engineOutputId: string;
   predictedFairValue: number;
@@ -351,6 +407,12 @@ export interface CalibrationRecord {
   errorWalkAway: number; // percentage
   meanAbsoluteError: number; // percentage
   highError: boolean;
+  overallConfidence: number;
+  realizedScore: number;
+  confidenceDelta: number;
+  withinPredictedRange: boolean;
+  primaryErrorCategory: PricingCalibrationErrorCategory;
+  errorCategories: PricingCalibrationErrorCategory[];
   daysToAccept: number | null;
   countersMade: number;
   acceptedAt: string;
@@ -358,3 +420,72 @@ export interface CalibrationRecord {
   modelId: string;
   recordedAt: string;
 }
+
+/** Backward-compatible alias for existing pricing calibration call sites. */
+export type CalibrationRecord = PricingCalibrationRecord;
+
+/** Recommendation backtest record for advisory outputs against later actions. */
+export interface RecommendationBacktestRecord {
+  propertyId: string;
+  dealRoomId: string;
+  offerId: string;
+  propertyCaseId: string;
+  synthesisVersion: string;
+  recommendationGeneratedAt: string;
+  recommendationConfidence: number;
+  recommendedOpeningPrice: number;
+  recommendedRiskLevel: OfferScenario["riskLevel"];
+  recommendedContingencies: string[];
+  sourceOutputIds: string[];
+  actualOfferPrice: number;
+  actualAcceptedPrice: number | null;
+  actualOutcome: RecommendationBacktestOutcome;
+  actualContingencies: string[];
+  priceDeltaPct: number;
+  contingencyMatchRatio: number;
+  adoptionScore: number;
+  followedRecommendation: boolean;
+  realizedScore: number;
+  confidenceDelta: number;
+  primaryErrorCategory: RecommendationBacktestErrorCategory;
+  errorCategories: RecommendationBacktestErrorCategory[];
+  countersMade: number;
+  outcomeRecordedAt: string;
+}
+
+export interface PricingCalibrationSummary {
+  kind: "pricing";
+  totalRecords: number;
+  meanAbsoluteError: number | null;
+  highErrorRate: number | null;
+  withinPredictedRangeRate: number | null;
+  averageDaysToAccept: number | null;
+  averageCountersMade: number | null;
+  confidenceBuckets: CalibrationBucketSummary[];
+  categoryCounts: Array<{
+    category: PricingCalibrationErrorCategory;
+    count: number;
+  }>;
+  consumers: CalibrationConsumer[];
+}
+
+export interface RecommendationCalibrationSummary {
+  kind: "recommendation";
+  totalRecords: number;
+  followedRecommendationRate: number | null;
+  acceptedOutcomeRate: number | null;
+  acceptedWhenFollowedRate: number | null;
+  averagePriceDeltaPct: number | null;
+  averageContingencyMatchRatio: number | null;
+  averageAdoptionScore: number | null;
+  confidenceBuckets: CalibrationBucketSummary[];
+  categoryCounts: Array<{
+    category: RecommendationBacktestErrorCategory;
+    count: number;
+  }>;
+  consumers: CalibrationConsumer[];
+}
+
+export type CalibrationSummary =
+  | PricingCalibrationSummary
+  | RecommendationCalibrationSummary;
