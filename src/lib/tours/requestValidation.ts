@@ -183,9 +183,9 @@ export function validateTourRequestInput(
 const LEGAL_TRANSITIONS: Record<TourRequestState, TourRequestState[]> = {
   draft: ["submitted", "canceled"],
   submitted: ["blocked", "assigned", "canceled", "failed"],
-  blocked: ["submitted", "canceled", "failed"], // can unblock and resubmit
-  assigned: ["confirmed", "canceled", "failed"],
-  confirmed: ["completed", "canceled", "failed"],
+  blocked: ["submitted", "assigned", "canceled", "failed"],
+  assigned: ["blocked", "submitted", "confirmed", "canceled", "failed"],
+  confirmed: ["blocked", "submitted", "completed", "canceled", "failed"],
   completed: [],
   canceled: [],
   failed: [],

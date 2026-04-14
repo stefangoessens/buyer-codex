@@ -10,6 +10,12 @@ import {
   type AvailabilityWindowRecord,
   type PreferredWindow,
 } from "./lib/assignmentRouting";
+import {
+  assertTourAssignmentTransition,
+  createAssignmentRecord,
+  serializeDetails,
+  syncCanonicalStateFromAssignment,
+} from "./lib/tourWorkflow";
 import { createPayoutObligationCore } from "./showingPayouts";
 
 const coverageAreaValidator = v.object({
@@ -22,44 +28,6 @@ const preferredWindowValidator = v.object({
   start: v.string(),
   end: v.string(),
 });
-
-const ACTIVE_ASSIGNMENT_STATUSES: Array<Doc<"tourAssignments">["status"]> = [
-  "pending",
-  "confirmed",
-  "in_progress",
-];
-
-function isActiveAssignment(status: Doc<"tourAssignments">["status"]): boolean {
-  return ACTIVE_ASSIGNMENT_STATUSES.includes(status);
-}
-
-function serializeDetails(
-  details: Record<string, unknown>,
-): string {
-  return JSON.stringify(details);
-}
-
-function stripSystemFields<T extends { _id: string; _creationTime: number }>(
-  doc: T,
-): Omit<T, "_id" | "_creationTime"> {
-  const { _id: _ignoredId, _creationTime: _ignoredCreationTime, ...rest } = doc;
-  return rest;
-}
-
-function applyOptionalPatch<T extends Record<string, unknown>>(
-  base: T,
-  patch: Partial<T>,
-): T {
-  const next: Record<string, unknown> = { ...base };
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === undefined) {
-      delete next[key];
-    } else {
-      next[key] = value;
-    }
-  }
-  return next as T;
-}
 
 function toCoverageRecord(doc: Doc<"agentCoverage">): AgentCoverageRecord {
   return {
@@ -109,276 +77,6 @@ async function loadAgentAvailability(
     (window: Doc<"availabilityWindows">) =>
       window.ownerType === "agent" && allowed.has(window.ownerId),
   );
-}
-
-async function getActiveAssignmentsForTour(
-  ctx: any,
-  tourId: Id<"tours">,
-): Promise<Array<Doc<"tourAssignments">>> {
-  const assignments = await ctx.db
-    .query("tourAssignments")
-    .withIndex("by_tourId", (q: any) => q.eq("tourId", tourId))
-    .collect();
-  return assignments.filter((assignment: Doc<"tourAssignments">) =>
-    isActiveAssignment(assignment.status),
-  );
-}
-
-async function getActiveAssignmentsForRequest(
-  ctx: any,
-  requestId: Id<"tourRequests">,
-): Promise<Array<Doc<"tourAssignments">>> {
-  const assignments = await ctx.db
-    .query("tourAssignments")
-    .withIndex("by_tourRequestId", (q: any) => q.eq("tourRequestId", requestId))
-    .collect();
-  return assignments.filter((assignment: Doc<"tourAssignments">) =>
-    isActiveAssignment(assignment.status),
-  );
-}
-
-async function ensureCanonicalTourForRequest(
-  ctx: any,
-  request: Doc<"tourRequests">,
-  params: {
-    routingPath: "network" | "showami" | "manual";
-    agentId?: Id<"users">;
-    showamiFallbackId?: string;
-  },
-): Promise<Id<"tours">> {
-  const existingTour = request.linkedTourId
-    ? await ctx.db.get(request.linkedTourId)
-    : null;
-  if (existingTour) {
-    await ctx.db.patch(existingTour._id, {
-      tourRequestId: request._id,
-      assignmentRoutingPath: params.routingPath,
-      ...(params.agentId !== undefined ? { agentId: params.agentId } : {}),
-      ...(params.showamiFallbackId !== undefined
-        ? { showamiFallbackId: params.showamiFallbackId }
-        : {}),
-    });
-    return existingTour._id;
-  }
-
-  const tourId = await ctx.db.insert("tours", {
-    dealRoomId: request.dealRoomId,
-    propertyId: request.propertyId,
-    buyerId: request.buyerId,
-    tourRequestId: request._id,
-    status: "requested",
-    ...(params.agentId !== undefined ? { agentId: params.agentId } : {}),
-    assignmentRoutingPath: params.routingPath,
-    ...(params.showamiFallbackId !== undefined
-      ? { showamiFallbackId: params.showamiFallbackId }
-      : {}),
-    ...(request.buyerNotes !== undefined ? { notes: request.buyerNotes } : {}),
-  });
-
-  await ctx.db.patch(request._id, {
-    linkedTourId: tourId,
-  });
-
-  return tourId;
-}
-
-async function replaceTourRequest(
-  ctx: any,
-  request: Doc<"tourRequests">,
-  patch: Partial<Omit<Doc<"tourRequests">, "_id" | "_creationTime">>,
-): Promise<void> {
-  const base = stripSystemFields(request);
-  const next = applyOptionalPatch(base, patch);
-  await ctx.db.replace(request._id, next);
-}
-
-async function replaceTour(
-  ctx: any,
-  tour: Doc<"tours">,
-  patch: Partial<Omit<Doc<"tours">, "_id" | "_creationTime">>,
-): Promise<void> {
-  const base = stripSystemFields(tour);
-  const next = applyOptionalPatch(base, patch);
-  await ctx.db.replace(tour._id, next);
-}
-
-async function createAssignmentRecord(
-  ctx: any,
-  actorId: Id<"users">,
-  request: Doc<"tourRequests">,
-  params: {
-    routingPath: "network" | "showami" | "manual";
-    agentId?: Id<"users">;
-    notes?: string;
-    showamiFallbackId?: string;
-    routingReason: string;
-    cooperatingBrokerage?: string;
-  },
-): Promise<Id<"tourAssignments">> {
-  const tourId = await ensureCanonicalTourForRequest(ctx, request, {
-    routingPath: params.routingPath,
-    agentId: params.agentId,
-    showamiFallbackId: params.showamiFallbackId,
-  });
-
-  const activeAssignments = await getActiveAssignmentsForRequest(ctx, request._id);
-  if (activeAssignments.length > 0) {
-    throw new Error(
-      "Tour request already has an active assignment. Cancel it before routing again.",
-    );
-  }
-
-  const now = new Date().toISOString();
-  const assignmentId = await ctx.db.insert("tourAssignments", {
-    tourId,
-    tourRequestId: request._id,
-    routingPath: params.routingPath,
-    status: "pending",
-    assignedAt: now,
-    routingReason: params.routingReason,
-    ...(params.agentId !== undefined ? { agentId: params.agentId } : {}),
-    ...(params.notes !== undefined ? { notes: params.notes } : {}),
-    ...(params.showamiFallbackId !== undefined
-      ? { showamiFallbackId: params.showamiFallbackId }
-      : {}),
-    ...(params.cooperatingBrokerage !== undefined
-      ? { cooperatingBrokerage: params.cooperatingBrokerage }
-      : {}),
-  });
-
-  const requestPatch: Partial<Omit<Doc<"tourRequests">, "_id" | "_creationTime">> =
-    params.routingPath === "manual" && params.agentId === undefined
-      ? {
-          status: "blocked",
-          blockingReason: "manual_broker_queue",
-          updatedAt: now,
-          currentAssignmentId: assignmentId,
-          assignmentRoutingPath: params.routingPath,
-          showamiFallbackId: params.showamiFallbackId,
-        }
-      : {
-          status: "assigned",
-          agentId: params.agentId,
-          assignedAt: now,
-          updatedAt: now,
-          blockingReason: undefined,
-          failureReason: undefined,
-          currentAssignmentId: assignmentId,
-          assignmentRoutingPath: params.routingPath,
-          showamiFallbackId: params.showamiFallbackId,
-        };
-  await replaceTourRequest(ctx, request, requestPatch);
-
-  const tour = await ctx.db.get(tourId);
-  if (tour) {
-    await replaceTour(ctx, tour, {
-      tourRequestId: request._id,
-      assignmentRoutingPath: params.routingPath,
-      agentId: params.agentId,
-      showamiFallbackId: params.showamiFallbackId,
-      showamiStatus:
-        params.routingPath === "showami" ? "requested" : undefined,
-    });
-  }
-
-  await ctx.db.insert("auditLog", {
-    userId: actorId,
-    action: "tour_assignment_recorded",
-    entityType: "tourAssignments",
-    entityId: assignmentId,
-    details: serializeDetails({
-      requestId: request._id,
-      tourId,
-      routingPath: params.routingPath,
-      agentId: params.agentId,
-      showamiFallbackId: params.showamiFallbackId,
-      routingReason: params.routingReason,
-    }),
-    timestamp: now,
-  });
-
-  return assignmentId;
-}
-
-async function syncCanonicalStateFromAssignment(
-  ctx: any,
-  assignment: Doc<"tourAssignments">,
-  nextStatus: Doc<"tourAssignments">["status"],
-  now: string,
-  opts?: {
-    completedAt?: string;
-    scheduledAt?: string;
-    showamiStatus?: string;
-    clearAssignment?: boolean;
-    agentId?: Id<"users">;
-    blockingReason?: string;
-  },
-): Promise<void> {
-  const request = assignment.tourRequestId
-    ? ((await ctx.db.get(assignment.tourRequestId)) as Doc<"tourRequests"> | null)
-    : null;
-  const tour = (await ctx.db.get(assignment.tourId)) as Doc<"tours"> | null;
-
-  if (request) {
-    if (nextStatus === "confirmed") {
-      await replaceTourRequest(ctx, request, {
-        status: "confirmed",
-        confirmedAt: now,
-        updatedAt: now,
-        blockingReason: undefined,
-        failureReason: undefined,
-        agentId: opts?.agentId ?? assignment.agentId,
-        currentAssignmentId: assignment._id,
-      });
-    } else if (nextStatus === "completed") {
-      await replaceTourRequest(ctx, request, {
-        status: "completed",
-        completedAt: opts?.completedAt ?? now,
-        confirmedAt: request.confirmedAt ?? now,
-        updatedAt: now,
-        agentId: opts?.agentId ?? assignment.agentId,
-        currentAssignmentId: assignment._id,
-      });
-    } else if (nextStatus === "canceled") {
-      await replaceTourRequest(ctx, request, {
-        status: opts?.blockingReason ? "blocked" : "submitted",
-        updatedAt: now,
-        blockingReason: opts?.blockingReason,
-        currentAssignmentId: undefined,
-        agentId: undefined,
-      });
-    }
-  }
-
-  if (tour) {
-    if (nextStatus === "confirmed") {
-      await replaceTour(ctx, tour, {
-        status: "confirmed",
-        assignmentRoutingPath: assignment.routingPath,
-        agentId: opts?.agentId ?? assignment.agentId,
-        scheduledAt: opts?.scheduledAt ?? tour.scheduledAt,
-        showamiFallbackId: assignment.showamiFallbackId,
-        showamiStatus: opts?.showamiStatus,
-      });
-    } else if (nextStatus === "completed") {
-      await replaceTour(ctx, tour, {
-        status: "completed",
-        assignmentRoutingPath: assignment.routingPath,
-        agentId: opts?.agentId ?? assignment.agentId,
-        completedAt: opts?.completedAt ?? now,
-        showamiFallbackId: assignment.showamiFallbackId,
-        showamiStatus: opts?.showamiStatus,
-      });
-    } else if (nextStatus === "canceled") {
-      await replaceTour(ctx, tour, {
-        status: "requested",
-        agentId: undefined,
-        assignmentRoutingPath: assignment.routingPath,
-        showamiFallbackId: assignment.showamiFallbackId,
-        showamiStatus: opts?.showamiStatus,
-      });
-    }
-  }
 }
 
 export const listActiveAgents = query({
@@ -874,23 +572,7 @@ export const updateAssignmentStatus = mutation({
       throw new Error("Assignment not found");
     }
 
-    const validTransitions: Record<
-      Doc<"tourAssignments">["status"],
-      Array<Doc<"tourAssignments">["status"]>
-    > = {
-      pending: ["confirmed", "canceled"],
-      confirmed: ["in_progress", "canceled"],
-      in_progress: ["completed", "canceled"],
-      completed: [],
-      canceled: [],
-    };
-
-    const allowed = validTransitions[assignment.status] ?? [];
-    if (!allowed.includes(args.newStatus)) {
-      throw new Error(
-        `Invalid transition: ${assignment.status} -> ${args.newStatus}`,
-      );
-    }
+    assertTourAssignmentTransition(assignment.status, args.newStatus);
 
     if (
       ["confirmed", "in_progress", "completed"].includes(args.newStatus) &&
@@ -975,22 +657,7 @@ export const syncShowamiStatus = mutation({
       }
     }
 
-    const validTransitions: Record<
-      Doc<"tourAssignments">["status"],
-      Array<Doc<"tourAssignments">["status"]>
-    > = {
-      pending: ["confirmed", "canceled"],
-      confirmed: ["in_progress", "canceled"],
-      in_progress: ["completed", "canceled"],
-      completed: [],
-      canceled: [],
-    };
-    const allowed = validTransitions[assignment.status] ?? [];
-    if (!allowed.includes(args.newStatus)) {
-      throw new Error(
-        `Invalid Showami transition: ${assignment.status} -> ${args.newStatus}`,
-      );
-    }
+    assertTourAssignmentTransition(assignment.status, args.newStatus);
 
     const resolvedAgentId = args.agentId ?? assignment.agentId;
     if (
