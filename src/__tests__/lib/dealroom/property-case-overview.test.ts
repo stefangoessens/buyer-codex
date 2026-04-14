@@ -584,7 +584,6 @@ describe("buildPropertyCaseOverview", () => {
           reason: "Offer scenarios have not been generated yet.",
         },
       ],
-      evidenceGraph: evidenceGraphFixture(),
       viewerRole: "buyer",
     });
 
