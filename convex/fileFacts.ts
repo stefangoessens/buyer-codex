@@ -516,6 +516,25 @@ export const listByStorageId = query({
 });
 
 /**
+ * List facts produced by one analysis run. Broker/admin only. This is the
+ * explicit boundary between the job pipeline and the typed fact review
+ * surface; callers no longer need to infer provenance from storageId alone.
+ */
+export const listByAnalysisRunId = query({
+  args: { analysisRunId: v.id("fileAnalysisJobs") },
+  returns: v.array(factReturnValidator),
+  handler: async (ctx, args) => {
+    await requireRole(ctx, "broker");
+    return await ctx.db
+      .query("fileFacts")
+      .withIndex("by_analysisRunId", (q) =>
+        q.eq("analysisRunId", args.analysisRunId)
+      )
+      .collect();
+  },
+});
+
+/**
  * List facts awaiting review. Broker/admin only. Used by the
  * broker review queue dashboard.
  */

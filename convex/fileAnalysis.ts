@@ -21,6 +21,12 @@ import { v } from "convex/values";
 import { requireAuth } from "./lib/session";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
+import {
+  assertAllowedJobTransition,
+  buildAnalysisSnapshot,
+  deriveJobOutcome,
+  serializeAnalysisSnapshot,
+} from "./lib/fileAnalysisPipeline";
 
 // ═══ Shared validators ═══
 
@@ -51,6 +57,88 @@ const ruleValidator = v.union(
   v.literal("lien_or_encumbrance"),
 );
 
+const analysisDocTypeValidator = v.union(
+  v.literal("seller_disclosure"),
+  v.literal("hoa_document"),
+  v.literal("inspection_report"),
+  v.literal("title_commitment"),
+  v.literal("survey"),
+  v.literal("other"),
+);
+
+const citationValidator = v.object({
+  pageNumber: v.optional(v.number()),
+  lineStart: v.optional(v.number()),
+  lineEnd: v.optional(v.number()),
+  snippet: v.optional(v.string()),
+});
+
+const pageClassificationValidator = v.object({
+  pageNumber: v.number(),
+  docType: analysisDocTypeValidator,
+  confidence: v.number(),
+});
+
+const extractedFactsValidator = v.object({
+  docType: analysisDocTypeValidator,
+  classifierConfidence: v.number(),
+  effectiveDate: v.optional(v.string()),
+  roofAgeYears: v.optional(v.number()),
+  roofReplacementYear: v.optional(v.number()),
+  floodZone: v.optional(v.string()),
+  knownLeaks: v.optional(v.boolean()),
+  priorClaimsCount: v.optional(v.number()),
+  permitsDisclosed: v.optional(
+    v.union(v.literal("yes"), v.literal("no"), v.literal("unknown")),
+  ),
+  unpermittedWorkMentioned: v.optional(v.boolean()),
+  hoaReserveBalance: v.optional(v.number()),
+  hoaAnnualBudget: v.optional(v.number()),
+  hoaSpecialAssessments: v.optional(
+    v.array(
+      v.object({
+        amount: v.number(),
+        purpose: v.string(),
+      }),
+    ),
+  ),
+  hoaReserveStudyDate: v.optional(v.string()),
+  buildingYearBuilt: v.optional(v.number()),
+  buildingStories: v.optional(v.number()),
+  milestoneInspectionDate: v.optional(v.string()),
+  sirsCompletedDate: v.optional(v.string()),
+  titleExceptions: v.optional(v.array(v.string())),
+  lienCount: v.optional(v.number()),
+  majorDefectCount: v.optional(v.number()),
+  recommendedRepairsCount: v.optional(v.number()),
+});
+
+const analysisFindingValidator = v.object({
+  rule: ruleValidator,
+  severity: severityValidator,
+  label: v.string(),
+  summary: v.string(),
+  confidence: v.number(),
+  requiresReview: v.boolean(),
+  citation: v.optional(citationValidator),
+  observedData: v.optional(v.any()),
+});
+
+const analysisResultValidator = v.object({
+  docType: analysisDocTypeValidator,
+  facts: extractedFactsValidator,
+  findings: v.array(analysisFindingValidator),
+  overallSeverity: severityValidator,
+  overallConfidence: v.number(),
+  requiresBrokerReview: v.boolean(),
+  plainEnglishSummary: v.string(),
+  buyerFacts: v.array(v.string()),
+  pageClassifications: v.array(pageClassificationValidator),
+  promptKey: v.string(),
+  promptVersion: v.string(),
+  engineVersion: v.string(),
+});
+
 // ═══ Access helpers ═══
 
 async function canReadDealRoom(
@@ -73,6 +161,8 @@ function stripJobForBuyer(job: Doc<"fileAnalysisJobs">): Record<string, unknown>
     payload: _payload,
     overallConfidence: _confidence,
     engineVersion: _engineVersion,
+    promptKey: _promptKey,
+    promptVersion: _promptVersion,
     reviewedBy: _r,
     reviewNotes: _rn,
     errorCount: _ec,
@@ -92,6 +182,72 @@ function stripFindingForBuyer(
     ...buyerVisible
   } = finding;
   return buyerVisible;
+}
+
+async function reconcileProjectedFactsForJob(
+  ctx: any,
+  args: {
+    jobId: Id<"fileAnalysisJobs">;
+    storageId: Id<"_storage">;
+    propertyId: Id<"properties">;
+    dealRoomId: Id<"dealRooms">;
+    factProjections: ReturnType<typeof buildAnalysisSnapshot>["factProjections"];
+    now: string;
+  },
+): Promise<void> {
+  if (args.factProjections.length === 0) return;
+
+  const existingFacts = await ctx.db
+    .query("fileFacts")
+    .withIndex("by_storageId", (q: any) => q.eq("storageId", args.storageId))
+    .collect();
+
+  for (const projection of args.factProjections) {
+    for (const existing of existingFacts) {
+      if (
+        existing.factSlug === projection.factSlug &&
+        existing.reviewStatus !== "superseded"
+      ) {
+        await ctx.db.patch(existing._id, {
+          reviewStatus: "superseded",
+          reviewedBy: existing.reviewedBy ?? "system:file_analysis",
+          reviewedAt: args.now,
+          updatedAt: args.now,
+        });
+      }
+    }
+
+    await ctx.db.insert("fileFacts", {
+      factSlug: projection.factSlug,
+      storageId: args.storageId,
+      propertyId: args.propertyId,
+      dealRoomId: args.dealRoomId,
+      analysisRunId: args.jobId,
+      valueKind: projection.valueKind,
+      valueNumeric:
+        projection.valueKind === "numeric"
+          ? projection.valueNumeric
+          : undefined,
+      valueNumericUnit:
+        projection.valueKind === "numeric"
+          ? projection.valueNumericUnit
+          : undefined,
+      valueText: projection.valueKind === "text" ? projection.valueText : undefined,
+      valueDate: projection.valueKind === "date" ? projection.valueDate : undefined,
+      valueBoolean:
+        projection.valueKind === "boolean" ? projection.valueBoolean : undefined,
+      valueEnum: projection.valueKind === "enum" ? projection.valueEnum : undefined,
+      valueEnumAllowed:
+        projection.valueKind === "enum"
+          ? projection.valueEnumAllowed
+          : undefined,
+      confidence: projection.confidence,
+      reviewStatus: "needsReview",
+      internalOnly: projection.internalOnly,
+      createdAt: args.now,
+      updatedAt: args.now,
+    });
+  }
 }
 
 // ═══ Queries ═══
@@ -230,9 +386,7 @@ export const markRunning = internalMutation({
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
     if (!job) throw new Error("Job not found");
-    if (job.status !== "queued" && job.status !== "failed") {
-      throw new Error(`Cannot mark running from status "${job.status}"`);
-    }
+    assertAllowedJobTransition(job.status, "running");
     await ctx.db.patch(args.jobId, {
       status: "running",
       updatedAt: new Date().toISOString(),
@@ -259,21 +413,7 @@ export const markRunning = internalMutation({
 export const recordAnalysisResult = internalMutation({
   args: {
     jobId: v.id("fileAnalysisJobs"),
-    docType: docTypeValidator,
-    payload: v.string(),
-    overallSeverity: severityValidator,
-    overallConfidence: v.number(),
-    engineVersion: v.string(),
-    findings: v.array(
-      v.object({
-        rule: ruleValidator,
-        severity: severityValidator,
-        label: v.string(),
-        summary: v.string(),
-        confidence: v.number(),
-        requiresReview: v.boolean(),
-      }),
-    ),
+    analysis: analysisResultValidator,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -289,29 +429,28 @@ export const recordAnalysisResult = internalMutation({
       );
     }
 
-    // Derive requiresBrokerReview from the findings array, NOT from a
-    // caller-supplied flag. If any finding needs review, the job must be
-    // routed to review_required so resolveJob can act on it.
-    const requiresBrokerReview = args.findings.some((f) => f.requiresReview);
-    const nextStatus = requiresBrokerReview ? "review_required" : "completed";
-
     const now = new Date().toISOString();
+    const snapshot = buildAnalysisSnapshot(args.analysis);
+    const { requiresBrokerReview, nextStatus } = deriveJobOutcome(args.analysis);
+    assertAllowedJobTransition(job.status, nextStatus);
 
     await ctx.db.patch(args.jobId, {
-      docType: args.docType,
+      docType: args.analysis.docType,
       status: nextStatus,
-      payload: args.payload,
-      overallSeverity: args.overallSeverity,
-      overallConfidence: args.overallConfidence,
+      payload: serializeAnalysisSnapshot(snapshot),
+      overallSeverity: args.analysis.overallSeverity,
+      overallConfidence: args.analysis.overallConfidence,
       requiresBrokerReview,
-      engineVersion: args.engineVersion,
+      engineVersion: args.analysis.engineVersion,
+      promptKey: args.analysis.promptKey,
+      promptVersion: args.analysis.promptVersion,
       errorMessage: undefined,
       updatedAt: now,
       completedAt: now,
     });
 
     // Fan out findings so the review queue can index them directly.
-    for (const finding of args.findings) {
+    for (const finding of args.analysis.findings) {
       await ctx.db.insert("fileAnalysisFindings", {
         jobId: args.jobId,
         dealRoomId: job.dealRoomId,
@@ -321,18 +460,37 @@ export const recordAnalysisResult = internalMutation({
         summary: finding.summary,
         confidence: finding.confidence,
         requiresReview: finding.requiresReview,
+        citationPageNumber: finding.citation?.pageNumber,
+        citationLineStart: finding.citation?.lineStart,
+        citationLineEnd: finding.citation?.lineEnd,
+        citationSnippet: finding.citation?.snippet,
+        observedDataJson: finding.observedData
+          ? JSON.stringify(finding.observedData)
+          : undefined,
         createdAt: now,
       });
     }
+
+    await reconcileProjectedFactsForJob(ctx, {
+      jobId: args.jobId,
+      storageId: job.fileStorageId,
+      propertyId: job.propertyId,
+      dealRoomId: job.dealRoomId,
+      factProjections: snapshot.factProjections,
+      now,
+    });
 
     await ctx.db.insert("auditLog", {
       action: `file_analysis_${nextStatus}`,
       entityType: "fileAnalysisJobs",
       entityId: args.jobId,
       details: JSON.stringify({
-        docType: args.docType,
-        severity: args.overallSeverity,
-        findingCount: args.findings.length,
+        docType: args.analysis.docType,
+        severity: args.analysis.overallSeverity,
+        findingCount: args.analysis.findings.length,
+        promptKey: args.analysis.promptKey,
+        promptVersion: args.analysis.promptVersion,
+        factProjectionCount: snapshot.factProjections.length,
       }),
       timestamp: now,
     });
@@ -367,6 +525,7 @@ export const recordFailure = internalMutation({
     }
 
     const now = new Date().toISOString();
+    assertAllowedJobTransition(job.status, "failed");
     await ctx.db.patch(args.jobId, {
       status: "failed",
       errorMessage: args.errorMessage,
@@ -403,9 +562,7 @@ export const retryJob = mutation({
     }
     const job = await ctx.db.get(args.jobId);
     if (!job) throw new Error("Job not found");
-    if (job.status !== "failed") {
-      throw new Error(`Cannot retry job in status "${job.status}"`);
-    }
+    assertAllowedJobTransition(job.status, "queued");
     const now = new Date().toISOString();
     await ctx.db.patch(args.jobId, {
       status: "queued",
@@ -442,11 +599,7 @@ export const resolveJob = mutation({
     }
     const job = await ctx.db.get(args.jobId);
     if (!job) throw new Error("Job not found");
-    if (job.status !== "review_required") {
-      throw new Error(
-        `Cannot resolve job in status "${job.status}" — only review_required jobs are eligible`,
-      );
-    }
+    assertAllowedJobTransition(job.status, "resolved");
 
     const now = new Date().toISOString();
     await ctx.db.patch(args.jobId, {

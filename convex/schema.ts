@@ -2182,7 +2182,7 @@ export default defineSchema({
       v.literal("failed"),
       v.literal("resolved"),
     ),
-    // Serialized DocAnalysisResult from the engine.
+    // Serialized typed snapshot of the persisted analysis result.
     payload: v.optional(v.string()),
     overallSeverity: v.optional(
       v.union(
@@ -2196,6 +2196,8 @@ export default defineSchema({
     overallConfidence: v.optional(v.number()),
     requiresBrokerReview: v.optional(v.boolean()),
     engineVersion: v.optional(v.string()),
+    promptKey: v.optional(v.string()),
+    promptVersion: v.optional(v.string()),
     errorMessage: v.optional(v.string()),
     errorCount: v.number(),
     uploadedBy: v.id("users"),
@@ -2234,6 +2236,11 @@ export default defineSchema({
     summary: v.string(),
     confidence: v.number(),
     requiresReview: v.boolean(),
+    citationPageNumber: v.optional(v.number()),
+    citationLineStart: v.optional(v.number()),
+    citationLineEnd: v.optional(v.number()),
+    citationSnippet: v.optional(v.string()),
+    observedDataJson: v.optional(v.string()),
     resolvedAt: v.optional(v.string()),
     resolvedBy: v.optional(v.id("users")),
     resolutionNotes: v.optional(v.string()),
