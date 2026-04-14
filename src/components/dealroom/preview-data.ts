@@ -145,6 +145,8 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
   viewState: "ready",
   generatedAt: "2026-04-13T15:15:00.000Z",
   generatedAtLabel: "Updated Apr 13",
+  confidenceFingerprint: "evidence-graph-preview-v1",
+  confidenceReplayKey: "dealroom-preview-123",
   overallConfidence: 0.78,
   overallConfidenceLabel: "78% confidence",
   overallConfidenceTone: "strong",
@@ -158,6 +160,118 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
     "Pricing, comps, and leverage are approved for the buyer-safe case. Offer strategy stays visible with one pending citation refresh.",
   headerDescription:
     "The asking price is still above the strongest comparable cluster, but the leverage signals are positive enough to support a disciplined opening number instead of a full-price start.",
+  confidenceSections: [
+    {
+      key: "pricing",
+      title: "Pricing",
+      band: "high",
+      bandLabel: "High confidence",
+      score: 0.82,
+      scoreLabel: "82% confidence",
+      tone: "strong",
+      status: "supported",
+      statusLabel: "Supported",
+      buyerHeadline:
+        "Pricing is anchored by aligned estimate and comp evidence.",
+      buyerExplanation:
+        "Pricing is anchored by aligned estimate and comp evidence. The current evidence is aligned enough to show this in the buyer-safe view.",
+      strongEvidence: [
+        "portal estimate consensus",
+        "recent renovated comparable sales",
+      ],
+      missingEvidence: [],
+      contradictoryEvidence: [],
+      whatWouldIncreaseConfidence: [
+        "Keep the cited evidence fresh before finalizing the decision.",
+      ],
+      dependsOnInference: false,
+    },
+    {
+      key: "comps",
+      title: "Comparable sales",
+      band: "medium",
+      bandLabel: "Moderate confidence",
+      score: 0.74,
+      scoreLabel: "74% confidence",
+      tone: "mixed",
+      status: "mixed",
+      statusLabel: "Mixed evidence",
+      buyerHeadline:
+        "The closest comparable set supports a below-ask opener, but the sample is still tight.",
+      buyerExplanation:
+        "The closest comparable set supports a below-ask opener, but the sample is still tight. Some of this still depends on inferred signals instead of fully verified records.",
+      strongEvidence: ["recent sold comps", "market-context baseline"],
+      missingEvidence: ["more verified local sold comps"],
+      contradictoryEvidence: [],
+      whatWouldIncreaseConfidence: ["Add more verified local sold comps."],
+      dependsOnInference: true,
+    },
+    {
+      key: "leverage",
+      title: "Negotiation leverage",
+      band: "medium",
+      bandLabel: "Moderate confidence",
+      score: 0.69,
+      scoreLabel: "69% confidence",
+      tone: "mixed",
+      status: "mixed",
+      statusLabel: "Mixed evidence",
+      buyerHeadline:
+        "Seller timing signals are helpful, but they are not fully one-directional yet.",
+      buyerExplanation:
+        "Seller timing signals are helpful, but they are not fully one-directional yet. Some of this still depends on inferred signals instead of fully verified records.",
+      strongEvidence: ["days on market", "recent price-cut history"],
+      missingEvidence: ["fresh neighborhood baselines"],
+      contradictoryEvidence: ["conflicting listing-history inputs"],
+      whatWouldIncreaseConfidence: [
+        "Add fresh neighborhood baselines.",
+        "Resolve the conflict around conflicting listing-history inputs.",
+      ],
+      dependsOnInference: true,
+    },
+    {
+      key: "risk",
+      title: "Risk",
+      band: "medium",
+      bandLabel: "Moderate confidence",
+      score: 0.71,
+      scoreLabel: "71% confidence",
+      tone: "mixed",
+      status: "supported",
+      statusLabel: "Supported",
+      buyerHeadline:
+        "The biggest known risks are visible, but they still need normal diligence.",
+      buyerExplanation:
+        "The biggest known risks are visible, but they still need normal diligence. The current evidence is aligned enough to show this in the buyer-safe view.",
+      strongEvidence: ["document findings", "risk hooks"],
+      missingEvidence: [],
+      contradictoryEvidence: [],
+      whatWouldIncreaseConfidence: [
+        "Keep the cited evidence fresh before finalizing the decision.",
+      ],
+      dependsOnInference: false,
+    },
+    {
+      key: "offer_recommendation",
+      title: "Offer recommendation",
+      band: "medium",
+      bandLabel: "Moderate confidence",
+      score: 0.73,
+      scoreLabel: "73% confidence",
+      tone: "mixed",
+      status: "waiting_on_evidence",
+      statusLabel: "Waiting on evidence",
+      buyerHeadline:
+        "The recommended opener is directionally grounded, but one refresh is still pending.",
+      buyerExplanation:
+        "The recommended opener is directionally grounded, but one refresh is still pending. The refreshed scenario set is not fully locked yet.",
+      strongEvidence: ["pricing support", "seller-timing leverage"],
+      missingEvidence: ["fresh offer-scenario refresh"],
+      contradictoryEvidence: [],
+      whatWouldIncreaseConfidence: ["Add fresh offer-scenario refresh."],
+      dependsOnInference: false,
+    },
+  ],
   claims: [
     {
       id: "preview-claim-pricing",
