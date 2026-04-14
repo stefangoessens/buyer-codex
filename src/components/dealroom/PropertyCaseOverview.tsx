@@ -31,8 +31,12 @@ import {
   trackAdvisorySummaryShared,
 } from "@/lib/dealroom/advisoryTelemetry";
 import { isConfigured } from "@/lib/env";
-import type { PropertyCaseOverviewSurface } from "@/lib/dealroom/property-case-overview";
 import type { BuyerReadinessSurface } from "@/lib/dealroom/buyer-readiness";
+import type {
+  DecisionMemoEvidenceHook,
+  DecisionMemoSectionView,
+  PropertyCaseOverviewSurface,
+} from "@/lib/dealroom/property-case-overview";
 import { trackDealRoomUnlocked } from "@/lib/intake/pasteLinkFunnel";
 import { cn } from "@/lib/utils";
 import type {
@@ -189,6 +193,7 @@ function PropertyCaseOverviewBody({
   const canNativeShare =
     typeof navigator !== "undefined" && typeof navigator.share === "function";
   const summaryText = buildBuyerSafeSummaryText(overview);
+  const decisionMemo = overview.decisionMemo;
   const memoState = overview.artifacts.memo;
   const recommendationState = overview.artifacts.recommendation;
   const summaryState = overview.artifacts.summary;
@@ -358,7 +363,7 @@ function PropertyCaseOverviewBody({
                     {overview.propertyAddress}
                   </h1>
                   <p className="mt-3 max-w-xl text-sm leading-6 text-white/78 sm:text-base">
-                    {overview.headerDescription}
+                    {decisionMemo.summary}
                   </p>
                 </div>
 
@@ -513,35 +518,133 @@ function PropertyCaseOverviewBody({
         </div>
       </section>
 
-      {(overview.keyTakeaways.length > 0 || memoState.kind !== "ready") && (
-        <section className="grid gap-4 xl:grid-cols-3">
+      <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
+        <CardHeader>
+          <CardTitle>{decisionMemo.title}</CardTitle>
+          <CardDescription>{decisionMemo.summary}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
           {memoState.kind !== "ready" ? (
-            <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)] xl:col-span-3">
-              <CardContent className="pt-6">
-                <EmptyStateCard
-                  title={memoState.title}
-                  description={`${memoState.description} ${memoState.recoveryDescription}`}
+            <EmptyStateCard
+              title={memoState.title}
+              description={`${memoState.description} ${memoState.recoveryDescription}`}
+            />
+          ) : (
+            <>
+              <div className="rounded-[22px] bg-neutral-950 p-5 text-white shadow-[0_24px_52px_-36px_rgba(3,14,29,0.4)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">
+                      {decisionMemo.recommendation.label}
+                    </p>
+                    <p className="mt-3 max-w-3xl text-base font-medium leading-7 text-white">
+                      {decisionMemo.recommendation.body}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {decisionMemo.recommendation.confidenceLabel ? (
+                      <Badge className="bg-white/10 text-white">
+                        {decisionMemo.recommendation.confidenceLabel}
+                      </Badge>
+                    ) : null}
+                    {decisionMemo.recommendation.riskLabel ? (
+                      <Badge className="bg-white/10 text-white">
+                        {decisionMemo.recommendation.riskLabel}
+                      </Badge>
+                    ) : null}
+                    {decisionMemo.recommendation.openingPriceLabel ? (
+                      <Badge className="bg-white/10 text-white">
+                        {decisionMemo.recommendation.openingPriceLabel}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
+                <DecisionMemoEvidenceHooks
+                  hooks={decisionMemo.recommendation.evidence}
+                  tone="dark"
+                  onSourceTraceClick={handleSourceTraceClick}
                 />
-              </CardContent>
-            </Card>
-          ) : null}
-          {overview.keyTakeaways.map((takeaway) => (
-            <Card
-              key={`${takeaway.title}-${takeaway.body}`}
-              className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]"
-            >
-              <CardHeader className="gap-3 pb-0">
-                <CardDescription className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-                  {takeaway.title}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm leading-6 text-neutral-700">
-                {takeaway.body}
-              </CardContent>
-            </Card>
-          ))}
-        </section>
-      )}
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <DecisionMemoSectionCard
+                  section={decisionMemo.upside}
+                  tone="support"
+                  onSourceTraceClick={handleSourceTraceClick}
+                />
+                <DecisionMemoSectionCard
+                  section={decisionMemo.downside}
+                  tone="caution"
+                  onSourceTraceClick={handleSourceTraceClick}
+                />
+                <DecisionMemoSectionCard
+                  section={decisionMemo.unknowns}
+                  tone="unknown"
+                  onSourceTraceClick={handleSourceTraceClick}
+                />
+                <DecisionMemoSectionCard
+                  section={decisionMemo.unresolvedRisks}
+                  tone="risk"
+                  onSourceTraceClick={handleSourceTraceClick}
+                />
+              </div>
+
+              {overview.variant === "internal" && (
+                <div className="rounded-[22px] border border-neutral-200/80 bg-neutral-50/78 p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-neutral-900">
+                        Internal rationale
+                      </p>
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-600">
+                        {overview.internal.decisionMemo.rationaleSummary}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="border-neutral-200 bg-white text-neutral-700">
+                      Internal only
+                    </Badge>
+                  </div>
+                  <div className="mt-5 grid gap-3 xl:grid-cols-2">
+                    {overview.internal.decisionMemo.sections.map((section) => (
+                      <article
+                        key={section.key}
+                        className="rounded-2xl border border-neutral-200 bg-white p-4"
+                      >
+                        <p className="text-sm font-semibold text-neutral-900">
+                          {section.title}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-neutral-600">
+                          {section.summary}
+                        </p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {section.sourceCategories.map((category) => (
+                            <Badge
+                              key={`${section.key}-${category}`}
+                              variant="outline"
+                              className="border-neutral-200 bg-neutral-50 text-neutral-700"
+                            >
+                              {category.replaceAll("_", " ")}
+                            </Badge>
+                          ))}
+                          {section.reasonCodes.map((code) => (
+                            <Badge
+                              key={`${section.key}-${code}`}
+                              variant="outline"
+                              className="border-neutral-200 bg-neutral-50 font-mono text-[11px] text-neutral-700"
+                            >
+                              {code}
+                            </Badge>
+                          ))}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {overview.marketReality && (
         <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
@@ -1333,6 +1436,123 @@ function PropertyCaseOverviewBody({
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function DecisionMemoSectionCard({
+  section,
+  tone,
+  onSourceTraceClick,
+}: {
+  section: DecisionMemoSectionView;
+  tone: "support" | "caution" | "unknown" | "risk";
+  onSourceTraceClick: (
+    citationId: string,
+    trigger?: "claim_link" | "broker_adjudication",
+  ) => void;
+}) {
+  return (
+    <article
+      className={cn(
+        "rounded-[22px] border p-5",
+        tone === "support" && "border-success-200 bg-success-50/60",
+        tone === "caution" && "border-warning-200 bg-warning-50/60",
+        tone === "unknown" && "border-neutral-200 bg-neutral-50/80",
+        tone === "risk" && "border-error-200 bg-error-50/55",
+      )}
+    >
+      <p className="text-sm font-semibold text-neutral-900">{section.title}</p>
+      <p className="mt-2 text-sm leading-6 text-neutral-600">{section.summary}</p>
+      <div className="mt-4 flex flex-col gap-4">
+        {section.items.length > 0 ? (
+          section.items.map((item) => (
+            <div key={item.id} className="rounded-2xl border border-white/70 bg-white/90 p-4">
+              <p className="text-sm font-semibold text-neutral-900">{item.title}</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-700">{item.body}</p>
+              <DecisionMemoEvidenceHooks
+                hooks={item.evidence}
+                onSourceTraceClick={onSourceTraceClick}
+              />
+            </div>
+          ))
+        ) : (
+          <p className="rounded-2xl border border-white/70 bg-white/90 p-4 text-sm leading-6 text-neutral-600">
+            No additional memo evidence is elevated here yet.
+          </p>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function DecisionMemoEvidenceHooks({
+  hooks,
+  onSourceTraceClick,
+  tone = "light",
+}: {
+  hooks: DecisionMemoEvidenceHook[];
+  onSourceTraceClick?: (
+    citationId: string,
+    trigger?: "claim_link" | "broker_adjudication",
+  ) => void;
+  tone?: "light" | "dark";
+}) {
+  if (hooks.length === 0) return null;
+
+  return (
+    <div className="mt-4 flex flex-col gap-2">
+      {hooks.map((hook) => (
+        <div
+          key={hook.id}
+          className={cn(
+            "rounded-xl border p-3 text-sm",
+            tone === "dark"
+              ? "border-white/10 bg-white/5 text-white/85"
+              : "border-neutral-200 bg-neutral-50/80 text-neutral-700",
+          )}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={cn(tone === "dark" ? "text-white" : "text-neutral-900")}>
+              {hook.label}
+            </span>
+            {hook.confidenceLabel ? (
+              <Badge className={tone === "dark" ? "bg-white/10 text-white" : "bg-white text-neutral-700"}>
+                {hook.confidenceLabel}
+              </Badge>
+            ) : null}
+            {hook.statusLabel ? (
+              <Badge className={tone === "dark" ? "bg-white/10 text-white" : "bg-white text-neutral-700"}>
+                {hook.statusLabel}
+              </Badge>
+            ) : null}
+            {hook.citationId && hook.sourceAnchorId ? (
+              <a
+                href={`#${hook.sourceAnchorId}`}
+                className={cn(
+                  "font-medium",
+                  tone === "dark" ? "text-white" : "text-primary",
+                )}
+                onClick={() =>
+                  onSourceTraceClick?.(hook.citationId!, "claim_link")
+                }
+              >
+                View source
+              </a>
+            ) : null}
+          </div>
+          {hook.provenance.length > 0 ? (
+            <p className={cn("mt-2 text-xs leading-5", tone === "dark" ? "text-white/65" : "text-neutral-500")}>
+              Provenance:{" "}
+              {hook.provenance
+                .map((item) =>
+                  item.capturedAt ? `${item.label} (${item.capturedAt})` : item.label,
+                )
+                .join(", ")}
+            </p>
+          ) : null}
+        </div>
+      ))}
     </div>
   );
 }

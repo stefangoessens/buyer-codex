@@ -219,11 +219,192 @@ function marketContextFixture() {
 
 function evidenceGraphFixture(): Pick<
   PropertyEvidenceGraph,
-  "fingerprint" | "replayKey" | "sections"
+  "fingerprint" | "replayKey" | "nodes" | "sections"
 > {
   return {
     fingerprint: "evidence-graph-v1",
     replayKey: "replay-key-v1",
+    nodes: {
+      "pricing-output": {
+        id: "pricing-output",
+        label: "Pricing output",
+        summary: "Latest pricing engine output.",
+        kind: "model_output",
+        sourceCategory: "inferred_model_generated",
+        confidence: 0.82,
+        internal: {
+          citations: ["engineOut_pricing_1"],
+          provenance: [
+            {
+              label: "Pricing engine output",
+              category: "inferred_model_generated",
+              citation: "engineOut_pricing_1",
+              capturedAt: "2026-04-13T18:55:00.000Z",
+            },
+          ],
+        },
+      },
+      "portal-estimates": {
+        id: "portal-estimates",
+        label: "Portal estimate consensus",
+        summary: "Consensus from portal estimate inputs.",
+        kind: "portal_signals",
+        sourceCategory: "market_baseline_aggregated",
+        confidence: 0.78,
+        internal: {
+          citations: [],
+          provenance: [
+            {
+              label: "Portal estimate consensus",
+              category: "market_baseline_aggregated",
+              capturedAt: "2026-04-13T18:54:00.000Z",
+            },
+          ],
+        },
+      },
+      "market-context": {
+        id: "market-context",
+        label: "Fresh neighborhood baselines",
+        summary: "Fresh neighborhood baselines are still missing.",
+        kind: "missing_evidence",
+        sourceCategory: "market_baseline_aggregated",
+        confidence: null,
+        internal: {
+          citations: [],
+          provenance: [
+            {
+              label: "Neighborhood baselines",
+              category: "market_baseline_aggregated",
+            },
+          ],
+        },
+      },
+      "conflicting-portal-estimates": {
+        id: "conflicting-portal-estimates",
+        label: "Conflicting portal estimates",
+        summary: "Portal estimates are not aligned enough yet.",
+        kind: "conflicting_evidence",
+        sourceCategory: "market_baseline_aggregated",
+        confidence: null,
+        internal: {
+          citations: [],
+          provenance: [
+            {
+              label: "Portal estimate disagreement",
+              category: "market_baseline_aggregated",
+            },
+          ],
+        },
+      },
+      "recent-sales": {
+        id: "recent-sales",
+        label: "Recent sold comps",
+        summary: "Recent sold comps are available.",
+        kind: "recent_sales",
+        sourceCategory: "market_baseline_aggregated",
+        confidence: 0.81,
+        internal: {
+          citations: ["engineOut_comps_1"],
+          provenance: [
+            {
+              label: "Recent sold comps",
+              category: "market_baseline_aggregated",
+              citation: "engineOut_comps_1",
+              capturedAt: "2026-04-13T18:50:00.000Z",
+            },
+          ],
+        },
+      },
+      "browser-verification": {
+        id: "browser-verification",
+        label: "Browser verification",
+        summary: "Browser verification captured listing posture and DOM.",
+        kind: "browser_verification",
+        sourceCategory: "browser_extracted_interactive",
+        confidence: 0.66,
+        internal: {
+          citations: ["engineOut_leverage_1"],
+          provenance: [
+            {
+              label: "Browser verification",
+              category: "browser_extracted_interactive",
+              citation: "engineOut_leverage_1",
+              capturedAt: "2026-04-13T18:57:00.000Z",
+            },
+          ],
+        },
+      },
+      "risk-hooks": {
+        id: "risk-hooks",
+        label: "Risk hooks",
+        summary: "Known risk hooks were detected.",
+        kind: "risk_hooks",
+        sourceCategory: "deterministic_extracted",
+        confidence: 0.79,
+        internal: {
+          citations: [],
+          provenance: [
+            {
+              label: "Risk hooks",
+              category: "deterministic_extracted",
+            },
+          ],
+        },
+      },
+      documents: {
+        id: "documents",
+        label: "Document findings",
+        summary: "Document findings are available.",
+        kind: "documents",
+        sourceCategory: "document_derived",
+        confidence: 0.79,
+        internal: {
+          citations: [],
+          provenance: [
+            {
+              label: "Document findings",
+              category: "document_derived",
+            },
+          ],
+        },
+      },
+      "offer-output": {
+        id: "offer-output",
+        label: "Offer output",
+        summary: "Offer output is available but waits on leverage refresh.",
+        kind: "model_output",
+        sourceCategory: "inferred_model_generated",
+        confidence: 0.68,
+        internal: {
+          citations: ["engineOut_offer_1"],
+          provenance: [
+            {
+              label: "Offer output",
+              category: "inferred_model_generated",
+              citation: "engineOut_offer_1",
+              capturedAt: "2026-04-13T18:59:00.000Z",
+            },
+          ],
+        },
+      },
+      "leverage-output": {
+        id: "leverage-output",
+        label: "Broker-reviewed leverage output",
+        summary: "Fresh leverage review is still missing.",
+        kind: "missing_evidence",
+        sourceCategory: "inferred_model_generated",
+        confidence: null,
+        internal: {
+          citations: [],
+          provenance: [
+            {
+              label: "Leverage output refresh",
+              category: "inferred_model_generated",
+            },
+          ],
+        },
+      },
+    },
     sections: {
       pricing: {
         key: "pricing",
@@ -468,6 +649,51 @@ describe("buildPropertyCaseOverview", () => {
     expect(surface.claims).toHaveLength(3);
     expect(surface.claims[0]?.guardrailState).toBe("softened");
     expect(surface.keyTakeaways).toHaveLength(3);
+    expect(surface.decisionMemo.upside.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Time on market",
+          evidence: [
+            expect.objectContaining({
+              citationId: "engineOut_leverage_1",
+              sourceAnchorId: "source-engineOut_leverage_1",
+            }),
+          ],
+        }),
+      ]),
+    );
+    expect(surface.decisionMemo.downside.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Pricing",
+          evidence: [
+            expect.objectContaining({
+              citationId: "engineOut_pricing_1",
+              provenance: expect.arrayContaining([
+                expect.objectContaining({
+                  label: "Pricing engine output",
+                }),
+              ]),
+            }),
+          ],
+        }),
+      ]),
+    );
+    expect(surface.decisionMemo.unknowns.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: expect.stringContaining("still needs more evidence"),
+        }),
+      ]),
+    );
+    expect(surface.decisionMemo.unresolvedRisks.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Risk",
+        }),
+      ]),
+    );
+    expect(surface.decisionMemo.recommendation.verdict).toBe("pursue_with_caution");
     expect(surface.action?.openingPriceLabel).toBe("$615,000");
     expect(surface.action?.guardrailState).toBe("softened");
     expect(surface.sources[0]?.anchorId).toBe("source-engineOut_pricing_1");
@@ -660,6 +886,16 @@ describe("buildPropertyCaseOverview", () => {
     expect(surface.internal.guardrails[0]).toMatchObject({
       engineLabel: "Pricing",
       state: "softened",
+    });
+    expect(surface.internal.decisionMemo.rationaleSummary).toContain(
+      "Internal rationale exposes",
+    );
+    expect(surface.internal.decisionMemo.sections[0]).toMatchObject({
+      key: "pricing",
+      reasonCodes: expect.arrayContaining([
+        "conflicting_portal_estimates",
+        "missing_market_context",
+      ]),
     });
   });
 
