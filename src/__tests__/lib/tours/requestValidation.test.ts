@@ -253,12 +253,24 @@ describe("canTransition", () => {
     expect(canTransition("blocked", "submitted")).toBe(true);
   });
 
+  it("allows blocked → assigned when routing resolves the blocker", () => {
+    expect(canTransition("blocked", "assigned")).toBe(true);
+  });
+
   it("allows assigned → confirmed", () => {
     expect(canTransition("assigned", "confirmed")).toBe(true);
   });
 
+  it("allows assigned → submitted when an assignment is canceled back to triage", () => {
+    expect(canTransition("assigned", "submitted")).toBe(true);
+  });
+
   it("allows confirmed → completed", () => {
     expect(canTransition("confirmed", "completed")).toBe(true);
+  });
+
+  it("allows confirmed → blocked when execution falls back into coordination", () => {
+    expect(canTransition("confirmed", "blocked")).toBe(true);
   });
 
   it("rejects draft → confirmed (must go through submit/assign)", () => {

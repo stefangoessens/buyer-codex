@@ -10,139 +10,27 @@
  *     stale) for the canonical ops surface
  *   - Internal coordinator notes mutations (hidden from buyers)
  *
- * The pure filter logic is in `src/lib/tours/coordinationFilters.ts` —
- * this module mirrors the essential helpers inline to keep Convex
- * self-contained.
+ * The pure filter logic lives in `src/lib/tours/coordinationFilters.ts`.
+ * This module owns the Convex data joins and delegates the deterministic
+ * queue logic to that shared layer.
  */
 
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAuth } from "./lib/session";
 import type { Doc } from "./_generated/dataModel";
-
-// ═══ Inline filter helpers (mirror src/lib/tours/coordinationFilters.ts) ═══
+import {
+  ACTIVE_STATUSES,
+  applyCoordinationFilters,
+  bucketizeQueue,
+  detectPrerequisiteFailures,
+  isStale,
+  sortByCoordinationPriority,
+  type CoordinationTourRequest,
+} from "../src/lib/tours/coordinationFilters";
+import { loadCurrentAgreementSnapshot } from "./lib/tourWorkflow";
 
 type TourRequest = Doc<"tourRequests">;
-
-const STALE_THRESHOLDS_HOURS = {
-  submitted: 24,
-  blocked: 48,
-  assigned: 12,
-};
-
-function isStaleInternal(request: TourRequest, nowIso: string): boolean {
-  const nowMs = Date.parse(nowIso);
-  if (Number.isNaN(nowMs)) return false;
-  const threshold = (h: number) => h * 60 * 60 * 1000;
-
-  if (request.status === "submitted") {
-    const refMs = Date.parse(request.submittedAt ?? request.createdAt);
-    if (Number.isNaN(refMs)) return false;
-    return nowMs - refMs > threshold(STALE_THRESHOLDS_HOURS.submitted);
-  }
-  if (request.status === "blocked") {
-    // Anchor to updatedAt (written by markBlocked) so a long-submitted
-    // request that was only recently blocked gets a fresh 48h window.
-    const anchor =
-      request.updatedAt ?? request.submittedAt ?? request.createdAt;
-    const refMs = Date.parse(anchor);
-    if (Number.isNaN(refMs)) return false;
-    return nowMs - refMs > threshold(STALE_THRESHOLDS_HOURS.blocked);
-  }
-  if (request.status === "assigned") {
-    const refMs = Date.parse(request.assignedAt ?? request.createdAt);
-    if (Number.isNaN(refMs)) return false;
-    return nowMs - refMs > threshold(STALE_THRESHOLDS_HOURS.assigned);
-  }
-  return false;
-}
-
-/**
- * Load the live agreement state for a buyer — the authoritative
- * current status (signed, canceled, replaced, etc.) derived from the
- * `agreements` table. Used by the prereq detector to catch agreements
- * that were canceled or replaced AFTER the tour request was submitted.
- */
-async function loadLiveAgreementState(
-  ctx: { db: { query: (t: "agreements") => unknown } } & { db: { query: typeof import("./_generated/server").query extends never ? never : (t: "agreements") => unknown } },
-  buyerId: TourRequest["buyerId"],
-): Promise<{
-  type: "none" | "tour_pass" | "full_representation";
-  status: "none" | "draft" | "sent" | "signed" | "replaced" | "canceled";
-}> {
-  type AgreementLike = {
-    type: "tour_pass" | "full_representation" | "none";
-    status: "draft" | "sent" | "signed" | "replaced" | "canceled" | "none";
-    signedAt?: string;
-  };
-
-  const db = (ctx as { db: { query: (table: "agreements") => any } }).db;
-  const agreements = await db
-    .query("agreements")
-    .withIndex("by_buyerId", (q: { eq: (field: string, value: unknown) => unknown }) =>
-      q.eq("buyerId", buyerId),
-    )
-    .collect() as AgreementLike[];
-
-  // Prefer full_representation over tour_pass (stronger grant)
-  const signedFullRep = agreements
-    .filter((a) => a.type === "full_representation" && a.status === "signed")
-    .sort((a, b) => (b.signedAt ?? "").localeCompare(a.signedAt ?? ""))
-    .at(0);
-  if (signedFullRep) return { type: "full_representation", status: "signed" };
-
-  const signedTourPass = agreements
-    .filter((a) => a.type === "tour_pass" && a.status === "signed")
-    .sort((a, b) => (b.signedAt ?? "").localeCompare(a.signedAt ?? ""))
-    .at(0);
-  if (signedTourPass) return { type: "tour_pass", status: "signed" };
-
-  return { type: "none", status: "none" };
-}
-
-function detectPrereqFailuresInternal(
-  request: TourRequest,
-  nowIso: string,
-  liveAgreement?: {
-    type: "none" | "tour_pass" | "full_representation";
-    status: "none" | "draft" | "sent" | "signed" | "replaced" | "canceled";
-  },
-): string[] {
-  const failures: string[] = [];
-  // Prefer live agreement state over the frozen snapshot.
-  const effectiveAgreement = liveAgreement ?? request.agreementStateSnapshot;
-  if (
-    (effectiveAgreement.type !== "tour_pass" &&
-      effectiveAgreement.type !== "full_representation") ||
-    effectiveAgreement.status !== "signed"
-  ) {
-    failures.push("missing_agreement");
-  }
-  if (
-    request.status === "submitted" &&
-    !request.agentId &&
-    isStaleInternal(request, nowIso)
-  ) {
-    failures.push("no_agent_coverage");
-  }
-  if (request.status === "submitted" && isStaleInternal(request, nowIso)) {
-    failures.push("stale_submission");
-  }
-  if (request.status === "blocked" && isStaleInternal(request, nowIso)) {
-    failures.push("stale_blocked");
-  }
-  if (request.status === "assigned" && isStaleInternal(request, nowIso)) {
-    failures.push("stale_assigned");
-  }
-  return failures;
-}
-
-const ACTIVE_STATUSES: Array<TourRequest["status"]> = [
-  "submitted",
-  "blocked",
-  "assigned",
-  "confirmed",
-];
 
 function normalizeSearchText(value: string | undefined): string {
   return value?.trim().toLowerCase() ?? "";
@@ -201,72 +89,89 @@ interface WorkspaceFilterArgs {
   limit?: number;
 }
 
+function toCoordinationRequest(
+  request: TourRequest,
+  liveAgreement = request.agreementStateSnapshot,
+): CoordinationTourRequest {
+  return {
+    _id: request._id as unknown as string,
+    dealRoomId: request.dealRoomId as unknown as string,
+    propertyId: request.propertyId as unknown as string,
+    buyerId: request.buyerId as unknown as string,
+    agentId: request.agentId as unknown as string | undefined,
+    status: request.status,
+    submittedAt: request.submittedAt,
+    assignedAt: request.assignedAt,
+    updatedAt: request.updatedAt,
+    createdAt: request.createdAt,
+    blockingReason: request.blockingReason,
+    agreementStateSnapshot: {
+      type: liveAgreement.type,
+      status: liveAgreement.status,
+    },
+  };
+}
+
 async function filterRequestsForWorkspace(
   ctx: { db: { query: (table: "tourRequests") => any; get: (id: unknown) => Promise<unknown> } },
   args: WorkspaceFilterArgs,
 ): Promise<TourRequest[]> {
   const all = (await ctx.db.query("tourRequests").collect()) as TourRequest[];
   const nowIso = new Date().toISOString();
-  const nowMs = Date.parse(nowIso);
-
-  const statusSet =
-    args.statuses && args.statuses.length > 0
-      ? new Set(args.statuses)
-      : new Set(ACTIVE_STATUSES);
 
   const liveAgreementCache = new Map<
     string,
-    Awaited<ReturnType<typeof loadLiveAgreementState>>
+    Awaited<ReturnType<typeof loadCurrentAgreementSnapshot>>
   >();
   const getLiveFor = async (buyerId: TourRequest["buyerId"]) => {
     const key = buyerId as unknown as string;
     if (!liveAgreementCache.has(key)) {
-      liveAgreementCache.set(key, await loadLiveAgreementState(ctx as never, buyerId));
+      liveAgreementCache.set(
+        key,
+        await loadCurrentAgreementSnapshot(ctx as never, buyerId),
+      );
     }
     return liveAgreementCache.get(key)!;
   };
 
-  const filtered: TourRequest[] = [];
-  for (const r of all) {
-    if (!statusSet.has(r.status)) continue;
-    if (args.unassignedOnly && r.agentId) continue;
-    if (args.assignedOnly && !r.agentId) continue;
-    if (args.agentId && r.agentId !== args.agentId) continue;
-    if (args.staleOnly && !isStaleInternal(r, nowIso)) continue;
+  const materialized = await Promise.all(
+    all.map(async (request) =>
+      toCoordinationRequest(request, await getLiveFor(request.buyerId)),
+    ),
+  );
 
-    if (typeof args.minAgeHours === "number") {
-      const createdMs = Date.parse(r.createdAt);
-      if (Number.isNaN(createdMs)) continue;
-      if (nowMs - createdMs < args.minAgeHours * 60 * 60 * 1000) continue;
-    }
-    if (typeof args.maxAgeHours === "number") {
-      const createdMs = Date.parse(r.createdAt);
-      if (Number.isNaN(createdMs)) continue;
-      if (nowMs - createdMs > args.maxAgeHours * 60 * 60 * 1000) continue;
-    }
-
-    if (args.hasPrerequisiteFailure) {
-      const live = await getLiveFor(r.buyerId);
-      const failures = detectPrereqFailuresInternal(r, nowIso, live);
-      if (failures.length === 0) continue;
-    }
-
-    if (args.geographyQuery) {
-      const property = (await ctx.db.get(r.propertyId)) as Doc<"properties"> | null;
-      if (!matchesGeographyQuery(property, args.geographyQuery)) continue;
-    }
-
-    filtered.push(r);
+  let filtered = applyCoordinationFilters(materialized, args, nowIso);
+  if (args.staleOnly) {
+    filtered = filtered.filter((request) => isStale(request, nowIso));
   }
 
-  filtered.sort((a, b) => {
-    const aStale = isStaleInternal(a, nowIso) ? 1 : 0;
-    const bStale = isStaleInternal(b, nowIso) ? 1 : 0;
-    if (aStale !== bStale) return bStale - aStale;
-    return a.createdAt.localeCompare(b.createdAt);
+  const keptIds = new Set(filtered.map((request) => request._id));
+  const matching: TourRequest[] = [];
+  for (const request of all) {
+    if (!keptIds.has(request._id as unknown as string)) continue;
+    if (args.geographyQuery) {
+      const property = (await ctx.db.get(request.propertyId)) as Doc<"properties"> | null;
+      if (!matchesGeographyQuery(property, args.geographyQuery)) continue;
+    }
+    matching.push(request);
+  }
+
+  const sorted = sortByCoordinationPriority(
+    matching.map((request) => toCoordinationRequest(request)),
+    nowIso,
+  );
+  const sortedIds = new Map(
+    sorted.map((request, index) => [request._id, index]),
+  );
+
+  matching.sort((left, right) => {
+    return (
+      (sortedIds.get(left._id as unknown as string) ?? 0) -
+      (sortedIds.get(right._id as unknown as string) ?? 0)
+    );
   });
 
-  return filtered.slice(0, args.limit ?? 100);
+  return matching.slice(0, args.limit ?? 100);
 }
 
 // ═══ Queries ═══
@@ -281,41 +186,15 @@ export const getQueueBuckets = query({
   handler: async (ctx) => {
     await requireInternalUser(ctx);
 
-    // Fetch all non-terminal tour requests. In production this could be
-    // paginated or bounded by a date window; for now we expect the
-    // active queue to stay small (< a few hundred rows).
-    const all = await ctx.db.query("tourRequests").collect();
-    const active = all.filter((r) => ACTIVE_STATUSES.includes(r.status));
-
     const nowIso = new Date().toISOString();
-    const incoming: TourRequest[] = [];
-    const blocked: TourRequest[] = [];
-    const assigned: TourRequest[] = [];
-    const confirmed: TourRequest[] = [];
-    const stale: TourRequest[] = [];
-
-    for (const r of active) {
-      if (isStaleInternal(r, nowIso)) stale.push(r);
-
-      if (r.status === "submitted" && !r.agentId) {
-        incoming.push(r);
-      } else if (r.status === "blocked") {
-        blocked.push(r);
-      } else if (r.status === "assigned") {
-        assigned.push(r);
-      } else if (r.status === "confirmed") {
-        confirmed.push(r);
-      }
-    }
+    const all = (await ctx.db.query("tourRequests").collect()) as TourRequest[];
+    const buckets = bucketizeQueue(
+      all.map((request) => toCoordinationRequest(request)),
+      nowIso,
+    );
 
     return {
-      incoming,
-      blocked,
-      assigned,
-      confirmed,
-      stale,
-      totalActive:
-        incoming.length + blocked.length + assigned.length + confirmed.length,
+      ...buckets,
       generatedAt: nowIso,
     };
   },
@@ -458,8 +337,16 @@ export const listWorkspace = query({
         const latestNoteAuthor = latestNote
           ? await loadUser(latestNote.authorId)
           : null;
-        const liveAgreement = await loadLiveAgreementState(ctx, request.buyerId);
-        const failures = detectPrereqFailuresInternal(request, nowIso, liveAgreement);
+        const liveAgreement = await loadCurrentAgreementSnapshot(
+          ctx as never,
+          request.buyerId,
+        );
+        const coordinationRequest = toCoordinationRequest(request, liveAgreement);
+        const failures = detectPrerequisiteFailures(
+          coordinationRequest,
+          nowIso,
+          liveAgreement,
+        );
         const createdMs = Date.parse(request.createdAt);
         const ageHours =
           Number.isNaN(createdMs) || Number.isNaN(nowMs)
@@ -499,7 +386,7 @@ export const listWorkspace = query({
           assignedAt: request.assignedAt ?? null,
           confirmedAt: request.confirmedAt ?? null,
           ageHours,
-          isStale: isStaleInternal(request, nowIso),
+          isStale: isStale(coordinationRequest, nowIso),
           prerequisiteFailures: failures,
           latestCoordinatorNote: latestNote
             ? {
@@ -569,16 +456,20 @@ export const getWithPrereqAnalysis = query({
     const nowIso = new Date().toISOString();
     // Load the live agreement state so the prereq analysis reflects
     // the current agreement, not just the frozen submission snapshot.
-    const liveAgreement = await loadLiveAgreementState(ctx, request.buyerId);
+    const liveAgreement = await loadCurrentAgreementSnapshot(
+      ctx as never,
+      request.buyerId,
+    );
+    const coordinationRequest = toCoordinationRequest(request, liveAgreement);
     return {
       request,
       liveAgreement,
-      prerequisiteFailures: detectPrereqFailuresInternal(
-        request,
+      prerequisiteFailures: detectPrerequisiteFailures(
+        coordinationRequest,
         nowIso,
         liveAgreement,
       ),
-      isStale: isStaleInternal(request, nowIso),
+      isStale: isStale(coordinationRequest, nowIso),
       analyzedAt: nowIso,
     };
   },

@@ -14,180 +14,22 @@
  * only handles persistence, auth, and audit logging.
  */
 
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAuth } from "./lib/session";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { MutationCtx } from "./_generated/server";
 import { buildTourFlowProfile, loadBuyerProfileView } from "./lib/buyerProfile";
-
-/**
- * Look up the buyer's current signed agreement state directly from the
- * `agreements` table. Returns the newest signed tour_pass OR
- * full_representation for this buyer, or null if none exists.
- *
- * This is the source of truth for tour eligibility — never trust a
- * client-supplied agreement snapshot (security regression: a malicious
- * buyer could forge `{type: "tour_pass", status: "signed"}` in createDraft
- * and bypass the tour-pass gate).
- */
-async function loadCurrentAgreementSnapshot(
-  ctx: MutationCtx,
-  buyerId: Id<"users">,
-): Promise<{
-  type: "none" | "tour_pass" | "full_representation";
-  status: "none" | "draft" | "sent" | "signed" | "replaced" | "canceled";
-  signedAt?: string;
-}> {
-  const agreements = await ctx.db
-    .query("agreements")
-    .withIndex("by_buyerId", (q) => q.eq("buyerId", buyerId))
-    .collect();
-
-  // Prefer full_representation over tour_pass (it grants broader access).
-  // Within each type, pick the most recently signed.
-  const signedFullRep = agreements
-    .filter((a) => a.type === "full_representation" && a.status === "signed")
-    .sort((a, b) => (b.signedAt ?? "").localeCompare(a.signedAt ?? ""))
-    .at(0);
-  if (signedFullRep) {
-    return {
-      type: "full_representation",
-      status: "signed",
-      signedAt: signedFullRep.signedAt,
-    };
-  }
-
-  const signedTourPass = agreements
-    .filter((a) => a.type === "tour_pass" && a.status === "signed")
-    .sort((a, b) => (b.signedAt ?? "").localeCompare(a.signedAt ?? ""))
-    .at(0);
-  if (signedTourPass) {
-    return {
-      type: "tour_pass",
-      status: "signed",
-      signedAt: signedTourPass.signedAt,
-    };
-  }
-
-  return { type: "none", status: "none" };
-}
-
-// ═══ Inline input validation ═══
-//
-// These validation rules mirror the pure helper in
-// src/lib/tours/requestValidation.ts. The src/ version is used by the
-// buyer UI for client-side pre-validation; the Convex version is the
-// authoritative check that runs on every mutation. Any rule change must
-// be made in BOTH places — test coverage for both sides enforces parity.
-
-interface ValidatedDraftInput {
-  preferredWindows: Array<{ start: string; end: string }>;
-  attendeeCount: number;
-  buyerNotes?: string;
-}
-
-function validateInputOrThrow(
-  input: {
-    dealRoomId: string;
-    propertyId: string;
-    preferredWindows: Array<{ start: string; end: string }>;
-    attendeeCount: number;
-    buyerNotes?: string;
-    agreementStateSnapshot: {
-      type: "none" | "tour_pass" | "full_representation";
-      status: "none" | "draft" | "sent" | "signed" | "replaced" | "canceled";
-      signedAt?: string;
-    };
-  },
-  now: string,
-): ValidatedDraftInput {
-  // Agreement check — tour pass or full representation required, signed
-  const agType = input.agreementStateSnapshot.type;
-  const agStatus = input.agreementStateSnapshot.status;
-  if (
-    (agType !== "tour_pass" && agType !== "full_representation") ||
-    agStatus !== "signed"
-  ) {
-    throw new Error(
-      "MISSING_TOUR_PASS: A signed tour pass or full representation agreement is required to request a tour",
-    );
-  }
-
-  // Attendee count
-  if (
-    !Number.isInteger(input.attendeeCount) ||
-    input.attendeeCount < 1 ||
-    input.attendeeCount > 10
-  ) {
-    throw new Error(
-      "INVALID_ATTENDEE_COUNT: Attendee count must be an integer between 1 and 10",
-    );
-  }
-
-  // Date windows — 1 to 5
-  if (input.preferredWindows.length === 0 || input.preferredWindows.length > 5) {
-    throw new Error(
-      "INVALID_DATE_WINDOW: Must provide between 1 and 5 preferred time windows",
-    );
-  }
-
-  const nowMs = Date.parse(now);
-  if (Number.isNaN(nowMs)) {
-    throw new Error(
-      "INVALID_DATE_WINDOW: Server clock is invalid — cannot validate windows",
-    );
-  }
-
-  for (const window of input.preferredWindows) {
-    const startMs = Date.parse(window.start);
-    const endMs = Date.parse(window.end);
-    if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
-      throw new Error(
-        "INVALID_DATE_WINDOW: Preferred window has unparseable start or end date",
-      );
-    }
-    if (endMs <= startMs) {
-      throw new Error(
-        "INVALID_DATE_WINDOW: Preferred window end must be after start",
-      );
-    }
-    if (startMs <= nowMs) {
-      throw new Error(
-        "INVALID_DATE_WINDOW: Preferred window start must be in the future",
-      );
-    }
-  }
-
-  return {
-    preferredWindows: input.preferredWindows,
-    attendeeCount: input.attendeeCount,
-    buyerNotes: input.buyerNotes?.trim().slice(0, 2000),
-  };
-}
+import {
+  assertTourRequestTransition,
+  loadCurrentAgreementSnapshot,
+  validateTourRequestDraftInputOrThrow,
+} from "./lib/tourWorkflow";
 
 // ═══ Shared validators ═══
 
 const windowValidator = v.object({
   start: v.string(),
   end: v.string(),
-});
-
-const agreementSnapshotValidator = v.object({
-  type: v.union(
-    v.literal("none"),
-    v.literal("tour_pass"),
-    v.literal("full_representation"),
-  ),
-  status: v.union(
-    v.literal("none"),
-    v.literal("draft"),
-    v.literal("sent"),
-    v.literal("signed"),
-    v.literal("replaced"),
-    v.literal("canceled"),
-  ),
-  signedAt: v.optional(v.string()),
 });
 
 // ═══ Queries ═══
@@ -322,7 +164,7 @@ export const createDraft = mutation({
     // Validate input BEFORE persisting. Invalid drafts never hit storage.
     // Import the validator dynamically to avoid circular deps with tests.
     const now = new Date().toISOString();
-    const validation = validateInputOrThrow({
+    const validation = validateTourRequestDraftInputOrThrow({
       dealRoomId: args.dealRoomId,
       propertyId: args.propertyId,
       preferredWindows: args.preferredWindows,
@@ -405,6 +247,8 @@ export const submit = mutation({
       throw new Error(`Cannot submit request in status "${request.status}"`);
     }
 
+    assertTourRequestTransition(request.status, "submitted");
+
     // Re-derive agreement snapshot from the LIVE agreements table at
     // submission time. Never trust the stored snapshot — an agreement can
     // be canceled or replaced between draft creation and submission, and
@@ -464,6 +308,7 @@ export const unblock = mutation({
         `ILLEGAL_TRANSITION: Cannot unblock request in status "${request.status}" — only blocked requests can be unblocked`,
       );
     }
+    assertTourRequestTransition(request.status, "submitted");
     const now = new Date().toISOString();
     await ctx.db.patch(args.requestId, {
       status: "submitted",
@@ -498,6 +343,7 @@ export const markBlocked = mutation({
     if (request.status !== "submitted") {
       throw new Error(`Cannot block request in status "${request.status}"`);
     }
+    assertTourRequestTransition(request.status, "blocked");
     const now = new Date().toISOString();
     await ctx.db.patch(args.requestId, {
       status: "blocked",
@@ -540,6 +386,7 @@ export const assignAgent = mutation({
         `ILLEGAL_TRANSITION: Cannot assign request in status "${request.status}" — only submitted requests can be assigned (blocked requests must be unblocked first)`,
       );
     }
+    assertTourRequestTransition(request.status, "assigned");
 
     // Verify the agent exists and has the right role
     const agent = await ctx.db.get(args.agentId);
@@ -584,6 +431,7 @@ export const confirm = mutation({
     if (request.status !== "assigned") {
       throw new Error(`Cannot confirm request in status "${request.status}"`);
     }
+    assertTourRequestTransition(request.status, "confirmed");
 
     // Validate linkedTourId belongs to the SAME deal room, property, and
     // buyer as this request before persisting. Prevents a broker from
@@ -641,6 +489,7 @@ export const markCompleted = mutation({
     if (request.status !== "confirmed") {
       throw new Error(`Cannot complete request in status "${request.status}"`);
     }
+    assertTourRequestTransition(request.status, "completed");
     const now = new Date().toISOString();
     await ctx.db.patch(args.requestId, {
       status: "completed",
@@ -681,6 +530,7 @@ export const cancel = mutation({
     if (terminal.has(request.status)) {
       throw new Error(`Cannot cancel request in terminal status "${request.status}"`);
     }
+    assertTourRequestTransition(request.status, "canceled");
 
     const now = new Date().toISOString();
     await ctx.db.patch(args.requestId, {
@@ -735,6 +585,7 @@ export const markFailed = mutation({
         `ILLEGAL_TRANSITION: Cannot mark request failed from status "${request.status}" (only submitted, blocked, assigned, or confirmed can fail)`,
       );
     }
+    assertTourRequestTransition(request.status, "failed");
 
     const now = new Date().toISOString();
     await ctx.db.patch(args.requestId, {
