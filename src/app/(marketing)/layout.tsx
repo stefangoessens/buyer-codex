@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { NavHeader } from "@/components/marketing/NavHeader";
-import { Footer } from "@/components/marketing/Footer";
+import {
+  MarketingShellFooter,
+  MarketingShellHeader,
+} from "@/components/marketing/MarketingScaffold";
 import { appSurfaceDefinitions } from "@/lib/app-shell";
 
 export const dynamic = "force-static";
@@ -12,10 +14,10 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen">
-      <NavHeader />
-      <main>{children}</main>
-      <Footer />
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_22%,#ffffff_60%,#f8fafc_100%)]">
+      <MarketingShellHeader />
+      <main className="pb-8">{children}</main>
+      <MarketingShellFooter />
     </div>
   );
 }
