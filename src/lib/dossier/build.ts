@@ -4,7 +4,12 @@ import {
   buildLeverageInputFromEnrichment,
   buildPricingInputFromEnrichment,
 } from "@/lib/enrichment/engineContext";
-import type { PortalEstimate, RecentComparableSale } from "@/lib/enrichment/types";
+import { buildListingAgentTrackRecord } from "@/lib/enrichment/listingAgentTrackRecord";
+import type {
+  ListingAgentProfile,
+  PortalEstimate,
+  RecentComparableSale,
+} from "@/lib/enrichment/types";
 import { BUILDER_VERSION } from "@/lib/negotiation/brief";
 import type { NegotiationBriefInputs } from "@/lib/negotiation/types";
 import {
@@ -33,7 +38,20 @@ export function buildPropertyDossier(
   input: DossierBuildInput,
 ): PropertyDossier {
   const latestOutputs = input.latestOutputs ?? {};
-  const engineInputs = buildDownstreamInputs(input, latestOutputs);
+  const listingAgents = input.listingAgents.map<ListingAgentProfile>((agent) => ({
+    ...agent,
+    trackRecord: buildListingAgentTrackRecord({
+      agent,
+      marketContext: input.marketContext,
+    }),
+  }));
+  const engineInputs = buildDownstreamInputs(
+    {
+      ...input,
+      listingAgents,
+    },
+    latestOutputs,
+  );
   const sections: PropertyDossierSections = {
     propertyFacts: createSection({
       key: "propertyFacts",
@@ -269,12 +287,12 @@ export function buildPropertyDossier(
       visibility: "internal_only",
       sourceCategories: sourceCategoryUnion([
         input.snapshots.length > 0 ? "deterministic_extracted" : null,
-        input.listingAgents.length > 0 ? "market_baseline_aggregated" : null,
+        listingAgents.length > 0 ? "market_baseline_aggregated" : null,
       ]),
       confidence: enrichmentArtifactsConfidence(input),
       lastRefreshedAt: latestTimestamp([
         ...input.snapshots.map((row) => row.lastRefreshedAt),
-        ...input.listingAgents.map((row) => row.lastRefreshedAt),
+        ...listingAgents.map((row) => row.lastRefreshedAt),
       ]),
       provenance: [
         ...input.snapshots.map((snapshot) => ({
@@ -283,7 +301,7 @@ export function buildPropertyDossier(
           citation: snapshot.provenance.source,
           capturedAt: snapshot.lastRefreshedAt,
         })),
-        ...input.listingAgents.map((agent) => ({
+        ...listingAgents.map((agent) => ({
           label: `Listing agent ${agent.name}`,
           category: "market_baseline_aggregated" as const,
           capturedAt: agent.lastRefreshedAt,
@@ -293,7 +311,7 @@ export function buildPropertyDossier(
         snapshots: [...input.snapshots].sort((a, b) =>
           compareDesc(a.lastRefreshedAt, b.lastRefreshedAt),
         ),
-        listingAgents: [...input.listingAgents].sort((a, b) =>
+        listingAgents: [...listingAgents].sort((a, b) =>
           compareDesc(a.lastRefreshedAt, b.lastRefreshedAt),
         ),
       },

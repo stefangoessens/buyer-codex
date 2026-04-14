@@ -79,7 +79,12 @@ export interface NegotiationPlaybookInputs {
   marketContext?: PropertyMarketContext | null;
   listingAgent?: Pick<
     ListingAgentProfile,
-    "name" | "brokerage" | "avgDaysOnMarket" | "medianListToSellRatio" | "priceCutFrequency"
+    | "name"
+    | "brokerage"
+    | "avgDaysOnMarket"
+    | "medianListToSellRatio"
+    | "priceCutFrequency"
+    | "trackRecord"
   > | null;
   buyer: {
     budgetMax?: number;
@@ -709,24 +714,29 @@ function buildBranchRationale(args: {
 
   if (
     args.input.listingAgent &&
-    (typeof args.input.listingAgent.priceCutFrequency === "number" ||
+    (args.input.listingAgent.trackRecord ||
+      typeof args.input.listingAgent.priceCutFrequency === "number" ||
       typeof args.input.listingAgent.medianListToSellRatio === "number")
   ) {
+    const trackRecord = args.input.listingAgent.trackRecord;
     rationale.push({
       code: "listing_agent",
       label: "Listing-agent pattern",
-      summary: `${
-        args.input.listingAgent.name || "This listing agent"
-      } carries ${
-        typeof args.input.listingAgent.priceCutFrequency === "number"
-          ? `${formatPercent(args.input.listingAgent.priceCutFrequency)} price-cut frequency`
-          : "no fresh price-cut read"
-      } and ${
-        typeof args.input.listingAgent.medianListToSellRatio === "number"
-          ? `${formatRatio(args.input.listingAgent.medianListToSellRatio)} median list-to-sell`
-          : "no current list-to-sell benchmark"
-      }.`,
+      summary:
+        trackRecord?.internalSummary ??
+        `${
+          args.input.listingAgent.name || "This listing agent"
+        } carries ${
+          typeof args.input.listingAgent.priceCutFrequency === "number"
+            ? `${formatPercent(args.input.listingAgent.priceCutFrequency)} price-cut frequency`
+            : "no fresh price-cut read"
+        } and ${
+          typeof args.input.listingAgent.medianListToSellRatio === "number"
+            ? `${formatRatio(args.input.listingAgent.medianListToSellRatio)} median list-to-sell`
+            : "no current list-to-sell benchmark"
+        }.`,
       buyerSafeSummary:
+        trackRecord?.buyerSafeSummary ??
         "The listing side looks more negotiable than a no-data file, so the broker has room to test terms.",
     });
   }

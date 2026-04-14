@@ -147,6 +147,68 @@ export interface FieldProvenance {
   fetchedAt: string;
 }
 
+export const LISTING_AGENT_TRACK_RECORD_METRICS = [
+  "days_on_market",
+  "ask_to_sale_ratio",
+  "price_cut_frequency",
+  "price_cut_severity",
+  "relist_rate",
+] as const;
+
+export type ListingAgentTrackRecordMetricKey =
+  (typeof LISTING_AGENT_TRACK_RECORD_METRICS)[number];
+
+export interface ListingAgentTrackRecordSampleSize {
+  agent: number | null;
+  baseline: number | null;
+  minimumRequired: number;
+  viable: boolean;
+  estimated: boolean;
+}
+
+export interface ListingAgentTrackRecordMetric {
+  key: ListingAgentTrackRecordMetricKey;
+  label: string;
+  status: "available" | "weak_signal" | "not_collected";
+  agentValue: number | null;
+  baselineValue: number | null;
+  delta: number | null;
+  deltaPct: number | null;
+  sampleSize: ListingAgentTrackRecordSampleSize;
+  confidence: number;
+  buyerSafeSummary: string | null;
+  internalSummary: string;
+  provenance: FieldProvenance[];
+}
+
+export interface ListingAgentTrackRecord {
+  status: "ready" | "narrowed" | "insufficient_data";
+  scope: "individual_agent";
+  confidence: number;
+  confidenceLabel: "high" | "moderate" | "low";
+  benchmarkArea:
+    | {
+        geoKind: GeoKind;
+        geoKey: string;
+        windowDays: number;
+      }
+    | null;
+  acquisition: {
+    viability: "viable" | "partial" | "weak";
+    thresholds: {
+      minimumSoldSamples: number;
+      minimumPriceCutSamples: number;
+      minimumTrajectorySamples: number;
+    };
+    availableMetrics: ListingAgentTrackRecordMetricKey[];
+    unavailableMetrics: ListingAgentTrackRecordMetricKey[];
+    notes: string[];
+  };
+  metrics: ListingAgentTrackRecordMetric[];
+  buyerSafeSummary: string;
+  internalSummary: string;
+}
+
 export interface ListingAgentProfile {
   canonicalAgentId: string;
   name: string;
@@ -162,6 +224,7 @@ export interface ListingAgentProfile {
   medianListToSellRatio?: number;
   priceCutFrequency?: number;
   recentActivityCount?: number;
+  trackRecord?: ListingAgentTrackRecord;
   provenance: Record<string, FieldProvenance>;
   lastRefreshedAt: string;
 }
