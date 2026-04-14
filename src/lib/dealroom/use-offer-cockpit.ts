@@ -33,6 +33,7 @@ import {
   termsChanged,
   validateOfferTerms,
 } from "./offer-cockpit-validation";
+import type { NegotiationPlaybookView } from "@/lib/negotiation/playbook";
 
 type CockpitServerPayload = {
   dealRoom: { _id: string; buyerId: string; status: string };
@@ -78,6 +79,7 @@ type CockpitServerPayload = {
     };
   } | null;
   whatIf: OfferWhatIfModel | null;
+  playbook: NegotiationPlaybookView | null;
   offerEvidence: AdvisoryEvidenceSectionInput | null;
   eligibility: OfferEligibilitySnapshot;
   canEdit: boolean;
@@ -98,6 +100,7 @@ export interface OfferCockpitState {
   validation: OfferCockpitValidation;
   brokerReviewState: BrokerReviewState;
   playbookState: AdvisorySurfaceState;
+  playbook: NegotiationPlaybookView | null;
   brokerNote: string | null;
   status: OfferCockpitStatus;
   canEdit: boolean;
@@ -328,6 +331,7 @@ export function useOfferCockpit(
     validation,
     brokerReviewState,
     playbookState,
+    playbook: data?.playbook ?? null,
     brokerNote,
     status,
     canEdit,

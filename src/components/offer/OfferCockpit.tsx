@@ -10,6 +10,7 @@ import { EligibilityGate } from "./EligibilityGate";
 import { OfferWhatIfComparison } from "./OfferWhatIfComparison";
 import { OfferTermsEditor } from "./OfferTermsEditor";
 import { OfferValidationSummary } from "./OfferValidationSummary";
+import { NegotiationPlaybookPanel } from "./NegotiationPlaybookPanel";
 import { ScenarioComparison } from "./ScenarioComparison";
 import { UnsavedChangesBanner } from "./UnsavedChangesBanner";
 
@@ -52,6 +53,8 @@ export function OfferCockpit({ dealRoomId }: OfferCockpitProps) {
   const disabled = !cockpit.canEdit;
   const showScenarioComparison =
     Boolean(scenarios) && !cockpit.playbookState.withholdOutput;
+  const showPlaybook =
+    Boolean(cockpit.playbook) && !cockpit.playbookState.withholdOutput;
   const playbookTone =
     cockpit.playbookState.tone === "critical"
       ? "error"
@@ -92,34 +95,9 @@ export function OfferCockpit({ dealRoomId }: OfferCockpitProps) {
           onDiscard={() => cockpit.reset()}
         />
 
-        {showScenarioComparison && scenarios ? (
-          <>
-            <ScenarioComparison
-              scenarios={scenarios.scenarios}
-              recommendedIndex={scenarios.recommendedIndex}
-              listPrice={data.listPrice}
-              selectedScenarioName={cockpit.selectedScenarioName}
-              onSelectScenario={cockpit.selectScenario}
-              inputSummary={scenarios.inputSummary}
-              confidence={data.scenarios?.confidence}
-              refreshedAt={data.scenarios?.generatedAt}
-              guardrailNote={
-                cockpit.playbookState.kind === "ready"
-                  ? scenarioGuardrail?.state === "softened"
-                    ? `${scenarioGuardrail.buyerHeadline}. ${scenarioGuardrail.buyerExplanation}`
-                    : undefined
-                  : cockpit.playbookState.description
-              }
-            />
-
-            {data.whatIf && (
-              <OfferWhatIfComparison
-                model={data.whatIf}
-                viewerRole={data.viewerRole}
-              />
-            )}
-          </>
-        ) : (
+        {showPlaybook && cockpit.playbook ? (
+          <NegotiationPlaybookPanel playbook={cockpit.playbook} />
+        ) : !showScenarioComparison ? (
           <Card>
             <CardContent className="p-6">
               <SurfaceState
@@ -130,6 +108,33 @@ export function OfferCockpit({ dealRoomId }: OfferCockpitProps) {
               />
             </CardContent>
           </Card>
+        ) : null}
+
+        {showScenarioComparison && scenarios && (
+          <ScenarioComparison
+            scenarios={scenarios.scenarios}
+            recommendedIndex={scenarios.recommendedIndex}
+            listPrice={data.listPrice}
+            selectedScenarioName={cockpit.selectedScenarioName}
+            onSelectScenario={cockpit.selectScenario}
+            inputSummary={scenarios.inputSummary}
+            confidence={data.scenarios?.confidence}
+            refreshedAt={data.scenarios?.generatedAt}
+            guardrailNote={
+              cockpit.playbookState.kind === "ready"
+                ? scenarioGuardrail?.state === "softened"
+                  ? `${scenarioGuardrail.buyerHeadline}. ${scenarioGuardrail.buyerExplanation}`
+                  : undefined
+                : cockpit.playbookState.description
+            }
+          />
+        )}
+
+        {showScenarioComparison && data.whatIf && (
+          <OfferWhatIfComparison
+            model={data.whatIf}
+            viewerRole={data.viewerRole}
+          />
         )}
 
         <OfferTermsEditor

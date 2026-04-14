@@ -10,6 +10,10 @@ import { assessEngineOutputGuardrail } from "../src/lib/advisory/guardrails";
 import { projectAdvisoryEvidenceSection } from "../src/lib/advisory/surface-state";
 import { buildOfferWhatIfModel } from "../src/lib/dealroom/offer-what-if";
 import type { OfferInput } from "../src/lib/ai/engines/types";
+import {
+  buildNegotiationPlaybookBundle,
+  projectNegotiationPlaybookForAudience,
+} from "../src/lib/negotiation/playbook";
 
 /**
  * Offer cockpit backend for KIN-791.
@@ -161,7 +165,61 @@ export const getCockpit = query({
         dossier?.sections?.downstreamInputs?.data?.engineInputs?.leverage ?? null,
       leverageOutput: dossier?.sections?.latestOutputs?.data?.leverage?.output ?? null,
     });
-
+    const latestOutputs = dossier?.sections?.latestOutputs?.data;
+    const marketContext = dossier?.sections?.marketContext?.data?.marketContext ?? null;
+    const listingAgent =
+      dossier?.sections?.enrichmentArtifacts?.data?.listingAgents?.[0] ?? null;
+    const propertyFacts = dossier?.sections?.propertyFacts?.data?.facts;
+    const playbookBundle = buildNegotiationPlaybookBundle({
+      subject: {
+        propertyId: String(dealRoom.propertyId),
+        address: formattedAddress,
+        listPrice: property.listPrice ?? 0,
+        daysOnMarket: property.daysOnMarket ?? propertyFacts?.daysOnMarket,
+        wasRelisted: propertyFacts?.wasRelisted,
+        wasPendingFellThrough: propertyFacts?.wasPendingFellThrough,
+        priceReductions: propertyFacts?.priceReductions,
+      },
+      pricing: latestOutputs?.pricing?.output
+        ? {
+            version: latestOutputs.pricing.promptVersion,
+            confidence: latestOutputs.pricing.confidence,
+            reviewState: latestOutputs.pricing.reviewState,
+            output: latestOutputs.pricing.output,
+          }
+        : undefined,
+      leverage: latestOutputs?.leverage?.output
+        ? {
+            version: latestOutputs.leverage.promptVersion,
+            confidence: latestOutputs.leverage.confidence,
+            reviewState: latestOutputs.leverage.reviewState,
+            output: latestOutputs.leverage.output,
+          }
+        : undefined,
+      offer: latestOutputs?.offer?.output
+        ? {
+            version: latestOutputs.offer.promptVersion,
+            confidence: latestOutputs.offer.confidence,
+            reviewState: latestOutputs.offer.reviewState,
+            output: latestOutputs.offer.output,
+          }
+        : scenarios?.output
+          ? {
+              version: scenarios.modelId,
+              confidence: scenarios.confidence,
+              reviewState: scenarios.reviewState,
+              output: scenarios.output,
+            }
+          : undefined,
+      marketContext,
+      listingAgent,
+      buyer: buildOfferFlowProfile(buyerProfileView),
+      generatedAt:
+        latestOutputs?.offer?.generatedAt ??
+        scenarios?.generatedAt ??
+        dossier?.generatedAt ??
+        property.updatedAt,
+    });
     return {
       dealRoom,
       propertyId: dealRoom.propertyId,
@@ -170,6 +228,10 @@ export const getCockpit = query({
       draft,
       scenarios,
       whatIf,
+      playbook:
+        user.role === "buyer"
+          ? projectNegotiationPlaybookForAudience(playbookBundle, "buyer_safe")
+          : projectNegotiationPlaybookForAudience(playbookBundle, "internal"),
       offerEvidence: projectAdvisoryEvidenceSection(
         dossier?.evidenceGraph?.sections?.offer_recommendation,
       ),
