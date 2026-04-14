@@ -72,6 +72,11 @@ export function buildBuyerSafeSummaryText(
     lines.push(
       `Recommended opener: ${overview.action.openingPriceLabel} (${overview.action.confidenceLabel}, ${overview.action.riskLabel.toLowerCase()}).`,
     );
+    if (overview.action.reviewedConclusion) {
+      lines.push(`Broker-reviewed conclusion: ${overview.action.reviewedConclusion}`);
+    } else if (overview.action.buyerExplanation) {
+      lines.push(`Broker-reviewed explanation: ${overview.action.buyerExplanation}`);
+    }
   } else {
     lines.push("Recommendation: No opener is being surfaced yet.");
   }

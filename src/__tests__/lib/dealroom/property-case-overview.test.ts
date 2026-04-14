@@ -238,10 +238,16 @@ describe("buildPropertyCaseOverview", () => {
       pendingCount: 0,
       approvedCount: 1,
       rejectedCount: 0,
+      buyerSafeCount: 1,
+      internalOnlyCount: 0,
+      adjustedCount: 0,
+      overriddenCount: 0,
     });
     expect(surface.internal.adjudicationItems[0]).toMatchObject({
       citationId: "engineOut_pricing_1",
       reviewState: "approved",
+      adjudicationStatus: "approved",
+      visibility: "buyer_safe",
     });
     expect(surface.internal.guardrails[0]).toMatchObject({
       engineLabel: "Pricing",
@@ -286,5 +292,94 @@ describe("buildPropertyCaseOverview", () => {
     expect(surface.viewState).toBe("empty");
     expect(surface.claims).toEqual([]);
     expect(surface.overallConfidence).toBeNull();
+  });
+
+  it("projects buyer-safe reviewed conclusions separately from internal notes", () => {
+    const surface = buildPropertyCaseOverview({
+      dealRoomId: "deal_123",
+      propertyId: "property_123",
+      propertyAddress: "123 Palm Way, Miami Beach, FL 33139",
+      listPrice: 640_000,
+      photoUrl: null,
+      dealStatus: "offer_prep",
+      caseRecord: {
+        generatedAt: "2026-04-13T19:00:00.000Z",
+        hitCount: 4,
+        payload: payloadFixture({
+          claims: [
+            claimFixture({
+              id: "offer_strategy",
+              topic: "offer_recommendation",
+              citation: "engineOut_offer_1",
+              narrative: "Original recommendation should not survive to buyers.",
+              marketReferenceLabel: "offer engine baseline",
+            }),
+          ],
+          recommendedAction: {
+            openingPrice: 615_000,
+            rationaleClaimIds: ["offer_strategy"],
+            suggestedContingencies: ["inspection"],
+            riskLevel: "medium",
+            confidence: 0.78,
+          },
+        }),
+      },
+      coverage: availableCoverage(),
+      citations: [
+        {
+          citationId: "engineOut_offer_1",
+          engineType: "offer",
+          confidence: 0.88,
+          generatedAt: "2026-04-13T18:56:00.000Z",
+          reviewState: "approved",
+          adjudication: {
+            status: "adjusted",
+            action: "adjust",
+            visibility: "buyer_safe",
+            rationale: "Broker softened the recommendation before buyer exposure.",
+            reviewedConclusion:
+              "Open at $615,000 with clean terms and keep concession asks light.",
+            buyerExplanation:
+              "This range was reviewed by your broker against comps and current seller posture.",
+            internalNotes: "Internal-only calibration note.",
+            actorUserId: "user_broker",
+            actorName: "Broker",
+            actedAt: "2026-04-13T19:05:00.000Z",
+          },
+          adjudicationHistory: [
+            {
+              status: "adjusted",
+              action: "adjust",
+              visibility: "buyer_safe",
+              rationale: "Broker softened the recommendation before buyer exposure.",
+              reviewedConclusion:
+                "Open at $615,000 with clean terms and keep concession asks light.",
+              buyerExplanation:
+                "This range was reviewed by your broker against comps and current seller posture.",
+              internalNotes: "Internal-only calibration note.",
+              actorUserId: "user_broker",
+              actorName: "Broker",
+              actedAt: "2026-04-13T19:05:00.000Z",
+              reviewStateBefore: "pending",
+              reviewStateAfter: "approved",
+            },
+          ],
+        },
+      ],
+      viewerRole: "buyer",
+    });
+
+    expect(surface.action?.reviewedConclusion).toBe(
+      "Open at $615,000 with clean terms and keep concession asks light.",
+    );
+    expect(surface.action?.buyerExplanation).toBe(
+      "This range was reviewed by your broker against comps and current seller posture.",
+    );
+    expect(surface.sources[0]).toMatchObject({
+      adjudicationStatus: "adjusted",
+      visibility: "buyer_safe",
+      reviewedConclusion:
+        "Open at $615,000 with clean terms and keep concession asks light.",
+    });
   });
 });

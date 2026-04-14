@@ -125,6 +125,33 @@ export const aiReviewState = v.union(
   v.literal("rejected")
 );
 
+export const brokerOverrideReasonCategory = v.union(
+  v.literal("unsupported_evidence"),
+  v.literal("stale_evidence"),
+  v.literal("policy_guardrail"),
+  v.literal("market_context_shift"),
+  v.literal("human_judgment"),
+  v.literal("other")
+);
+
+export const aiOutputAdjudicationAction = v.union(
+  v.literal("approve"),
+  v.literal("adjust"),
+  v.literal("override")
+);
+
+export const aiOutputAdjudicationStatus = v.union(
+  v.literal("pending"),
+  v.literal("approved"),
+  v.literal("adjusted"),
+  v.literal("overridden")
+);
+
+export const aiOutputAdjudicationVisibility = v.union(
+  v.literal("buyer_safe"),
+  v.literal("internal_only")
+);
+
 // Financing type (for IPC limits)
 export const financingType = v.union(
   v.literal("cash"),

@@ -195,11 +195,62 @@ describe("advisoryTelemetry", () => {
   });
 
   it("builds buyer-safe summary exports with measurable length and recommendation inclusion", () => {
-    const overview = buildSurface();
+    const overview = buildPropertyCaseOverview({
+      dealRoomId: "deal_123",
+      propertyId: "property_123",
+      propertyAddress: "123 Palm Way, Miami Beach, FL 33139",
+      listPrice: 640_000,
+      photoUrl: null,
+      dealStatus: "analysis",
+      caseRecord: {
+        generatedAt: "2026-04-13T19:00:00.000Z",
+        hitCount: 3,
+        payload: payloadFixture(),
+      },
+      coverage: availableCoverage(),
+      citations: [
+        {
+          citationId: "engineOut_pricing_1",
+          engineType: "pricing",
+          confidence: 0.82,
+          generatedAt: "2026-04-13T18:55:00.000Z",
+          reviewState: "approved",
+        },
+        {
+          citationId: "engineOut_offer_1",
+          engineType: "offer",
+          confidence: 0.78,
+          generatedAt: "2026-04-13T18:59:00.000Z",
+          reviewState: "approved",
+          adjudication: {
+            status: "adjusted",
+            action: "adjust",
+            visibility: "buyer_safe",
+            rationale: "Reviewed before buyer exposure.",
+            reviewedConclusion:
+              "Open near $615,000 and keep the first draft clean.",
+            buyerExplanation:
+              "Your broker reviewed this recommendation against the live market context.",
+            actorUserId: "user_broker",
+            actorName: "Broker",
+            actedAt: "2026-04-13T19:05:00.000Z",
+          },
+          adjudicationHistory: [],
+        },
+        {
+          citationId: "engineOut_comps_1",
+          engineType: "comps",
+          confidence: 0.55,
+          generatedAt: "2026-04-13T18:50:00.000Z",
+          reviewState: "approved",
+        },
+      ],
+      viewerRole: "buyer",
+    });
     const summary = buildBuyerSafeSummaryText(overview);
     const payload = buildAdvisorySummaryCopiedPayload(overview, summary);
 
-    expect(summary).toContain("Recommended opener");
+    expect(summary).toContain("Broker-reviewed conclusion");
     expect(payload.summaryLength).toBe(summary.length);
     expect(payload.includesRecommendation).toBe(true);
   });
