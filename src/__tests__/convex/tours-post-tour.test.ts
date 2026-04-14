@@ -47,6 +47,20 @@ class FakeQuery {
     return this.run();
   }
 
+  async first() {
+    return this.run()[0] ?? null;
+  }
+
+  async unique() {
+    const rows = this.run();
+    if (rows.length > 1) {
+      throw new Error(
+        `Expected at most one ${this.table} row for indexed lookup, received ${rows.length}`,
+      );
+    }
+    return rows[0] ?? null;
+  }
+
   private run() {
     return this.db
       .tableRows(this.table)

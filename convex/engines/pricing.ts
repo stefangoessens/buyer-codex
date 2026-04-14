@@ -4,12 +4,8 @@ import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { PricingInput } from "../../src/lib/ai/engines/types";
-import {
-  buildPricingRequest,
-  parsePricingResponse,
-  computeConsensus,
-} from "../../src/lib/ai/engines/pricing";
-import { gateway } from "../../src/lib/ai/gateway";
+import { executePricingAnalysis } from "../../src/lib/ai/engines/pricing";
+import { serializeEngineInputSnapshot } from "../../src/lib/ai/engines/runtime";
 
 export const runPricingEngine = internalAction({
   args: {
@@ -62,29 +58,15 @@ export const runPricingEngine = internalAction({
         redfinEstimate: property.redfinEstimate,
         realtorEstimate: property.realtorEstimate,
       };
-    const inputSnapshot = JSON.stringify(input);
-
-    const request = buildPricingRequest(input, prompt.prompt, prompt.systemPrompt);
-    const result = await gateway({
-      ...request,
-      prompt: {
-        promptKey: "default",
-        version: prompt.version,
-        model: prompt.model,
-      },
-    });
-    if (!result.success) return null;
-
-    const { consensus, spread, sources } = computeConsensus(input);
-    const pricingOutput = parsePricingResponse(
-      result.data.content,
+    const inputSnapshot = serializeEngineInputSnapshot("pricing", input);
+    const { output: pricingOutput, usage } = await executePricingAnalysis({
       input,
-      consensus,
-      spread,
-      sources,
-    );
-
-    if (!pricingOutput) return null;
+      promptTemplate: prompt.prompt,
+      systemPrompt: prompt.systemPrompt,
+      promptKey: "default",
+      promptVersion: prompt.version,
+      promptModel: prompt.model,
+    });
 
     // 4. Store the engine output
     const outputId: any = await ctx.runMutation(
@@ -98,7 +80,7 @@ export const runPricingEngine = internalAction({
         confidence: pricingOutput.overallConfidence,
         citations: pricingOutput.estimateSources,
         output: JSON.stringify(pricingOutput),
-        modelId: result.data.usage.model,
+        modelId: usage.model,
       },
     );
 

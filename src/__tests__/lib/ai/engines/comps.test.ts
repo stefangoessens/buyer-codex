@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   dedupCandidates,
+  evaluateCompsSelection,
   scoreSimilarity,
   selectComps,
 } from "@/lib/ai/engines/comps";
@@ -295,6 +296,34 @@ describe("selectComps", () => {
     expect(result.comps[0].sourceCitations?.map((citation) => citation.portal)).toEqual([
       "redfin",
       "zillow",
+    ]);
+  });
+
+  it("packages deterministic execution metadata for replay and persistence", () => {
+    const execution = evaluateCompsSelection({
+      subject,
+      candidates: [
+        makeCandidate("meta-1", {
+          sourcePlatform: "redfin",
+          sourceCitation: "redfin://meta-1",
+        }),
+        makeCandidate("meta-2", {
+          sourcePlatform: "zillow",
+          sourceCitation: "zillow://meta-2",
+        }),
+        makeCandidate("meta-3", {
+          sourcePlatform: "realtor",
+          sourceCitation: "realtor://meta-3",
+        }),
+      ],
+    });
+
+    expect(execution.modelId).toBe("deterministic-comps-v2");
+    expect(execution.confidence).toBeGreaterThan(0.7);
+    expect(execution.citations).toEqual([
+      "redfin://meta-1",
+      "zillow://meta-2",
+      "realtor://meta-3",
     ]);
   });
 });

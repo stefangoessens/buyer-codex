@@ -1,12 +1,10 @@
 import type { GatewayRequest, GatewayResult } from "./types";
 import {
-  buildPricingRequest,
-  computeConsensus,
-  parsePricingResponse,
+  executePricingAnalysisWithGateway,
 } from "./engines/pricing";
-import { selectComps } from "./engines/comps";
-import { analyzeLeverage } from "./engines/leverage";
-import { generateOfferScenarios } from "./engines/offer";
+import { evaluateCompsSelection } from "./engines/comps";
+import { evaluateLeverageAnalysis } from "./engines/leverage";
+import { evaluateOfferScenarios } from "./engines/offer";
 import { computeOwnershipCosts } from "./engines/cost";
 import type {
   CompsInput,
@@ -15,6 +13,11 @@ import type {
   OfferInput,
   PricingInput,
 } from "./engines/types";
+import {
+  buildDeterministicEngineExecution,
+  DETERMINISTIC_ENGINE_MODEL_IDS,
+  parseEngineInputSnapshot,
+} from "./engines/runtime";
 import type { PromptRegistryEngineType } from "../../../packages/shared/src/prompt-registry";
 
 export const REPLAYABLE_PROMPT_ENGINE_TYPES = [
@@ -61,16 +64,6 @@ export type GatewayInvoker = (
   request: GatewayRequest,
 ) => Promise<GatewayResult>;
 
-function parseInputSnapshot<T>(inputSnapshot: string): T {
-  try {
-    return JSON.parse(inputSnapshot) as T;
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "unknown parse failure";
-    throw new Error(`Invalid historical input snapshot: ${message}`);
-  }
-}
-
 export function isReplayablePromptEngineType(
   engineType: PromptRegistryEngineType | string,
 ): engineType is ReplayablePromptEngineType {
@@ -88,127 +81,104 @@ export async function replayPromptExecution(args: {
 
   switch (prompt.engineType) {
     case "pricing": {
-      const input = parseInputSnapshot<PricingInput>(args.inputSnapshot);
-      const request = buildPricingRequest(input, prompt.prompt, prompt.systemPrompt);
-      const response = await args.invokeGateway({
-        ...request,
-        prompt: {
-          promptKey: prompt.promptKey,
-          version: prompt.version,
-          model: prompt.model,
-        },
-      });
-      if (!response.success) {
-        throw new Error(`Pricing replay failed: ${response.error.message}`);
-      }
-
-      const { consensus, spread, sources } = computeConsensus(input);
-      const replayed = parsePricingResponse(
-        response.data.content,
-        input,
-        consensus,
-        spread,
-        sources,
+      const input = parseEngineInputSnapshot<PricingInput>(
+        args.inputSnapshot,
+        "pricing",
       );
-      if (!replayed) {
-        throw new Error("Pricing replay returned an invalid response payload");
-      }
+      const { execution } = await executePricingAnalysisWithGateway({
+        input,
+        promptTemplate: prompt.prompt,
+        systemPrompt: prompt.systemPrompt,
+        promptKey: prompt.promptKey,
+        promptVersion: prompt.version,
+        promptModel: prompt.model,
+        invokeGateway: args.invokeGateway,
+      });
 
       return {
         engineType: prompt.engineType,
         promptKey: prompt.promptKey,
         promptVersion: prompt.version,
-        modelId: response.data.usage.model,
-        confidence: replayed.overallConfidence,
-        citations: replayed.estimateSources,
-        outputSnapshot: JSON.stringify(replayed),
+        modelId: execution.modelId,
+        confidence: execution.confidence,
+        citations: execution.citations,
+        outputSnapshot: JSON.stringify(execution.output),
       };
     }
     case "comps": {
-      const input = parseInputSnapshot<{
+      const input = parseEngineInputSnapshot<{
         subject: CompsInput["subject"];
         candidates: CompsInput["candidates"];
-      }>(args.inputSnapshot);
-      const replayed = selectComps(input);
-      const citations = Array.from(
-        new Set(
-          replayed.comps.flatMap((comp) =>
-            comp.sourceCitations?.map((citation) => citation.citation) ??
-            [comp.sourceCitation],
-          ),
-        ),
-      );
-      const confidenceBase =
-        replayed.comps.length >= 3 ? 0.7 : replayed.comps.length >= 1 ? 0.52 : 0.3;
-      const basisBoost =
-        replayed.selectionBasis === "subdivision"
-          ? 0.18
-          : replayed.selectionBasis === "school_zone"
-            ? 0.1
-            : 0.04;
-      const conflictPenalty = replayed.comps.some(
-        (comp) => (comp.candidate.conflicts?.length ?? 0) > 0,
-      )
-        ? 0.04
-        : 0;
+      }>(args.inputSnapshot, "comps");
+      const execution = evaluateCompsSelection(input);
 
       return {
         engineType: prompt.engineType,
         promptKey: prompt.promptKey,
         promptVersion: prompt.version,
-        modelId: prompt.model,
-        confidence: Number(
-          Math.max(
-            0.3,
-            Math.min(0.94, confidenceBase + basisBoost - conflictPenalty),
-          ).toFixed(2),
-        ),
-        citations,
-        outputSnapshot: JSON.stringify(replayed),
+        modelId: execution.modelId,
+        confidence: execution.confidence,
+        citations: execution.citations,
+        outputSnapshot: JSON.stringify(execution.output),
       };
     }
     case "leverage": {
-      const input = parseInputSnapshot<LeverageInput>(args.inputSnapshot);
-      const replayed = analyzeLeverage(input);
+      const input = parseEngineInputSnapshot<LeverageInput>(
+        args.inputSnapshot,
+        "leverage",
+      );
+      const execution = evaluateLeverageAnalysis(input);
 
       return {
         engineType: prompt.engineType,
         promptKey: prompt.promptKey,
         promptVersion: prompt.version,
-        modelId: prompt.model,
-        confidence: replayed.overallConfidence,
-        citations: replayed.signals.map((signal) => signal.citation),
-        outputSnapshot: JSON.stringify(replayed),
+        modelId: execution.modelId,
+        confidence: execution.confidence,
+        citations: execution.citations,
+        outputSnapshot: JSON.stringify(execution.output),
       };
     }
     case "offer": {
-      const input = parseInputSnapshot<OfferInput>(args.inputSnapshot);
-      const replayed = generateOfferScenarios(input);
+      const input = parseEngineInputSnapshot<OfferInput>(
+        args.inputSnapshot,
+        "offer",
+      );
+      const execution = evaluateOfferScenarios(input);
 
       return {
         engineType: prompt.engineType,
         promptKey: prompt.promptKey,
         promptVersion: prompt.version,
-        modelId: prompt.model,
-        confidence: 0.75,
-        citations: ["pricing_engine", "leverage_engine"],
-        outputSnapshot: JSON.stringify(replayed),
+        modelId: execution.modelId,
+        confidence: execution.confidence,
+        citations: execution.citations,
+        outputSnapshot: JSON.stringify(execution.output),
       };
     }
     case "cost": {
-      const input = parseInputSnapshot<CostInput>(args.inputSnapshot);
+      const input = parseEngineInputSnapshot<CostInput>(
+        args.inputSnapshot,
+        "cost",
+      );
       const replayed = computeOwnershipCosts(input);
-
-      return {
-        engineType: prompt.engineType,
-        promptKey: prompt.promptKey,
-        promptVersion: prompt.version,
-        modelId: prompt.model,
+      const execution = buildDeterministicEngineExecution({
+        output: replayed,
         confidence: 0.75,
         citations: replayed.lineItems
           .filter((lineItem) => lineItem.source === "fact")
           .map((lineItem) => lineItem.label),
-        outputSnapshot: JSON.stringify(replayed),
+        modelId: DETERMINISTIC_ENGINE_MODEL_IDS.cost,
+      });
+
+      return {
+        engineType: prompt.engineType,
+        promptKey: prompt.promptKey,
+        promptVersion: prompt.version,
+        modelId: execution.modelId,
+        confidence: execution.confidence,
+        citations: execution.citations,
+        outputSnapshot: JSON.stringify(execution.output),
       };
     }
   }

@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { requireServerEnv } from "@/lib/env.server";
+import { requireEnvKeys, webServerEnvSpec } from "@buyer-codex/shared";
 import type {
   GatewayProvider,
   GatewayProviderError,
@@ -15,9 +15,15 @@ import { MODEL_COSTS } from "./types";
 let anthropicClient: Anthropic | null = null;
 let openaiClient: OpenAI | null = null;
 
+function requireAiEnv<
+  const TKeys extends readonly (keyof typeof webServerEnvSpec)[],
+>(...keys: TKeys) {
+  return requireEnvKeys(webServerEnvSpec, keys, process.env);
+}
+
 function getAnthropicClient(): Anthropic {
   if (!anthropicClient) {
-    const { ANTHROPIC_API_KEY } = requireServerEnv("ANTHROPIC_API_KEY");
+    const { ANTHROPIC_API_KEY } = requireAiEnv("ANTHROPIC_API_KEY");
     anthropicClient = new Anthropic({
       apiKey: ANTHROPIC_API_KEY,
     });
@@ -27,7 +33,7 @@ function getAnthropicClient(): Anthropic {
 
 function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
-    const { OPENAI_API_KEY } = requireServerEnv("OPENAI_API_KEY");
+    const { OPENAI_API_KEY } = requireAiEnv("OPENAI_API_KEY");
     openaiClient = new OpenAI({
       apiKey: OPENAI_API_KEY,
     });

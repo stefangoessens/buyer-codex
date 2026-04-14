@@ -304,10 +304,45 @@ export interface CostOutput {
 
 // ═══ Offer Engine Types ═══
 
+export interface OfferPricingContext {
+  fairValue: number;
+  likelyAccepted?: number;
+  strongOpener?: number;
+  walkAway?: number;
+  reviewRequired?: boolean;
+  sourceOutputId?: string;
+}
+
+export interface OfferLeverageContext {
+  score: number;
+  summary?: string;
+  signalCount?: number;
+  signalNames?: string[];
+  sourceOutputId?: string;
+}
+
+export interface OfferDependencySummary {
+  pricing: {
+    available: boolean;
+    fairValue: number | null;
+    reviewRequired: boolean | null;
+    sourceOutputId: string | null;
+  };
+  leverage: {
+    available: boolean;
+    score: number | null;
+    signalCount: number | null;
+    sourceOutputId: string | null;
+  };
+}
+
 export interface OfferInput {
   listPrice: number;
+  pricing?: OfferPricingContext;
+  leverage?: OfferLeverageContext;
+  // Legacy top-level fields remain for backward-compatible replays.
   fairValue?: number;
-  leverageScore?: number; // 0-100 from leverage engine
+  leverageScore?: number;
   buyerMaxBudget?: number;
   daysOnMarket?: number;
   competingOffers?: number;
@@ -332,6 +367,8 @@ export interface OfferOutput {
   recommendedIndex: number;
   inputSummary: string;
   refreshable: boolean;
+  contractVersion?: string;
+  dependencySummary?: OfferDependencySummary;
 }
 
 // ═══ Calibration ═══

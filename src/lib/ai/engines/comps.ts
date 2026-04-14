@@ -10,6 +10,10 @@ import type {
   CompsOutput,
   CompResult,
 } from "./types";
+import {
+  buildDeterministicEngineExecution,
+  DETERMINISTIC_ENGINE_MODEL_IDS,
+} from "./runtime";
 
 const PORTAL_PRIORITY: Record<CompSourcePlatform, number> = {
   redfin: 3,
@@ -502,6 +506,34 @@ function compareRankedCandidates(
   );
 }
 
+export function collectCompCitations(output: CompsOutput): string[] {
+  return output.comps.flatMap((comp) =>
+    comp.sourceCitations?.map((citation) => citation.citation) ??
+    [comp.sourceCitation],
+  );
+}
+
+export function computeCompsConfidence(output: CompsOutput): number {
+  const confidenceBase =
+    output.comps.length >= 3 ? 0.7 : output.comps.length >= 1 ? 0.52 : 0.3;
+  const basisBoost =
+    output.selectionBasis === "subdivision"
+      ? 0.18
+      : output.selectionBasis === "school_zone"
+        ? 0.1
+        : 0.04;
+  const conflictPenalty = output.comps.some(
+    (comp) => (comp.candidate.conflicts?.length ?? 0) > 0,
+  )
+    ? 0.04
+    : 0;
+
+  return Math.max(
+    0.3,
+    Math.min(0.94, confidenceBase + basisBoost - conflictPenalty),
+  );
+}
+
 /** Run the comps selection engine. */
 export function selectComps(input: CompsInput): CompsOutput {
   const maxComps = input.maxComps ?? 5;
@@ -567,4 +599,14 @@ export function selectComps(input: CompsInput): CompsOutput {
     totalCandidates: input.candidates.length,
     dedupedCandidates: deduped.length,
   };
+}
+
+export function evaluateCompsSelection(input: CompsInput) {
+  const output = selectComps(input);
+  return buildDeterministicEngineExecution({
+    output,
+    confidence: computeCompsConfidence(output),
+    citations: collectCompCitations(output),
+    modelId: DETERMINISTIC_ENGINE_MODEL_IDS.comps,
+  });
 }

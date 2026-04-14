@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { generateOfferScenarios } from "@/lib/ai/engines/offer";
+import {
+  evaluateOfferScenarios,
+  generateOfferScenarios,
+} from "@/lib/ai/engines/offer";
 
 describe("generateOfferScenarios", () => {
   const baseInput = { listPrice: 500000 };
@@ -55,11 +58,11 @@ describe("generateOfferScenarios", () => {
   it("adjusts for high leverage", () => {
     const lowLeverage = generateOfferScenarios({
       ...baseInput,
-      leverageScore: 20,
+      leverage: { score: 20 },
     });
     const highLeverage = generateOfferScenarios({
       ...baseInput,
-      leverageScore: 80,
+      leverage: { score: 80 },
     });
     expect(highLeverage.scenarios[0].price).toBeLessThan(
       lowLeverage.scenarios[0].price,
@@ -69,5 +72,60 @@ describe("generateOfferScenarios", () => {
   it("is refreshable", () => {
     const result = generateOfferScenarios(baseInput);
     expect(result.refreshable).toBe(true);
+  });
+
+  it("surfaces explicit dependency summary on the output contract", () => {
+    const result = generateOfferScenarios({
+      listPrice: 500000,
+      pricing: {
+        fairValue: 485000,
+        reviewRequired: true,
+        sourceOutputId: "output_pricing_1",
+      },
+      leverage: {
+        score: 62,
+        signalCount: 4,
+        sourceOutputId: "output_leverage_1",
+      },
+    });
+
+    expect(result.contractVersion).toBe("offer-engine.v2");
+    expect(result.dependencySummary).toEqual({
+      pricing: {
+        available: true,
+        fairValue: 485000,
+        reviewRequired: true,
+        sourceOutputId: "output_pricing_1",
+      },
+      leverage: {
+        available: true,
+        score: 62,
+        signalCount: 4,
+        sourceOutputId: "output_leverage_1",
+      },
+    });
+  });
+});
+
+describe("evaluateOfferScenarios", () => {
+  it("uses explicit engine dependencies as citations when available", () => {
+    const execution = evaluateOfferScenarios({
+      listPrice: 500000,
+      pricing: {
+        fairValue: 485000,
+        sourceOutputId: "pricing-output-1",
+      },
+      leverage: {
+        score: 58,
+        sourceOutputId: "leverage-output-1",
+      },
+    });
+
+    expect(execution.modelId).toBe("deterministic-offer-v2");
+    expect(execution.citations).toEqual([
+      "pricing-output-1",
+      "leverage-output-1",
+    ]);
+    expect(execution.confidence).toBeGreaterThan(0.7);
   });
 });

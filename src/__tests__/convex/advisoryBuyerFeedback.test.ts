@@ -18,14 +18,34 @@ vi.mock("../../../convex/lib/analytics", () => ({
 
 import * as advisoryBuyerFeedbackModule from "../../../convex/advisoryBuyerFeedback";
 
-type TableName = "dealRooms" | "advisoryBuyerFeedback" | "auditLog";
+type Row = Record<string, unknown>;
 
-type Tables = Record<TableName, Array<Record<string, unknown>>>;
+type TableName =
+  | "dealRooms"
+  | "advisoryBuyerFeedback"
+  | "auditLog"
+  | "buyerProfiles"
+  | "watchlistEntries"
+  | "tourPostObservations"
+  | "buyerPreferenceMemories";
+
+type Tables = Record<TableName, Row[]>;
 
 type TestContext = {
   db: {
-    get: (id: string) => Promise<Record<string, unknown> | null>;
-    insert: (table: TableName, value: Record<string, unknown>) => Promise<string>;
+    get: (id: string) => Promise<Row | null>;
+    insert: (table: string, value: Row) => Promise<string>;
+    query: (table: string) => {
+      withIndex: (
+        indexName: string,
+        builder: (q: {
+          eq: (field: string, value: unknown) => unknown;
+        }) => unknown,
+      ) => {
+        collect: () => Promise<Row[]>;
+        unique: () => Promise<Row | null>;
+      };
+    };
   };
 };
 
@@ -56,16 +76,18 @@ function createContext(initial: Partial<Tables> = {}) {
     dealRooms: [...(initial.dealRooms ?? [])],
     advisoryBuyerFeedback: [...(initial.advisoryBuyerFeedback ?? [])],
     auditLog: [...(initial.auditLog ?? [])],
+    buyerProfiles: [...(initial.buyerProfiles ?? [])],
+    watchlistEntries: [...(initial.watchlistEntries ?? [])],
+    tourPostObservations: [...(initial.tourPostObservations ?? [])],
+    buyerPreferenceMemories: [...(initial.buyerPreferenceMemories ?? [])],
   };
 
   const byId = new Map<
     string,
-    { table: TableName; row: Record<string, unknown> }
+    { table: string; row: Row }
   >();
 
-  for (const [tableName, rows] of Object.entries(tables) as Array<
-    [TableName, Array<Record<string, unknown>>]
-  >) {
+  for (const [tableName, rows] of Object.entries(tables) as Array<[string, Row[]]>) {
     for (const row of rows) {
       byId.set(String(row._id), { table: tableName, row });
     }
@@ -78,16 +100,63 @@ function createContext(initial: Partial<Tables> = {}) {
     async get(id: string) {
       return cloneRow(byId.get(id)?.row ?? null);
     },
-    async insert(table: TableName, value: Record<string, unknown>) {
+    async insert(table: string, value: Row) {
       const id = String(value._id ?? `${table}_${nextId++}`);
       const row = {
         ...value,
         _id: id,
         _creationTime: value._creationTime ?? nextCreationTime++,
       };
-      tables[table].push(row);
+      const existingRows = tables[table as TableName];
+      if (existingRows) {
+        existingRows.push(row);
+      }
       byId.set(id, { table, row });
       return id;
+    },
+    query(table: string) {
+      return {
+        withIndex(
+          _indexName: string,
+          builder: (q: {
+            eq: (field: string, value: unknown) => unknown;
+          }) => unknown,
+        ) {
+          const conditions: Array<{ field: string; value: unknown }> = [];
+          const queryBuilder = {
+            eq(field: string, value: unknown) {
+              conditions.push({ field, value });
+              return queryBuilder;
+            },
+          };
+
+          builder(queryBuilder);
+
+          const rows = Object.values(tables)
+            .flat()
+            .filter((row) => {
+              const entry = byId.get(String(row._id));
+              return (
+                entry?.table === table &&
+                conditions.every(({ field, value }) => row[field] === value)
+              );
+            });
+
+          return {
+            async collect() {
+              return rows.map((row) => cloneRow(row)).filter(Boolean) as Row[];
+            },
+            async unique() {
+              if (rows.length > 1) {
+                throw new Error(
+                  `Expected unique row in ${table}, found ${rows.length}`,
+                );
+              }
+              return cloneRow(rows[0] ?? null);
+            },
+          };
+        },
+      };
     },
   };
 
