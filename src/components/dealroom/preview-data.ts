@@ -3,6 +3,10 @@ import type {
   DashboardRecentDealRow,
   DashboardSummaryBadge,
 } from "@/lib/dashboard/deal-index";
+import {
+  buildAdvisorySurfaceState,
+  summarizeAdvisoryEvidence,
+} from "@/lib/advisory/surface-state";
 import type { BuyerDashboardState } from "@/lib/dashboard/deal-index-state";
 import type { PropertyCaseOverviewSurface } from "@/lib/dealroom/property-case-overview";
 
@@ -126,6 +130,39 @@ export const previewBuyerDashboardState: BuyerDashboardState = {
   summaryBadges: previewSummaryBadges,
   hasPartialDeals: false,
 };
+
+const previewMemoEvidence = summarizeAdvisoryEvidence([
+  {
+    status: "supported",
+    confidenceBand: "medium",
+    supportLabels: ["portal estimates", "recent comparable sales"],
+    missingLabels: [],
+    conflictingLabels: [],
+    caution: null,
+    dependsOnInference: false,
+  },
+  {
+    status: "mixed",
+    confidenceBand: "medium",
+    supportLabels: ["market context", "listing history"],
+    missingLabels: ["seller posture refresh"],
+    conflictingLabels: [],
+    caution: "Still waiting on seller posture refresh.",
+    dependsOnInference: false,
+  },
+]);
+
+const previewRecommendationEvidence = summarizeAdvisoryEvidence([
+  {
+    status: "mixed",
+    confidenceBand: "medium",
+    supportLabels: ["pricing output", "offer strategy"],
+    missingLabels: ["fresh broker review"],
+    conflictingLabels: [],
+    caution: "Still waiting on fresh broker review.",
+    dependsOnInference: true,
+  },
+]);
 
 export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
   variant: "buyer_safe",
@@ -272,6 +309,31 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       dependsOnInference: false,
     },
   ],
+  artifacts: {
+    memo: buildAdvisorySurfaceState({
+      surface: "memo",
+      evidence: previewMemoEvidence,
+      hasRenderableContent: true,
+    }),
+    recommendation: buildAdvisorySurfaceState({
+      surface: "recommendation",
+      evidence: previewRecommendationEvidence,
+      hasRenderableContent: true,
+    }),
+    playbook: buildAdvisorySurfaceState({
+      surface: "playbook",
+      evidence: previewRecommendationEvidence,
+      hasRenderableContent: true,
+    }),
+    summary: buildAdvisorySurfaceState({
+      surface: "summary",
+      evidence: summarizeAdvisoryEvidence([
+        previewMemoEvidence,
+        previewRecommendationEvidence,
+      ]),
+      hasRenderableContent: true,
+    }),
+  },
   claims: [
     {
       id: "preview-claim-pricing",

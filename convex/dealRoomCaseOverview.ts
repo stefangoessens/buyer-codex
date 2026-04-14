@@ -18,7 +18,7 @@ import type { PropertyDossier } from "../src/lib/dossier/types";
 export const getOverview = query({
   args: { dealRoomId: v.id("dealRooms") },
   returns: v.any(),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<unknown> => {
     const user = await getCurrentUser(ctx);
     if (!user) return null;
 
@@ -73,12 +73,14 @@ export const getOverview = query({
 
     const submittedOffer = offerDocs
       .filter(
-        (offer) =>
+        (offer: Doc<"offers">) =>
           offer.status === "submitted" ||
           offer.status === "countered" ||
           offer.status === "accepted",
       )
-      .sort((a, b) => (b.submittedAt ?? "").localeCompare(a.submittedAt ?? ""))[0];
+      .sort((a: Doc<"offers">, b: Doc<"offers">) =>
+        (b.submittedAt ?? "").localeCompare(a.submittedAt ?? ""),
+      )[0];
 
     let latestOffer: OverviewInputs["latestOffer"];
     if (submittedOffer) {
@@ -105,8 +107,10 @@ export const getOverview = query({
       },
     );
 
-    const latestCase = caseDocs
-      .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+    const latestCase: Doc<"propertyCases"> | undefined = caseDocs
+      .sort((a: Doc<"propertyCases">, b: Doc<"propertyCases">) =>
+        b.generatedAt.localeCompare(a.generatedAt),
+      )
       .at(0);
     const latestDossier = dossierDocs
       .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
@@ -142,7 +146,6 @@ export const getOverview = query({
       generatedAt: doc.generatedAt,
       reviewState: doc.reviewState,
     }));
-
     return buildPropertyCaseOverview({
       dealRoomId: dealRoom._id,
       propertyId: dealRoom.propertyId,

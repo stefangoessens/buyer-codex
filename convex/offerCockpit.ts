@@ -3,9 +3,11 @@ import { v } from "convex/values";
 import { getCurrentUser, requireAuth } from "./lib/session";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getPromptVersionRef } from "../packages/shared/src/prompt-registry";
 import { buildOfferFlowProfile, loadBuyerProfileView } from "./lib/buyerProfile";
 import { assessEngineOutputGuardrail } from "../src/lib/advisory/guardrails";
+import { projectAdvisoryEvidenceSection } from "../src/lib/advisory/surface-state";
 
 /**
  * Offer cockpit backend for KIN-791.
@@ -108,7 +110,7 @@ async function loadDraft(
 export const getCockpit = query({
   args: { dealRoomId: v.id("dealRooms") },
   returns: v.any(),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<unknown> => {
     const user = await getCurrentUser(ctx);
     if (!user) return null;
 
@@ -124,11 +126,21 @@ export const getCockpit = query({
 
     const buyerId = isOwner ? user._id : dealRoom.buyerId;
 
-    const [draft, scenarios, eligibility, buyerProfileView] = await Promise.all([
+    const [draft, scenarios, eligibility, buyerProfileView, dossier]: [
+      Awaited<ReturnType<typeof loadDraft>>,
+      Awaited<ReturnType<typeof loadOfferScenarios>>,
+      Awaited<ReturnType<typeof loadEligibility>>,
+      Awaited<ReturnType<typeof loadBuyerProfileView>>,
+      any,
+    ] = await Promise.all([
       loadDraft(ctx, args.dealRoomId, buyerId),
       loadOfferScenarios(ctx, dealRoom.propertyId),
       loadEligibility(ctx, buyerId, args.dealRoomId),
       loadBuyerProfileView(ctx, buyerId, user.role !== "buyer"),
+      ctx.runQuery(internal.propertyDossiers.getForPropertyInternal, {
+        propertyId: dealRoom.propertyId,
+        dealRoomId: args.dealRoomId,
+      }),
     ]);
 
     const formattedAddress =
@@ -142,6 +154,9 @@ export const getCockpit = query({
       propertyAddress: formattedAddress,
       draft,
       scenarios,
+      offerEvidence: projectAdvisoryEvidenceSection(
+        dossier?.evidenceGraph?.sections?.offer_recommendation,
+      ),
       eligibility,
       buyerProfile: buildOfferFlowProfile(buyerProfileView),
       canEdit: isOwner && eligibility.isEligible,
