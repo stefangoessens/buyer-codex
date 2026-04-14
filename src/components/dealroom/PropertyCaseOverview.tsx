@@ -32,11 +32,17 @@ import {
 } from "@/lib/dealroom/advisoryTelemetry";
 import { isConfigured } from "@/lib/env";
 import type { BuyerReadinessSurface } from "@/lib/dealroom/buyer-readiness";
+import {
+  buildPropertyRecommendation,
+  type PropertyRecommendation,
+  type PropertyRecommendationCondition,
+} from "@/lib/dealroom/next-best-action";
 import type {
   DecisionMemoEvidenceHook,
   DecisionMemoSectionView,
   PropertyCaseOverviewSurface,
 } from "@/lib/dealroom/property-case-overview";
+import type { DealRoomRiskSummary } from "@/lib/dealroom/risk-summary";
 import { trackDealRoomUnlocked } from "@/lib/intake/pasteLinkFunnel";
 import { cn } from "@/lib/utils";
 import type {
@@ -114,6 +120,12 @@ function LivePropertyCaseOverview({
       dealRoomId,
     },
   ) as BuyerReadinessSurface | null | undefined;
+  const riskSummary = useQuery(
+    (api as any).dealRoomRiskSummary.getRiskSummary,
+    {
+      dealRoomId,
+    },
+  ) as DealRoomRiskSummary | null | undefined;
 
   useEffect(() => {
     if (!overview) return;
@@ -126,7 +138,11 @@ function LivePropertyCaseOverview({
     });
   }, [overview]);
 
-  if (overview === undefined || readiness === undefined) {
+  if (
+    overview === undefined ||
+    readiness === undefined ||
+    riskSummary === undefined
+  ) {
     return <LoadingState variant="panel" />;
   }
 
@@ -145,6 +161,7 @@ function LivePropertyCaseOverview({
     <PropertyCaseOverviewBody
       overview={overview}
       readiness={readiness ?? undefined}
+      riskSummary={riskSummary ?? undefined}
       telemetryEnabled
       onSubmitAdjudication={async ({
         citationId,
@@ -176,11 +193,13 @@ function LivePropertyCaseOverview({
 function PropertyCaseOverviewBody({
   overview,
   readiness,
+  riskSummary,
   telemetryEnabled = false,
   onSubmitAdjudication,
 }: {
   overview: PropertyCaseOverviewSurface;
   readiness?: BuyerReadinessSurface | null;
+  riskSummary?: DealRoomRiskSummary | null;
   telemetryEnabled?: boolean;
   onSubmitAdjudication?: (input: SubmitSourceAdjudicationInput) => Promise<void>;
 }) {
@@ -197,6 +216,11 @@ function PropertyCaseOverviewBody({
   const memoState = overview.artifacts.memo;
   const recommendationState = overview.artifacts.recommendation;
   const summaryState = overview.artifacts.summary;
+  const recommendation = buildPropertyRecommendation({
+    overview,
+    readiness,
+    riskSummary,
+  });
 
   useEffect(() => {
     if (!telemetryEnabled) return;
@@ -1005,42 +1029,190 @@ function PropertyCaseOverviewBody({
         <div className="flex flex-col gap-6">
           <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
             <CardHeader>
-              <CardTitle>Recommended action</CardTitle>
+              <CardTitle>Recommended next step</CardTitle>
               <CardDescription>
-                Offer guidance is only shown when it is tied back to the case.
+                Property evidence, readiness, and risk stay separate until they are explicit enough to drive one next move.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              {overview.action && !recommendationState.withholdOutput ? (
-                <div className="space-y-5">
-                  <div className="rounded-[22px] bg-neutral-950 p-5 text-white shadow-[0_28px_56px_-38px_rgba(3,14,29,0.45)]">
+            <CardContent className="space-y-5">
+              <div className="rounded-[22px] bg-neutral-950 p-5 text-white shadow-[0_28px_56px_-38px_rgba(3,14,29,0.45)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">
-                      {overview.action.guardrailState === "softened"
-                        ? "Illustrative opener"
-                        : "Suggested opener"}
+                      Recommendation state
                     </p>
                     <p className="mt-3 text-3xl font-semibold">
-                      {overview.action.openingPriceLabel}
+                      {recommendation.label}
                     </p>
-                    <div className="mt-4 flex flex-wrap gap-2">
+                  </div>
+                  <Badge className={recommendationBadgeClasses(recommendation.kind)}>
+                    {recommendation.kind.replaceAll("_", " ")}
+                  </Badge>
+                </div>
+                <p className="mt-4 text-sm leading-6 text-white/88">
+                  {recommendation.shortRationale}
+                </p>
+                <p className="mt-3 text-sm leading-6 text-white/72">
+                  {recommendation.explanation}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <ConfidenceBadge tone={overview.overallConfidenceTone}>
+                    {overview.overallConfidenceLabel}
+                  </ConfidenceBadge>
+                  {overview.marketReality ? (
+                    <MarketPositionBadge tone={overview.marketReality.position.tone}>
+                      {overview.marketReality.position.label}
+                    </MarketPositionBadge>
+                  ) : null}
+                  {recommendationState.withholdOutput ? (
+                    <Badge className="bg-white/10 text-white">
+                      {recommendationState.title}
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+
+              {recommendation.rationale.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-neutral-900">
+                    Why this is the next move
+                  </p>
+                  {recommendation.rationale.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border border-neutral-200 p-3"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                          {item.title}
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className="border-neutral-200 bg-neutral-50 text-neutral-600"
+                        >
+                          {item.source.replaceAll("_", " ")}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-neutral-700">
+                        {item.body}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {recommendation.blockersAndConditions.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-neutral-900">
+                    Blockers and conditions
+                  </p>
+                  {recommendation.blockersAndConditions.map((condition) => (
+                    <div
+                      key={condition.id}
+                      className={cn(
+                        "rounded-2xl border p-4",
+                        conditionCardClasses(condition),
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className="border-white/40 bg-white/80 text-neutral-700"
+                        >
+                          {condition.source.replaceAll("_", " ")}
+                        </Badge>
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-neutral-500">
+                          {condition.effect.replaceAll("_", " ")}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm font-semibold text-neutral-900">
+                        {condition.title}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-neutral-700">
+                        {condition.summary}
+                      </p>
+                      <p className="mt-3 text-xs font-medium uppercase tracking-[0.16em] text-neutral-500">
+                        Next move
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-neutral-700">
+                        {condition.actionLabel}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {recommendation.whatWouldChange.length > 0 && (
+                <div className="rounded-xl border border-dashed border-neutral-200 p-4">
+                  <p className="text-sm font-semibold text-neutral-900">
+                    What would change the recommendation
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm leading-6 text-neutral-700">
+                    {recommendation.whatWouldChange.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-neutral-200 bg-neutral-50/80 p-4">
+                <p className="text-sm font-semibold text-neutral-900">
+                  Buyer-safe CTA
+                </p>
+                <p className="mt-2 text-sm leading-6 text-neutral-700">
+                  {recommendation.buyerCta.explanation}
+                </p>
+                {recommendation.buyerCta.href ? (
+                  <Button asChild size="sm" className="mt-4 justify-between">
+                    <Link
+                      href={recommendation.buyerCta.href}
+                      onClick={() =>
+                        telemetryEnabled && recommendation.buyerCta.target
+                          ? trackAdvisoryNextBestActionClicked(overview, {
+                              target: recommendation.buyerCta.target,
+                              ctaId: `recommendation_${recommendation.kind}`,
+                              nextActionLabel: recommendation.label,
+                            })
+                          : undefined
+                      }
+                    >
+                      {recommendation.buyerCta.label}
+                      <span aria-hidden="true">→</span>
+                    </Link>
+                  </Button>
+                ) : (
+                  <p className="mt-4 text-sm font-medium text-neutral-900">
+                    {recommendation.buyerCta.label}
+                  </p>
+                )}
+              </div>
+
+              {overview.action && !recommendationState.withholdOutput ? (
+                <div className="space-y-3 rounded-[22px] border border-neutral-200 bg-white p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                        Offer guidance
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-neutral-950">
+                        {overview.action.openingPriceLabel}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                       <ConfidenceBadge tone={confidenceToneFromAction(overview.action.confidence)}>
                         {overview.action.confidenceLabel}
                       </ConfidenceBadge>
                       <RiskBadge risk={overview.action.riskLevel}>
                         {overview.action.riskLabel}
                       </RiskBadge>
-                      {overview.action.guardrailState !== "can_say" && (
-                        <Badge className="bg-white/10 text-white">
-                          {overview.action.guardrailLabel}
-                        </Badge>
-                      )}
                     </div>
-                    {overview.action.guardrailState !== "can_say" && (
-                      <p className="mt-4 text-sm leading-6 text-white/78">
-                        {overview.action.guardrailExplanation}
-                      </p>
-                    )}
                   </div>
+
+                  <p className="text-sm leading-6 text-neutral-700">
+                    {overview.action.reviewedConclusion ??
+                      overview.action.buyerExplanation ??
+                      overview.action.guardrailExplanation}
+                  </p>
 
                   {overview.action.rationale.length > 0 && (
                     <div className="space-y-3">
@@ -1081,53 +1253,126 @@ function PropertyCaseOverviewBody({
                       </div>
                     </div>
                   )}
-
-                  <div className="rounded-xl border border-dashed border-neutral-200 p-3">
-                    <p className="text-sm font-semibold text-neutral-900">
-                      How are you using this recommendation?
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        variant={
-                          feedbackDecision === "accepted" ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={() => handleRecommendationFeedback("accepted")}
-                      >
-                        Using it
-                      </Button>
-                      <Button
-                        variant={
-                          feedbackDecision === "deferred" ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={() => handleRecommendationFeedback("deferred")}
-                      >
-                        Not yet
-                      </Button>
-                      <Button
-                        variant={
-                          feedbackDecision === "dismissed" ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={() => handleRecommendationFeedback("dismissed")}
-                      >
-                        Not useful
-                      </Button>
-                    </div>
-                    {feedbackDecision ? (
-                      <p className="mt-3 text-xs font-medium text-neutral-500">
-                        Saved as a calibration signal for this recommendation.
-                      </p>
-                    ) : null}
-                  </div>
                 </div>
-              ) : (
-                <EmptyStateCard
-                  title={recommendationState.title}
-                  description={`${recommendationState.description} ${recommendationState.recoveryDescription}`}
-                />
-              )}
+              ) : null}
+
+              {recommendation.variant === "internal" ? (
+                <details className="rounded-xl border border-neutral-200 bg-neutral-50/70 p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-neutral-900">
+                    Internal expanded reasoning
+                  </summary>
+                  <div className="mt-4 space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <MetricTile
+                        label="Property direction"
+                        value={recommendation.internal.propertyDirection}
+                      />
+                      <MetricTile
+                        label="Broker review required"
+                        value={
+                          recommendation.internal.brokerReviewRequired ? "Yes" : "No"
+                        }
+                      />
+                    </div>
+
+                    {recommendation.internal.brokerReviewReasons.length > 0 ? (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                          Broker review reasons
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {recommendation.internal.brokerReviewReasons.map((item) => (
+                            <Badge
+                              key={item}
+                              variant="outline"
+                              className="border-neutral-200 bg-white text-neutral-700"
+                            >
+                              {item}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {recommendation.internal.reasonCodes.length > 0 ? (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                          Reason codes
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {recommendation.internal.reasonCodes.map((item) => (
+                            <Badge
+                              key={item}
+                              variant="outline"
+                              className="border-neutral-200 bg-white font-mono text-[11px] text-neutral-700"
+                            >
+                              {item}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-3">
+                      {recommendation.internal.expandedReasoning.map((item) => (
+                        <div
+                          key={item.id}
+                          className="rounded-xl border border-neutral-200 bg-white p-3"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                              {item.title}
+                            </p>
+                            <Badge
+                              variant="outline"
+                              className="border-neutral-200 bg-neutral-50 text-neutral-600"
+                            >
+                              {item.source.replaceAll("_", " ")}
+                            </Badge>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-neutral-700">
+                            {item.body}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </details>
+              ) : null}
+
+              <div className="rounded-xl border border-dashed border-neutral-200 p-3">
+                <p className="text-sm font-semibold text-neutral-900">
+                  How are you using this recommendation?
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    variant={feedbackDecision === "accepted" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleRecommendationFeedback("accepted")}
+                  >
+                    Using it
+                  </Button>
+                  <Button
+                    variant={feedbackDecision === "deferred" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleRecommendationFeedback("deferred")}
+                  >
+                    Not yet
+                  </Button>
+                  <Button
+                    variant={feedbackDecision === "dismissed" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleRecommendationFeedback("dismissed")}
+                  >
+                    Not useful
+                  </Button>
+                </div>
+                {feedbackDecision ? (
+                  <p className="mt-3 text-xs font-medium text-neutral-500">
+                    Saved as a calibration signal for this recommendation.
+                  </p>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
 
@@ -1664,6 +1909,30 @@ function RiskBadge({
       {children}
     </Badge>
   );
+}
+
+function recommendationBadgeClasses(kind: PropertyRecommendation["kind"]): string {
+  return cn(
+    "border-transparent text-white",
+    kind === "offer_now" && "bg-success-500/20",
+    kind === "tour" && "bg-info-500/20",
+    kind === "ask_for_docs" && "bg-warning-500/20",
+    kind === "wait_and_watch" && "bg-white/10",
+    kind === "proceed_with_conditions" && "bg-warning-500/20",
+    kind === "skip" && "bg-error-500/20",
+  );
+}
+
+function conditionCardClasses(
+  condition: PropertyRecommendationCondition,
+): string {
+  if (condition.effect === "blocks") {
+    return "border-error-200 bg-error-50/70";
+  }
+  if (condition.effect === "review_required") {
+    return "border-warning-200 bg-warning-50/70";
+  }
+  return "border-neutral-200 bg-neutral-50";
 }
 
 function ConfidenceSectionEvidenceList({
