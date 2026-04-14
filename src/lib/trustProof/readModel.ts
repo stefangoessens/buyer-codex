@@ -64,7 +64,9 @@ function formatUsdCompact(value: number): string {
     currency: "USD",
     notation: "compact",
     maximumFractionDigits: value >= 100_000 ? 0 : 1,
-  }).format(value);
+  })
+    .format(value)
+    .replace(/\.0(?=[KMBT])/u, "");
 }
 
 function formatPercent(value: number): string {
