@@ -1,10 +1,14 @@
 import type { LinkPastedSource } from "@buyer-codex/shared/launch-events";
 import { parseListingUrl } from "./parser";
+import type { SourcePlatform } from "./types";
 import type { ParseErrorCode, ParseResult } from "./types";
 
 export interface BuildListingIntakeHrefOptions {
   source?: LinkPastedSource;
   submittedAt?: number;
+  platform?: SourcePlatform;
+  sourceListingId?: string;
+  attemptId?: string;
 }
 
 export function buildListingIntakeHref(
@@ -19,6 +23,18 @@ export function buildListingIntakeHref(
 
   if (typeof options.submittedAt === "number") {
     params.set("submittedAt", String(options.submittedAt));
+  }
+
+  if (options.platform) {
+    params.set("platform", options.platform);
+  }
+
+  if (options.sourceListingId) {
+    params.set("sourceListingId", options.sourceListingId);
+  }
+
+  if (options.attemptId) {
+    params.set("attemptId", options.attemptId);
   }
 
   return `/intake?${params.toString()}`;

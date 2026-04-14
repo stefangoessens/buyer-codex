@@ -6,6 +6,8 @@ import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  buildListingIntakeHref,
+  getPasteLinkErrorMessage,
   prepareListingIntakeSubmission,
   type PreparedListingIntakeSubmissionSuccess,
 } from "@/lib/intake/pasteLink";
@@ -29,9 +31,10 @@ export function PasteLinkInput({
 }: PasteLinkInputProps) {
   const [value, setValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isHero = variant === "hero";
-  const canSubmit = value.trim().length > 0;
+  const canSubmit = value.trim().length > 0 && !isSubmitting;
 
   async function recordParserFailure(url: string, submittedAt: string) {
     if (!convex) {
@@ -49,36 +52,73 @@ export function PasteLinkInput({
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
 
-    const submittedAt = new Date().toISOString();
-    const submission = prepareListingIntakeSubmission(value, variant);
+    const submittedAtMs = Date.now();
+    const submittedAt = new Date(submittedAtMs).toISOString();
+    const submission = prepareListingIntakeSubmission(value, variant, submittedAtMs);
     if (!submission.ok) {
       setErrorMessage(submission.message);
       void recordParserFailure(value, submittedAt);
       return;
     }
 
-    setErrorMessage(null);
+    if (!convex) {
+      setErrorMessage("Listing intake is temporarily unavailable. Try again in a moment.");
+      return;
+    }
 
-    trackPasteSubmitted({
-      url: submission.parsed.data.rawUrl,
-      source: variant,
-      platform: submission.parsed.data.platform,
-    });
-    trackParseSucceeded({
-      source: variant,
-      platform: submission.parsed.data.platform,
-      listingId: submission.parsed.data.listingId,
-    });
+    setErrorMessage(null);
+    setIsSubmitting(true);
 
     try {
-      onSubmit?.(submission);
+      const result = await convex.mutation(api.intake.submitUrl, {
+        url: submission.parsed.data.rawUrl,
+        source: variant,
+        submittedAt,
+      });
+
+      if (!result.success) {
+        setErrorMessage(getPasteLinkErrorMessage(result.code));
+        void recordParserFailure(value, submittedAt);
+        return;
+      }
+
+      trackPasteSubmitted({
+        url: result.normalizedUrl,
+        source: variant,
+        platform: result.platform,
+      });
+      trackParseSucceeded({
+        source: variant,
+        platform: result.platform,
+        listingId: result.listingId,
+      });
+
+      const persistedSubmission: PreparedListingIntakeSubmissionSuccess = {
+        ok: true,
+        parsed: submission.parsed,
+        href: buildListingIntakeHref(result.normalizedUrl, {
+          source: variant,
+          submittedAt: submittedAtMs,
+          platform: result.platform,
+          sourceListingId: String(result.sourceListingId),
+          attemptId: String(result.attemptId),
+        }),
+      };
+
+      onSubmit?.(persistedSubmission);
     } catch (err) {
       const code =
-        err instanceof Error ? err.message : "unknown_intake_navigation_error";
-      track("error_boundary_hit", { error: code, url: value.trim() });
+        err instanceof Error ? err.message : "unknown_intake_submission_error";
+      setErrorMessage("We couldn't save this listing right now. Try again in a moment.");
+      track("error_boundary_hit", { error: code });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -109,6 +149,7 @@ export function PasteLinkInput({
             inputMode="url"
             value={value}
             aria-invalid={errorMessage ? true : undefined}
+            disabled={isSubmitting}
             onChange={(e) => {
               setValue(e.target.value);
               if (errorMessage) {
@@ -129,7 +170,9 @@ export function PasteLinkInput({
           className={`mt-2 text-sm ${errorMessage ? "text-error-700" : "text-neutral-500"}`}
         >
           {errorMessage ??
-            "Supports Zillow, Redfin, and Realtor.com listing URLs."}
+            (isSubmitting
+              ? "Saving the listing and opening your intake..."
+              : "Supports Zillow, Redfin, and Realtor.com listing URLs.")}
         </p>
       </div>
 
@@ -142,7 +185,7 @@ export function PasteLinkInput({
             : "h-11 rounded-[12px] bg-primary-500 px-4 text-sm font-medium hover:bg-primary-600 disabled:bg-primary-200"
         }
       >
-        {isHero ? "Get free analysis" : "Analyze"}
+        {isSubmitting ? "Saving..." : isHero ? "Get free analysis" : "Analyze"}
       </Button>
     </form>
   );

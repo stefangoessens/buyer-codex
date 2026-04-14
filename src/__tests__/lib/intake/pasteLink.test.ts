@@ -24,6 +24,23 @@ describe("buildListingIntakeHref", () => {
       "/intake?url=https%3A%2F%2Fwww.zillow.com%2Fhomedetails%2F1_zpid%2F&source=hero&submittedAt=123456789",
     );
   });
+
+  it("preserves persisted intake identifiers for canonical handoff", () => {
+    const href = buildListingIntakeHref(
+      "https://zillow.com/homedetails/1_zpid/",
+      {
+        source: "hero",
+        submittedAt: 123456789,
+        platform: "zillow",
+        sourceListingId: "source_listing_123",
+        attemptId: "intake_attempt_456",
+      },
+    );
+
+    expect(href).toBe(
+      "/intake?url=https%3A%2F%2Fzillow.com%2Fhomedetails%2F1_zpid%2F&source=hero&submittedAt=123456789&platform=zillow&sourceListingId=source_listing_123&attemptId=intake_attempt_456",
+    );
+  });
 });
 
 describe("prepareListingIntakeSubmission", () => {
