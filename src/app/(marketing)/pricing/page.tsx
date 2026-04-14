@@ -10,7 +10,7 @@ import {
   PricingSections,
   DisclosureList,
 } from "@/components/marketing/content/PricingSections";
-import { TestimonialCard } from "@/components/marketing/TestimonialCard";
+import { TrustProofCaseStudyCard } from "@/components/marketing/TrustProofCaseStudyCard";
 import type { ContentPageMeta } from "@/lib/content/types";
 import { metadataForStaticPage } from "@/lib/seo/pageDefinitions";
 import { buildPricingTrustProofReadModel } from "@/lib/trustProof/readModel";
@@ -97,18 +97,10 @@ export default function PricingPage() {
           {trustProof.caseStudies.length > 0 && (
             <div className="mt-8 grid gap-6 lg:grid-cols-2">
               {trustProof.caseStudies.map((study) => (
-                <TestimonialCard
+                <TrustProofCaseStudyCard
                   key={study.id}
-                  quote={study.summary}
-                  author={study.buyerDisplayName}
-                  role={study.buyerRole}
-                  eyebrow={
-                    trustProof.sliceLabelingMode.kind === "mixed" &&
-                    study.isIllustrative
-                      ? study.badge ?? undefined
-                      : undefined
-                  }
-                  eyebrowAriaLabel={study.badgeAriaLabel ?? undefined}
+                  study={study}
+                  showBadge={trustProof.sliceLabelingMode.kind === "mixed"}
                 />
               ))}
             </div>

@@ -6,8 +6,7 @@ import type {
 import { FAQ_ENTRIES } from "@/content/faq";
 import { filterPublic } from "@/lib/content/publicFilter";
 import { CASE_STUDIES } from "@/content/trustProof";
-import { labelCase } from "@/lib/trustProof/policy";
-import type { CaseStudy } from "@/lib/trustProof/types";
+import { publicCaseStudies } from "@/lib/trustProof/policy";
 
 /**
  * Renderer for the typed `LocationBlock` discriminated union used by
@@ -231,15 +230,12 @@ function BlockRenderer({
       );
 
     case "testimonial_ref": {
-      // Resolve public case studies; labelCase applies the
-      // illustrative label for pre-revenue records.
-      const publicStudies = CASE_STUDIES.filter(
-        (c): c is CaseStudy => c.visibility === "public"
-      );
+      // Resolve against the render-safe boundary so invalid live
+      // records are filtered before the marketing surface sees them.
+      const publicStudies = publicCaseStudies(CASE_STUDIES);
       const resolved = block.caseStudyIds
-        .map((id) => publicStudies.find((c) => c.id === id))
-        .filter((c): c is CaseStudy => c !== undefined)
-        .map((c) => labelCase(c));
+        .map((id) => publicStudies.find((c) => c.case.id === id))
+        .filter((c) => c !== undefined);
       if (resolved.length === 0) return null;
       return (
         <section>

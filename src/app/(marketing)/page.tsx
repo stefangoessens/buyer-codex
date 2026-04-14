@@ -3,7 +3,7 @@ import Image from "next/image";
 import { HeroSection } from "@/components/marketing/HeroSection";
 import { TrustBar } from "@/components/marketing/TrustBar";
 import { FeatureCard } from "@/components/marketing/FeatureCard";
-import { TestimonialCard } from "@/components/marketing/TestimonialCard";
+import { TrustProofCaseStudyCard } from "@/components/marketing/TrustProofCaseStudyCard";
 import { HeroInput } from "@/components/marketing/HeroInput";
 import { BentoCard } from "@/components/marketing/BentoCard";
 import { metadataForStaticPage } from "@/lib/seo/pageDefinitions";
@@ -14,7 +14,7 @@ import { buildHomepageTrustProofReadModel } from "@/lib/trustProof/readModel";
 const features = [
   { imageSrc: "/images/marketing/features/feature-1.png", imageAlt: "Paste a listing link and instantly get property data", title: "Paste any listing link", description: "Drop a Zillow, Redfin, or Realtor.com URL. We instantly pull the property data and start our AI analysis engine." },
   { imageSrc: "/images/marketing/features/feature-2.png", imageAlt: "AI-powered property analysis dashboard", title: "Get AI-powered analysis", description: "Fair pricing, comparable sales, leverage signals, risk assessment, and a competitiveness score — all in seconds." },
-  { imageSrc: "/images/marketing/features/feature-3.png", imageAlt: "Expert buyer representation saves you money", title: "Save with expert representation", description: "Our licensed Florida brokers negotiate on your behalf using AI insights. Average buyer savings: $12,400." },
+  { imageSrc: "/images/marketing/features/feature-3.png", imageAlt: "Expert buyer representation saves you money", title: "Save with expert representation", description: "Our licensed Florida brokers negotiate on your behalf using AI insights, with buyer-credit mechanics explained clearly before closing." },
 ];
 
 const steps = [
@@ -29,10 +29,6 @@ export const metadata: Metadata = metadataForStaticPage("home");
 
 export default function Home() {
   const trustProof = buildHomepageTrustProofReadModel();
-  const trustStats = trustProof.stats.map((stat) => ({
-    value: stat.value,
-    label: stat.label,
-  }));
 
   return (
     <>
@@ -40,7 +36,11 @@ export default function Home() {
       <HeroSection><HeroInput /></HeroSection>
 
       {/* ── Trust Bar ────────────────────────────────────────────────── */}
-      <TrustBar stats={trustStats} />
+      <TrustBar
+        stats={trustProof.stats}
+        badge={trustProof.sectionBadge}
+        badgeAriaLabel={trustProof.sectionBadgeAriaLabel}
+      />
 
       {/* ── Features (PayFit-style: image cards) ─────────────────────── */}
       <section className="w-full bg-white py-20 lg:py-28">
@@ -157,54 +157,23 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Testimonials ─────────────────────────────────────────────── */}
+      {/* ── Trust Proof ─────────────────────────────────────────────── */}
       <section className="w-full bg-neutral-50 py-20 lg:py-28">
         <div className="mx-auto max-w-[1248px] px-6">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary-400">Social proof</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.003em] text-neutral-800 lg:text-[41px] lg:leading-[1.2]">What buyers are saying</h2>
-          </div>
-          {trustProof.sectionBadge && (
-            <p
-              className="mt-6 text-center text-xs font-semibold uppercase tracking-[0.18em] text-accent-700"
-              aria-label={trustProof.sectionBadgeAriaLabel ?? trustProof.sectionBadge}
-            >
-              {trustProof.sectionBadge}
+            <p className="text-sm font-semibold uppercase tracking-widest text-primary-400">Trust proof</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.003em] text-neutral-800 lg:text-[41px] lg:leading-[1.2]">Illustrative buyer scenarios, kept separate from live closings</h2>
+            <p className="mt-4 text-lg leading-relaxed text-neutral-500">
+              buyer-codex uses a typed trust-proof catalog for public marketing surfaces, so scenario content stays visibly illustrative until verified transaction records exist.
             </p>
-          )}
+          </div>
           <div className="mt-14 grid grid-cols-1 gap-8 md:grid-cols-3">
             {trustProof.caseStudies.map((study) => (
-              <TestimonialCard
+              <TrustProofCaseStudyCard
                 key={study.id}
-                quote={study.summary}
-                author={study.buyerDisplayName}
-                role={study.buyerRole}
-                eyebrow={
-                  trustProof.sliceLabelingMode.kind === "mixed" &&
-                  study.isIllustrative
-                    ? study.badge ?? undefined
-                    : undefined
-                }
-                eyebrowAriaLabel={study.badgeAriaLabel ?? undefined}
+                study={study}
+                showBadge={trustProof.sliceLabelingMode.kind === "mixed"}
               />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats Banner ─────────────────────────────────────────────── */}
-      <section className="relative w-full overflow-hidden bg-gradient-to-r from-primary-700 to-primary-600 py-16 lg:py-20">
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="absolute -left-20 -top-20 h-60 w-60 rounded-full bg-white/[0.04] blur-3xl" />
-          <div className="absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-white/[0.04] blur-3xl" />
-        </div>
-        <div className="relative mx-auto max-w-[1248px] px-6">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12">
-            {[{ value: "$12,400", label: "Avg. buyer savings" }, { value: "23 days", label: "Avg. time to close" }, { value: "98%", label: "Client satisfaction" }, { value: "4.9/5", label: "Average rating" }].map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="text-3xl font-semibold tracking-tight text-white lg:text-4xl">{s.value}</div>
-                <div className="mt-2 text-sm font-medium text-primary-100/80">{s.label}</div>
-              </div>
             ))}
           </div>
         </div>
