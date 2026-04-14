@@ -21,7 +21,12 @@ import {
   type RawCounterOffer,
 } from "./lib/counterofferHistory";
 import { buildCalibrationRecord } from "../src/lib/ai/engines/pricingCalibration";
-import type { PricingOutput } from "../src/lib/ai/engines/types";
+import { buildRecommendationBacktestRecord } from "../src/lib/ai/engines/recommendationBacktest";
+import type { PropertyCase } from "../src/lib/ai/engines/caseSynthesis";
+import type {
+  PricingOutput,
+  RecommendationBacktestOutcome,
+} from "../src/lib/ai/engines/types";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Validators for return shape
@@ -178,6 +183,80 @@ async function recordPricingCalibrationForAcceptedOffer(
     ...record,
     propertyId: args.propertyId,
     engineOutputId: latestPricingOutput._id,
+  });
+}
+
+function parsePropertyCase(payload: string): PropertyCase | null {
+  try {
+    return JSON.parse(payload) as PropertyCase;
+  } catch {
+    return null;
+  }
+}
+
+async function recordRecommendationBacktestForOfferOutcome(
+  ctx: { db: any },
+  args: {
+    propertyId: Id<"properties">;
+    dealRoomId: Id<"dealRooms">;
+    offerId: Id<"offers">;
+    actualOfferPrice: number;
+    actualAcceptedPrice?: number | null;
+    actualOutcome: RecommendationBacktestOutcome;
+    actualContingencies?: string[];
+    outcomeRecordedAt: string;
+  },
+) {
+  const db = ctx.db as any;
+
+  const existingRecord = await db
+    .query("recommendationBacktestRecords")
+    .withIndex("by_offerId", (q: any) => q.eq("offerId", args.offerId))
+    .first();
+  if (existingRecord) return;
+
+  const latestCase = (
+    await db
+      .query("propertyCases")
+      .withIndex("by_dealRoomId", (q: any) => q.eq("dealRoomId", args.dealRoomId))
+      .collect()
+  )
+    .sort((left: Doc<"propertyCases">, right: Doc<"propertyCases">) =>
+      right.generatedAt.localeCompare(left.generatedAt),
+    )
+    .at(0);
+  if (!latestCase) return;
+
+  const propertyCase = parsePropertyCase(latestCase.payload);
+  if (!propertyCase?.recommendedAction) return;
+
+  const counters = await db
+    .query("counterOffers")
+    .withIndex("by_offerId", (q: any) => q.eq("offerId", args.offerId))
+    .collect();
+
+  const record = buildRecommendationBacktestRecord({
+    propertyId: String(args.propertyId),
+    dealRoomId: String(args.dealRoomId),
+    offerId: String(args.offerId),
+    propertyCaseId: String(latestCase._id),
+    propertyCase,
+    synthesisVersion: latestCase.synthesisVersion,
+    recommendationGeneratedAt: latestCase.generatedAt,
+    actualOfferPrice: args.actualOfferPrice,
+    actualAcceptedPrice: args.actualAcceptedPrice,
+    actualOutcome: args.actualOutcome,
+    actualContingencies: args.actualContingencies,
+    countersMade: counters.length,
+    outcomeRecordedAt: args.outcomeRecordedAt,
+  });
+
+  await db.insert("recommendationBacktestRecords", {
+    ...record,
+    propertyId: args.propertyId,
+    dealRoomId: args.dealRoomId,
+    offerId: args.offerId,
+    propertyCaseId: latestCase._id,
   });
 }
 
@@ -416,27 +495,39 @@ export const respondToCounter = mutation({
       timestamp: now,
     });
 
+    const offer = await ctx.db.get(row.offerId);
+    if (offer) {
+      await recordRecommendationBacktestForOfferOutcome(ctx, {
+        propertyId: offer.propertyId,
+        dealRoomId: offer.dealRoomId,
+        offerId: row.offerId,
+        actualOfferPrice: offer.offerPrice,
+        actualAcceptedPrice: args.decision === "accepted" ? row.price : null,
+        actualOutcome: args.decision,
+        actualContingencies: offer.contingencies ?? [],
+        outcomeRecordedAt: now,
+      });
+    }
+
     // If this counter was accepted, roll the parent offer into a
     // terminal state. Rejected/expired/withdrawn leave the offer in
     // "countered" so the UI can still show the history.
-    if (args.decision === "accepted") {
-      const offer = await ctx.db.get(row.offerId);
-      if (
-        offer &&
-        offer.status !== "accepted" &&
-        offer.status !== "rejected" &&
-        offer.status !== "withdrawn" &&
-        offer.status !== "expired"
-      ) {
-        await ctx.db.patch(row.offerId, { status: "accepted" });
-        await recordPricingCalibrationForAcceptedOffer(ctx, {
-          propertyId: offer.propertyId,
-          offerId: row.offerId,
-          actualAcceptedPrice: row.price,
-          acceptedAt: now,
-          submittedAt: offer.submittedAt,
-        });
-      }
+    if (
+      args.decision === "accepted" &&
+      offer &&
+      offer.status !== "accepted" &&
+      offer.status !== "rejected" &&
+      offer.status !== "withdrawn" &&
+      offer.status !== "expired"
+    ) {
+      await ctx.db.patch(row.offerId, { status: "accepted" });
+      await recordPricingCalibrationForAcceptedOffer(ctx, {
+        propertyId: offer.propertyId,
+        offerId: row.offerId,
+        actualAcceptedPrice: row.price,
+        acceptedAt: now,
+        submittedAt: offer.submittedAt,
+      });
     }
 
     return null;

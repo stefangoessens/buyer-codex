@@ -744,6 +744,30 @@ export default defineSchema({
     errorWalkAway: v.number(),
     meanAbsoluteError: v.number(),
     highError: v.boolean(),
+    overallConfidence: v.number(),
+    realizedScore: v.number(),
+    confidenceDelta: v.number(),
+    withinPredictedRange: v.boolean(),
+    primaryErrorCategory: v.union(
+      v.literal("within_expected_range"),
+      v.literal("accepted_below_strong_opener"),
+      v.literal("accepted_below_fair_value"),
+      v.literal("accepted_above_likely_accepted"),
+      v.literal("accepted_above_walk_away"),
+      v.literal("confidence_overstated"),
+      v.literal("required_heavy_negotiation"),
+    ),
+    errorCategories: v.array(
+      v.union(
+        v.literal("within_expected_range"),
+        v.literal("accepted_below_strong_opener"),
+        v.literal("accepted_below_fair_value"),
+        v.literal("accepted_above_likely_accepted"),
+        v.literal("accepted_above_walk_away"),
+        v.literal("confidence_overstated"),
+        v.literal("required_heavy_negotiation"),
+      ),
+    ),
     daysToAccept: v.union(v.number(), v.null()),
     countersMade: v.number(),
     acceptedAt: v.string(),
@@ -752,7 +776,70 @@ export default defineSchema({
     .index("by_propertyId", ["propertyId"])
     .index("by_engineOutputId", ["engineOutputId"])
     .index("by_recordedAt", ["recordedAt"])
-    .index("by_highError", ["highError"]),
+    .index("by_highError", ["highError"])
+    .index("by_primaryErrorCategory", ["primaryErrorCategory"]),
+
+  recommendationBacktestRecords: defineTable({
+    propertyId: v.id("properties"),
+    dealRoomId: v.id("dealRooms"),
+    offerId: v.id("offers"),
+    propertyCaseId: v.id("propertyCases"),
+    synthesisVersion: v.string(),
+    recommendationGeneratedAt: v.string(),
+    recommendationConfidence: v.number(),
+    recommendedOpeningPrice: v.number(),
+    recommendedRiskLevel: v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high"),
+    ),
+    recommendedContingencies: v.array(v.string()),
+    sourceOutputIds: v.array(v.string()),
+    actualOfferPrice: v.number(),
+    actualAcceptedPrice: v.union(v.number(), v.null()),
+    actualOutcome: v.union(
+      v.literal("accepted"),
+      v.literal("rejected"),
+      v.literal("withdrawn"),
+      v.literal("expired"),
+    ),
+    actualContingencies: v.array(v.string()),
+    priceDeltaPct: v.number(),
+    contingencyMatchRatio: v.number(),
+    adoptionScore: v.number(),
+    followedRecommendation: v.boolean(),
+    realizedScore: v.number(),
+    confidenceDelta: v.number(),
+    primaryErrorCategory: v.union(
+      v.literal("followed_recommendation"),
+      v.literal("opened_above_recommendation"),
+      v.literal("opened_below_recommendation"),
+      v.literal("contingencies_mismatch"),
+      v.literal("followed_but_unsuccessful"),
+      v.literal("accepted_after_override"),
+      v.literal("confidence_overstated"),
+    ),
+    errorCategories: v.array(
+      v.union(
+        v.literal("followed_recommendation"),
+        v.literal("opened_above_recommendation"),
+        v.literal("opened_below_recommendation"),
+        v.literal("contingencies_mismatch"),
+        v.literal("followed_but_unsuccessful"),
+        v.literal("accepted_after_override"),
+        v.literal("confidence_overstated"),
+      ),
+    ),
+    countersMade: v.number(),
+    outcomeRecordedAt: v.string(),
+  })
+    .index("by_propertyId", ["propertyId"])
+    .index("by_dealRoomId", ["dealRoomId"])
+    .index("by_offerId", ["offerId"])
+    .index("by_propertyCaseId", ["propertyCaseId"])
+    .index("by_outcomeRecordedAt", ["outcomeRecordedAt"])
+    .index("by_actualOutcome", ["actualOutcome"])
+    .index("by_primaryErrorCategory", ["primaryErrorCategory"]),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // AI PROMPT REGISTRY

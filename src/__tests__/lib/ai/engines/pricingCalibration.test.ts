@@ -4,6 +4,7 @@ import {
   buildCalibrationRecord,
   computeDaysToAccept,
   HIGH_ERROR_THRESHOLD,
+  summarizePricingCalibration,
 } from "@/lib/ai/engines/pricingCalibration";
 import type { PricingOutput } from "@/lib/ai/engines/types";
 
@@ -71,6 +72,12 @@ describe("pricingCalibration", () => {
     expect(record.errorWalkAway).toBeCloseTo(0.0192, 4);
     expect(record.meanAbsoluteError).toBeCloseTo(0.0336, 4);
     expect(record.highError).toBe(false);
+    expect(record.overallConfidence).toBe(0.82);
+    expect(record.realizedScore).toBeCloseTo(0.832, 3);
+    expect(record.confidenceDelta).toBeCloseTo(-0.012, 3);
+    expect(record.withinPredictedRange).toBe(true);
+    expect(record.primaryErrorCategory).toBe("within_expected_range");
+    expect(record.errorCategories).toContain("required_heavy_negotiation");
     expect(record.daysToAccept).toBe(3.5);
     expect(record.countersMade).toBe(2);
   });
@@ -89,6 +96,8 @@ describe("pricingCalibration", () => {
 
     expect(record.meanAbsoluteError).toBeGreaterThan(HIGH_ERROR_THRESHOLD);
     expect(record.highError).toBe(true);
+    expect(record.errorCategories).toContain("accepted_above_walk_away");
+    expect(record.errorCategories).toContain("confidence_overstated");
   });
 
   it("computes average drift from recorded mean absolute errors", () => {
@@ -99,5 +108,53 @@ describe("pricingCalibration", () => {
       ]),
     ).toBe(0.06);
     expect(averageCalibrationDrift([])).toBeNull();
+  });
+
+  it("summarizes pricing calibration for later confidence and telemetry work", () => {
+    const baseline = buildCalibrationRecord({
+      propertyId: "property-1",
+      engineOutputId: "engine-1",
+      promptVersion: "pricing-v2",
+      modelId: "claude-sonnet-4-20250514",
+      pricing: pricingOutput,
+      actualAcceptedPrice: 520_000,
+      acceptedAt: "2026-04-13T12:00:00.000Z",
+      submittedAt: "2026-04-10T00:00:00.000Z",
+      countersMade: 1,
+    });
+    const miss = buildCalibrationRecord({
+      propertyId: "property-2",
+      engineOutputId: "engine-2",
+      promptVersion: "pricing-v2",
+      modelId: "claude-sonnet-4-20250514",
+      pricing: {
+        ...pricingOutput,
+        overallConfidence: 0.91,
+      },
+      actualAcceptedPrice: 610_000,
+      acceptedAt: "2026-04-15T12:00:00.000Z",
+      submittedAt: "2026-04-10T00:00:00.000Z",
+      countersMade: 3,
+    });
+
+    const summary = summarizePricingCalibration([baseline, miss]);
+
+    expect(summary).toMatchObject({
+      kind: "pricing",
+      totalRecords: 2,
+      consumers: ["confidence", "telemetry", "override_learning"],
+    });
+    expect(summary.meanAbsoluteError).toBeCloseTo(0.1008, 4);
+    expect(summary.highErrorRate).toBe(0.5);
+    expect(summary.withinPredictedRangeRate).toBe(0.5);
+    expect(
+      summary.categoryCounts.find(
+        (entry) => entry.category === "confidence_overstated",
+      )?.count,
+    ).toBe(1);
+    expect(
+      summary.confidenceBuckets.find((bucket) => bucket.bucket === "high")
+        ?.totalRecords,
+    ).toBe(2);
   });
 });
