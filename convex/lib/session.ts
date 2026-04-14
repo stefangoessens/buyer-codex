@@ -3,6 +3,7 @@ import { type Doc } from "../_generated/dataModel";
 import { type UserIdentity } from "convex/server";
 import { v } from "convex/values";
 import { authProvider } from "./validators";
+import { authComponent } from "../auth";
 
 type SessionCtx = QueryCtx | MutationCtx;
 type SessionUser = Doc<"users">;
@@ -67,6 +68,25 @@ export function inferAuthProviderFromIssuer(
   return undefined;
 }
 
+export function normalizeAuthProviderHint(
+  providerId: string | undefined,
+): "google" | "email" | "clerk" | "auth0" | undefined {
+  const normalized = providerId?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === "google") return "google";
+  if (
+    normalized === "email" ||
+    normalized === "magic-link" ||
+    normalized === "email-otp" ||
+    normalized === "credential"
+  ) {
+    return "email";
+  }
+  if (normalized === "clerk") return "clerk";
+  if (normalized === "auth0") return "auth0";
+  return undefined;
+}
+
 export function buildSessionPermissions(
   role: SessionUser["role"],
 ): SessionPermissions {
@@ -108,6 +128,18 @@ async function lookupUserByIdentity(
     .unique();
 }
 
+async function lookupUserByAuthEmail(ctx: SessionCtx): Promise<SessionUser | null> {
+  const authUser = await authComponent.getAuthUser(ctx).catch(() => null);
+  if (!authUser?.email) {
+    return null;
+  }
+
+  return await ctx.db
+    .query("users")
+    .withIndex("by_email", (q) => q.eq("email", authUser.email))
+    .unique();
+}
+
 /**
  * Resolve the caller into an explicit auth state. This keeps anonymous,
  * unknown-user, and authenticated callers distinct so queries can return
@@ -126,6 +158,16 @@ export async function getSessionContext(ctx: SessionCtx): Promise<SessionContext
 
   const user = await lookupUserByIdentity(ctx, identity);
   if (!user) {
+    const userByEmail = await lookupUserByAuthEmail(ctx);
+    if (userByEmail) {
+      return {
+        kind: "authenticated",
+        identity,
+        user: userByEmail,
+        permissions: buildSessionPermissions(userByEmail.role),
+      };
+    }
+
     return {
       kind: "unknown_user",
       identity,

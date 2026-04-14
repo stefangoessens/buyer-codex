@@ -1,15 +1,17 @@
 "use client";
 
 import type { LinkPastedSource } from "@buyer-codex/shared/launch-events";
-import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { api } from "../../../convex/_generated/api";
+import { AuthEntryPanel } from "@/components/auth/AuthEntryPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { env, isConfigured } from "@/lib/env";
+import { authClient } from "@/lib/auth-client";
+import { readAuthProviderHint } from "@/lib/auth-hints";
+import { isConfigured } from "@/lib/env";
 import { buildListingIntakeHref } from "@/lib/intake/pasteLink";
 import {
   trackRegistrationCompleted,
@@ -80,35 +82,26 @@ function EnsureCurrentBuyerEffect({
   attributionSessionId?: string;
   onError: (message: string | null) => void;
 }) {
-  const { user, isLoaded } = useUser();
+  const { data: sessionData, isPending } = authClient.useSession();
   const ensureCurrentBuyer = useMutation(api.users.ensureCurrentBuyer);
+  const user = sessionData?.user ?? null;
   const attemptedFor = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isLoaded || !user) return;
+    if (isPending || !user) return;
     if (attemptedFor.current === user.id) return;
-
-    const primaryEmail =
-      user.primaryEmailAddress?.emailAddress ?? user.emailAddresses[0]?.emailAddress;
-    if (!primaryEmail) {
-      onError("Your auth account is missing a primary email address.");
-      return;
-    }
 
     attemptedFor.current = user.id;
     onError(null);
 
     void ensureCurrentBuyer({
-      email: primaryEmail,
-      name: user.fullName ?? user.firstName ?? primaryEmail,
-      phone: user.primaryPhoneNumber?.phoneNumber,
-      avatarUrl: user.imageUrl,
       attributionSessionId,
+      authProviderHint: readAuthProviderHint(),
     }).catch((error) => {
       attemptedFor.current = null;
       onError(error instanceof Error ? error.message : "Could not bind your account.");
     });
-  }, [attributionSessionId, ensureCurrentBuyer, isLoaded, onError, user]);
+  }, [attributionSessionId, ensureCurrentBuyer, isPending, onError, user]);
 
   return null;
 }
@@ -118,11 +111,12 @@ function RegistrationCompletionEffect({
 }: {
   source: string;
 }) {
-  const { user, isLoaded } = useUser();
+  const { data: sessionData, isPending } = authClient.useSession();
+  const user = sessionData?.user ?? null;
   const trackedFor = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isLoaded || !user) return;
+    if (isPending || !user) return;
     if (trackedFor.current === user.id) return;
 
     trackedFor.current = user.id;
@@ -131,7 +125,7 @@ function RegistrationCompletionEffect({
       userId: user.id,
       source,
     });
-  }, [isLoaded, source, user]);
+  }, [isPending, source, user]);
 
   return null;
 }
@@ -139,10 +133,7 @@ function RegistrationCompletionEffect({
 export function BuyerOnboardingFlow({
   ...props
 }: BuyerOnboardingFlowProps) {
-  const isClerkConfigured =
-    env.NEXT_PUBLIC_AUTH_PROVIDER === "clerk" && isConfigured.auth();
-
-  return isClerkConfigured ? (
+  return isConfigured.auth() ? (
     <BuyerOnboardingFlowWithAuth {...props} />
   ) : (
     <BuyerOnboardingFlowAuthDisabled {...props} />
@@ -285,6 +276,7 @@ function BuyerOnboardingFlowWithAuth({
 }: BuyerOnboardingFlowProps) {
   const router = useRouter();
   const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
+  const authCapabilities = useQuery(api.authState.getCapabilities);
   const { draft, isHydrated, setDraft, clearDraft } = useStoredBuyerOnboardingDraft();
   const submitUrl = useMutation(api.intake.submitUrl);
   const saveBuyerProfile = useMutation(api.buyerProfiles.createOrUpdate);
@@ -304,7 +296,8 @@ function BuyerOnboardingFlowWithAuth({
   >([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const isClerkConfigured = true;
+  const isAuthAvailable =
+    Boolean(authCapabilities?.googleEnabled) || Boolean(authCapabilities?.emailEnabled);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -428,11 +421,11 @@ function BuyerOnboardingFlowWithAuth({
 
   useEffect(() => {
     if (registrationPromptTracked.current) return;
-    if (!isClerkConfigured || isAuthLoading || isAuthenticated) return;
+    if (!isAuthAvailable || isAuthLoading || isAuthenticated) return;
 
     registrationPromptTracked.current = true;
     trackRegistrationPrompted(teaserSource);
-  }, [isAuthenticated, isAuthLoading, isClerkConfigured, teaserSource]);
+  }, [isAuthenticated, isAuthAvailable, isAuthLoading, teaserSource]);
 
   const handleDraftChange = (
     updater: (current: BuyerOnboardingDraft) => BuyerOnboardingDraft,
@@ -576,18 +569,27 @@ function BuyerOnboardingFlowWithAuth({
             </div>
           )}
 
-          {isClerkConfigured && isAuthenticated && actor === null && (
+          {isAuthAvailable && isAuthenticated && actor === null && (
             <EnsureCurrentBuyerEffect
               attributionSessionId={undefined}
               onError={setAccountError}
             />
           )}
 
-          {isClerkConfigured && isAuthenticated && (
+          {isAuthAvailable && isAuthenticated && (
             <RegistrationCompletionEffect source={teaserSource} />
           )}
 
-          {!isClerkConfigured ? (
+          {authCapabilities === undefined ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-900">
+                Loading auth methods…
+              </p>
+              <p className="text-sm text-neutral-500">
+                buyer-codex is checking which sign-in options are available in this environment.
+              </p>
+            </div>
+          ) : !isAuthAvailable ? (
             <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800">
               Auth is not configured in this environment, so the registration step
               cannot complete.
@@ -608,29 +610,18 @@ function BuyerOnboardingFlowWithAuth({
                   Step 1: Create your account
                 </h2>
                 <p className="mt-1 text-sm text-neutral-500">
-                  Use the same return URL so the flow resumes on this listing after
-                  sign-up or sign-in.
+                  Use Google or a magic-link email. buyer-codex returns to this listing
+                  once the session is ready.
                 </p>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <SignUpButton forceRedirectUrl={returnUrl}>
-                  <button
-                    type="button"
-                    className="inline-flex h-11 items-center justify-center rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-600"
-                  >
-                    Create buyer account
-                  </button>
-                </SignUpButton>
-                <SignInButton forceRedirectUrl={returnUrl}>
-                  <button
-                    type="button"
-                    className="inline-flex h-11 items-center justify-center rounded-xl border border-neutral-300 px-5 text-sm font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
-                  >
-                    I already have an account
-                  </button>
-                </SignInButton>
-              </div>
+              <AuthEntryPanel
+                compact
+                mode="sign-up"
+                returnTo={returnUrl}
+                title="Step 1: Create your account"
+                description="Keep the listing context, then continue directly into your buyer basics."
+              />
             </div>
           ) : (
             <div className="space-y-6">

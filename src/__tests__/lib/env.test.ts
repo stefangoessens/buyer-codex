@@ -13,9 +13,11 @@ describe("environment contracts", () => {
   it("reads typed public env defaults", () => {
     const value = readPublicEnv({
       NEXT_PUBLIC_APP_URL: "https://buyer.example",
+      NEXT_PUBLIC_SITE_URL: "https://buyer.example",
     });
 
     expect(value.NEXT_PUBLIC_APP_URL).toBe("https://buyer.example");
+    expect(value.NEXT_PUBLIC_SITE_URL).toBe("https://buyer.example");
     expect(value.NEXT_PUBLIC_POSTHOG_HOST).toBe("https://us.i.posthog.com");
   });
 
@@ -33,6 +35,7 @@ describe("environment contracts", () => {
   it("reports a clean public env when required keys are present", () => {
     const issues = getPublicEnvIssues({
       NEXT_PUBLIC_APP_URL: "https://buyer.example",
+      NEXT_PUBLIC_SITE_URL: "https://buyer.example",
     });
 
     expect(issues).toEqual([]);

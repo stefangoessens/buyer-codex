@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { appSurfaceDefinitions } from "@/lib/app-shell";
 
 // Internal console pages are always dynamic — they query live session
@@ -17,5 +18,5 @@ export default function AdminLayout({
   // The AdminShell wrapper lives at the page level, not here, so the
   // /preview route can render the shell chrome with mocked data for
   // design verification without pulling in the live Convex query.
-  return <>{children}</>;
+  return <ProtectedRoute surface="admin">{children}</ProtectedRoute>;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { formatConsoleTimestamp, initialsFromName } from "@/lib/admin/format";
 import { roleLabel, type InternalConsoleRole } from "@/lib/admin/roles";
 
@@ -89,6 +90,7 @@ export function AdminTopbar({
         <span className="hidden rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-medium text-neutral-600 md:inline-flex">
           {roleLabel(user.role)}
         </span>
+        <SignOutButton />
       </div>
     </header>
   );

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { SurfaceDrawer } from "@/components/product/SurfaceDrawer";
 import { Button } from "@/components/ui/button";
 import { DASHBOARD_NAV } from "@/lib/dealroom/dashboard-types";
@@ -87,6 +88,9 @@ export function AppSidebar({ buyerName, buyerEmail }: AppSidebarProps) {
                 Use the rail for orientation. Keep primary property action in the
                 canvas.
               </p>
+              <div className="mt-4">
+                <SignOutButton className="w-full justify-center" />
+              </div>
             </div>
           </div>
         </div>

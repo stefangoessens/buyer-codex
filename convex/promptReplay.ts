@@ -69,6 +69,34 @@ const comparisonValidator = v.object({
   removedPathCount: v.number(),
 });
 
+type ReplayHistoricalOutputResult = {
+  sourceOutput: {
+    outputId: import("./_generated/dataModel").Id<"aiEngineOutputs">;
+    propertyId: import("./_generated/dataModel").Id<"properties">;
+    engineType: "pricing" | "comps" | "leverage" | "offer" | "cost";
+    promptKey: string | null;
+    promptVersion: string | null;
+    modelId: string;
+    generatedAt: string;
+    confidence: number;
+    reviewState: "pending" | "approved" | "rejected";
+    inputSnapshot: string | null;
+    outputSnapshot: string;
+    citations: string[];
+  };
+  prompt: {
+    engineType: "pricing" | "comps" | "leverage" | "offer" | "cost";
+    promptKey: string;
+    version: string;
+    model: string;
+    author: string;
+    createdAt: string;
+    changeNotes?: string;
+  };
+  replay: Awaited<ReturnType<typeof replayPromptExecution>>;
+  comparison: ReturnType<typeof compareReplaySnapshots>;
+};
+
 export const replayHistoricalOutput = action({
   args: {
     outputId: v.id("aiEngineOutputs"),
@@ -81,7 +109,7 @@ export const replayHistoricalOutput = action({
     replay: replayValidator,
     comparison: comparisonValidator,
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ReplayHistoricalOutputResult> => {
     const canAccessConsole = await ctx.runQuery(
       api.adminShell.canAccessConsole,
       {},

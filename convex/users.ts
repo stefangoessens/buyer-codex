@@ -1,14 +1,91 @@
-import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
+import {
+  query,
+  mutation,
+  internalQuery,
+  internalMutation,
+  type MutationCtx,
+} from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { api } from "./_generated/api";
+import { api, components } from "./_generated/api";
 import { authProvider } from "./lib/validators";
 import {
+  normalizeAuthProviderHint,
   getSessionContext,
   inferAuthProviderFromIssuer,
   requireAuth,
   sessionUserValidator,
 } from "./lib/session";
+import { authComponent } from "./auth";
+
+const authProviderHintValidator = v.optional(authProvider);
+
+async function resolveCurrentAuthUser(ctx: MutationCtx) {
+  return await authComponent.getAuthUser(ctx);
+}
+
+async function resolveCurrentAuthProvider(
+  ctx: MutationCtx,
+  authProviderHint?: "google" | "email" | "clerk" | "auth0",
+) {
+  const session = await getSessionContext(ctx);
+  if (session.kind === "anonymous") {
+    return undefined;
+  }
+
+  const accounts = await ctx.runQuery(components.betterAuth.adapter.findMany, {
+    model: "account",
+    where: [{ field: "userId", value: session.identity.subject }],
+    paginationOpts: {
+      cursor: null,
+      numItems: 10,
+    },
+  });
+
+  for (const account of accounts.page) {
+    const normalized = normalizeAuthProviderHint(account.providerId);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return authProviderHint ?? inferAuthProviderFromIssuer(session.identity.issuer);
+}
+
+async function buildIdentityPatch(
+  ctx: MutationCtx,
+  authProviderHint?: "google" | "email" | "clerk" | "auth0",
+  overrides?: {
+    phone?: string;
+    avatarUrl?: string;
+  },
+) {
+  const session = await getSessionContext(ctx);
+  if (session.kind === "anonymous") {
+    throw new Error("Authentication required");
+  }
+
+  const authUser = await resolveCurrentAuthUser(ctx);
+  const authProvider = await resolveCurrentAuthProvider(ctx, authProviderHint);
+  const now = new Date().toISOString();
+
+  return {
+    session,
+    authUser,
+    patch: {
+      email: authUser.email,
+      name: authUser.name || authUser.email,
+      avatarUrl: overrides?.avatarUrl ?? authUser.image ?? undefined,
+      phone: overrides?.phone,
+      authProvider,
+      authIssuer: session.identity.issuer,
+      authSubject: session.identity.subject,
+      authTokenIdentifier: session.identity.tokenIdentifier,
+      sessionVersion: 1,
+      lastAuthenticatedAt: now,
+    },
+  };
+}
 
 export const get = query({
   args: { userId: v.id("users") },
@@ -130,44 +207,30 @@ export const updateProfile = mutation({
 /**
  * Ensure the current authenticated identity is bound to a buyer row in Convex.
  *
- * Web onboarding uses this right after Clerk sign-in: if the identity is new,
+ * Web onboarding uses this right after Better Auth sign-in: if the identity is new,
  * we create a buyer row; if it already exists (or matches by email), we bind
  * the auth fields and refresh the presentation fields. This keeps onboarding
  * flows resumable without exposing a public arbitrary user-creation endpoint.
  */
 export const ensureCurrentBuyer = mutation({
   args: {
-    email: v.string(),
-    name: v.string(),
     phone: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
     attributionSessionId: v.optional(v.string()),
+    authProviderHint: authProviderHintValidator,
   },
   returns: sessionUserValidator,
   handler: async (ctx, args) => {
-    const session = await getSessionContext(ctx);
-    if (session.kind === "anonymous") {
-      throw new Error("Authentication required");
-    }
-
-    const now = new Date().toISOString();
-    const authProvider = inferAuthProviderFromIssuer(session.identity.issuer);
+    const { session, authUser, patch } = await buildIdentityPatch(
+      ctx,
+      args.authProviderHint,
+      {
+        phone: args.phone,
+        avatarUrl: args.avatarUrl,
+      },
+    );
 
     const bindUser = async (userId: Id<"users">) => {
-      const patch: Record<string, unknown> = {
-        email: args.email,
-        name: args.name,
-        lastAuthenticatedAt: now,
-        authProvider,
-        authIssuer: session.identity.issuer,
-        authSubject: session.identity.subject,
-        authTokenIdentifier: session.identity.tokenIdentifier,
-        sessionVersion: 1,
-      };
-
-      if (args.phone !== undefined) patch.phone = args.phone;
-      if (args.avatarUrl !== undefined) patch.avatarUrl = args.avatarUrl;
-
       await ctx.db.patch(userId, patch);
 
       if (args.attributionSessionId) {
@@ -190,7 +253,7 @@ export const ensureCurrentBuyer = mutation({
 
     const existingByEmail = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .withIndex("by_email", (q) => q.eq("email", authUser.email))
       .unique();
 
     if (existingByEmail) {
@@ -198,17 +261,8 @@ export const ensureCurrentBuyer = mutation({
     }
 
     const userId = await ctx.db.insert("users", {
-      email: args.email,
-      name: args.name,
       role: "buyer",
-      phone: args.phone,
-      avatarUrl: args.avatarUrl,
-      authProvider,
-      authIssuer: session.identity.issuer,
-      authSubject: session.identity.subject,
-      authTokenIdentifier: session.identity.tokenIdentifier,
-      sessionVersion: 1,
-      lastAuthenticatedAt: now,
+      ...patch,
     });
 
     if (args.attributionSessionId) {
@@ -223,5 +277,32 @@ export const ensureCurrentBuyer = mutation({
       throw new Error("User not found after creation");
     }
     return created;
+  },
+});
+
+export const syncCurrentIdentity = mutation({
+  args: {
+    authProviderHint: authProviderHintValidator,
+  },
+  returns: v.union(sessionUserValidator, v.null()),
+  handler: async (ctx, args) => {
+    const { session, authUser, patch } = await buildIdentityPatch(ctx, args.authProviderHint);
+
+    if (session.kind === "authenticated") {
+      await ctx.db.patch(session.user._id, patch);
+      return await ctx.db.get(session.user._id);
+    }
+
+    const existingByEmail = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", authUser.email))
+      .unique();
+
+    if (!existingByEmail) {
+      return null;
+    }
+
+    await ctx.db.patch(existingByEmail._id, patch);
+    return await ctx.db.get(existingByEmail._id);
   },
 });

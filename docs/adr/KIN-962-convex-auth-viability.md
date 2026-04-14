@@ -1,8 +1,13 @@
 # KIN-962 - Convex Auth Viability
 
-Status: Proposed
+Status: Superseded by KIN-1053
 Scope: buyer-codex web app, Convex backend, iOS app session model
 Date: 2026-04-12
+
+This ADR captures a rejected Clerk/Auth0 direction. The live web runtime now
+uses Convex Better Auth with Google OAuth plus email magic-link sign-in. Keep
+this document only as historical context for why the earlier Clerk-first path
+was abandoned.
 
 ## Decision Summary
 

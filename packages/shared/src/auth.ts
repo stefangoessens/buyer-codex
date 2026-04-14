@@ -2,7 +2,7 @@ export const appRoles = ["buyer", "broker", "admin"] as const;
 
 export type AppRole = (typeof appRoles)[number];
 
-export const authProviders = ["clerk", "auth0"] as const;
+export const authProviders = ["google", "email", "clerk", "auth0"] as const;
 
 export type AuthProvider = (typeof authProviders)[number];
 

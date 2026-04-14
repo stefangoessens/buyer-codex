@@ -34,10 +34,12 @@ This refreshes the checked-in files under `convex/_generated/`.
 
 ## Auth/session baseline
 
-- Primary OIDC provider: Clerk.
-- Fallback OIDC provider: Auth0.
+- Primary auth runtime: Convex Better Auth.
+- Supported web providers in the current runtime path: Google OAuth and
+  magic-link email.
 - Convex joins authenticated identities onto `users` through
-  `authTokenIdentifier` first, then falls back to issuer/subject for legacy rows.
+  `authTokenIdentifier` first, then falls back to issuer/subject or email for
+  legacy rows.
 - Business authorization still comes from `users.role`, never from the client.
 
 ## Runtime coverage

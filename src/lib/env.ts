@@ -20,10 +20,9 @@ export const env = readPublicEnv();
 export const isConfigured = {
   convex: () => hasValue(env.NEXT_PUBLIC_CONVEX_URL),
   auth: () =>
-    env.NEXT_PUBLIC_AUTH_PROVIDER === "auth0"
-      ? hasValue(env.NEXT_PUBLIC_AUTH0_DOMAIN) &&
-        hasValue(env.NEXT_PUBLIC_AUTH0_CLIENT_ID)
-      : hasValue(env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY),
+    hasValue(env.NEXT_PUBLIC_CONVEX_URL) &&
+    hasValue(env.NEXT_PUBLIC_CONVEX_SITE_URL) &&
+    hasValue(env.NEXT_PUBLIC_SITE_URL),
   posthog: () => hasValue(env.NEXT_PUBLIC_POSTHOG_KEY),
   sentry: () => hasValue(env.NEXT_PUBLIC_SENTRY_DSN),
 } as const;

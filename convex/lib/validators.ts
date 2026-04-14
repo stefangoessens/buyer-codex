@@ -8,6 +8,8 @@ export const userRole = v.union(
 );
 
 export const authProvider = v.union(
+  v.literal("google"),
+  v.literal("email"),
   v.literal("clerk"),
   v.literal("auth0")
 );

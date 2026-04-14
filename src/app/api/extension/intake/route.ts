@@ -8,7 +8,11 @@ import {
   type ExtensionIntakeFailureCode,
 } from "@/lib/extension/detect-listing";
 
-const CLERK_SESSION_COOKIE = "__session";
+const AUTH_SESSION_COOKIES = [
+  "better-auth.session_token",
+  "session_token",
+  "__session",
+] as const;
 
 function readCookieValue(cookieHeader: string | null, cookieName: string): string | null {
   if (!cookieHeader) return null;
@@ -29,8 +33,15 @@ function resolveConvexAuthToken(request: Request): string | null {
     return authorization.slice("Bearer ".length).trim() || null;
   }
 
-  // Best-effort Clerk support for extension fetches using credentials: include.
-  return readCookieValue(request.headers.get("cookie"), CLERK_SESSION_COOKIE);
+  const cookieHeader = request.headers.get("cookie");
+  for (const cookieName of AUTH_SESSION_COOKIES) {
+    const cookieValue = readCookieValue(cookieHeader, cookieName);
+    if (cookieValue) {
+      return cookieValue;
+    }
+  }
+
+  return null;
 }
 
 async function trackExtensionFailure(

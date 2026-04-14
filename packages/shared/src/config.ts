@@ -185,25 +185,27 @@ export const webPublicEnvSpec = {
     visibility: "public",
     format: "url",
   },
-  NEXT_PUBLIC_AUTH_PROVIDER: {
-    defaultValue: "clerk",
-    description: "Primary web auth provider. Clerk is primary; Auth0 is the fallback.",
-    visibility: "public",
-  },
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: {
+  NEXT_PUBLIC_CONVEX_SITE_URL: {
     defaultValue: "",
-    description: "Clerk publishable key for web session bootstrapping.",
+    description:
+      "Convex site URL used by Better Auth proxy handlers. This must end in .convex.site.",
     visibility: "public",
+    format: "url",
   },
-  NEXT_PUBLIC_AUTH0_DOMAIN: {
-    defaultValue: "",
-    description: "Fallback Auth0 tenant domain for browser auth flows.",
+  NEXT_PUBLIC_SITE_URL: {
+    defaultValue: "http://localhost:3000",
+    description:
+      "Canonical public site URL used by Better Auth redirects in the web app.",
     visibility: "public",
+    required: true,
+    format: "url",
   },
-  NEXT_PUBLIC_AUTH0_CLIENT_ID: {
-    defaultValue: "",
-    description: "Fallback Auth0 client ID for browser auth flows.",
+  NEXT_PUBLIC_APP_URL: {
+    defaultValue: "http://localhost:3000",
+    description: "Canonical app URL used by the web surface.",
     visibility: "public",
+    required: true,
+    format: "url",
   },
   NEXT_PUBLIC_POSTHOG_KEY: {
     defaultValue: "",
@@ -222,13 +224,6 @@ export const webPublicEnvSpec = {
     visibility: "public",
     format: "url",
   },
-  NEXT_PUBLIC_APP_URL: {
-    defaultValue: "http://localhost:3000",
-    description: "Canonical app URL used by the web surface.",
-    visibility: "public",
-    required: true,
-    format: "url",
-  },
 } as const satisfies EnvSpec;
 
 export const webServerEnvSpec = {
@@ -238,34 +233,36 @@ export const webServerEnvSpec = {
     description: "Convex deploy key for CI and deploy automation.",
     visibility: "server",
   },
-  CLERK_SECRET_KEY: {
+  BETTER_AUTH_SECRET: {
     defaultValue: "",
-    description: "Clerk server secret for Next.js server-side session validation.",
+    description: "Better Auth secret used for signing and encrypting session state.",
     visibility: "server",
   },
-  CLERK_JWT_ISSUER_DOMAIN: {
+  SITE_URL: {
     defaultValue: "",
-    description: "Issuer/domain for Clerk JWTs accepted by Convex.",
+    description:
+      "Canonical site URL exposed to the Convex Better Auth runtime for callback construction.",
+    visibility: "server",
+    format: "url",
+  },
+  GOOGLE_CLIENT_ID: {
+    defaultValue: "",
+    description: "Google OAuth client ID for Better Auth social sign-in.",
     visibility: "server",
   },
-  CONVEX_CLERK_APPLICATION_ID: {
-    defaultValue: "convex",
-    description: "Audience/application ID Convex should require for Clerk-issued tokens.",
+  GOOGLE_CLIENT_SECRET: {
+    defaultValue: "",
+    description: "Google OAuth client secret for Better Auth social sign-in.",
     visibility: "server",
   },
-  AUTH0_ISSUER_BASE_URL: {
+  RESEND_API_KEY: {
     defaultValue: "",
-    description: "Fallback Auth0 issuer base URL accepted by Convex.",
+    description: "Resend API key used to deliver Better Auth magic links.",
     visibility: "server",
   },
-  AUTH0_API_AUDIENCE: {
+  AUTH_EMAIL_FROM: {
     defaultValue: "",
-    description: "Fallback Auth0 audience/application ID accepted by Convex.",
-    visibility: "server",
-  },
-  AUTH0_CLIENT_SECRET: {
-    defaultValue: "",
-    description: "Fallback Auth0 server secret for web session flows.",
+    description: "Verified sender email used for Better Auth magic link delivery.",
     visibility: "server",
   },
   ANTHROPIC_API_KEY: {

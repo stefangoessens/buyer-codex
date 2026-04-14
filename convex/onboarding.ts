@@ -56,6 +56,29 @@ const firstPropertyLinkValidator = v.union(
   }),
 );
 
+type FirstPropertyLinkResult =
+  | {
+      status: "pending_source_listing";
+      sourceListingId: Id<"sourceListings">;
+      sourceListingStatus: Doc<"sourceListings">["status"];
+      propertyId: null;
+      dealRoomId: null;
+    }
+  | {
+      status: "source_listing_failed";
+      sourceListingId: Id<"sourceListings">;
+      sourceListingStatus: Doc<"sourceListings">["status"];
+      propertyId: null;
+      dealRoomId: null;
+    }
+  | {
+      status: "deal_room_ready";
+      sourceListingId: Id<"sourceListings">;
+      sourceListingStatus: Doc<"sourceListings">["status"];
+      propertyId: Id<"properties">;
+      dealRoomId: Id<"dealRooms">;
+    };
+
 function mapSourceListingStatus(
   sourceListing: Pick<Doc<"sourceListings">, "_id" | "status" | "propertyId">,
 ):
@@ -133,7 +156,7 @@ export const linkFirstProperty = mutation({
     sourceListingId: v.id("sourceListings"),
   },
   returns: firstPropertyLinkValidator,
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<FirstPropertyLinkResult> => {
     await requireAuth(ctx);
 
     const sourceListing = await ctx.db.get(args.sourceListingId);

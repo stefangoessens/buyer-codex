@@ -162,6 +162,32 @@ describe("POST /api/extension/intake", () => {
     expect(setAuthMock).toHaveBeenCalledWith("test-token");
   });
 
+  it("forwards better-auth session cookies when bearer auth is absent", async () => {
+    mutationMock.mockResolvedValue({
+      kind: "created",
+      authState: "signed_in",
+      platform: "zillow",
+      listingId: "cookie_123",
+      normalizedUrl: "https://www.zillow.com/homedetails/cookie_123_zpid/",
+      sourceListingId: "sl_cookie",
+    });
+
+    await POST(
+      new Request("http://localhost/api/extension/intake", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "better-auth.session_token=cookie-token",
+        },
+        body: JSON.stringify({
+          url: "https://www.zillow.com/homedetails/cookie_123_zpid/",
+        }),
+      }),
+    );
+
+    expect(setAuthMock).toHaveBeenCalledWith("cookie-token");
+  });
+
   it("rejects missing URL payloads before calling Convex", async () => {
     const response = await POST(
       new Request("http://localhost/api/extension/intake", {
