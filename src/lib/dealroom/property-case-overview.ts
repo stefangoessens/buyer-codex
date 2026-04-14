@@ -325,6 +325,11 @@ export interface PropertyCaseArtifactStates {
   summary: AdvisorySurfaceState;
 }
 
+export interface PropertyCaseAdvisoryVersion {
+  synthesisVersion: string | null;
+  artifactGeneratedAt: string | null;
+}
+
 interface PropertyCaseOverviewBase {
   variant: PropertyCaseOverviewVariant;
   viewerRole: PropertyCaseOverviewViewerRole;
@@ -338,6 +343,7 @@ interface PropertyCaseOverviewBase {
   viewState: PropertyCaseOverviewViewState;
   generatedAt: string | null;
   generatedAtLabel: string;
+  advisoryVersion: PropertyCaseAdvisoryVersion;
   confidenceFingerprint: string | null;
   confidenceReplayKey: string | null;
   overallConfidence: number | null;
@@ -571,6 +577,10 @@ export function buildPropertyCaseOverview(
     generatedAtLabel: input.caseRecord?.generatedAt
       ? `Updated ${formatShortDate(input.caseRecord.generatedAt)}`
       : "Awaiting first synthesis",
+    advisoryVersion: {
+      synthesisVersion: payload?.synthesisVersion ?? null,
+      artifactGeneratedAt: input.caseRecord?.generatedAt ?? null,
+    },
     confidenceFingerprint: input.evidenceGraph?.fingerprint ?? null,
     confidenceReplayKey: input.evidenceGraph?.replayKey ?? null,
     overallConfidence,

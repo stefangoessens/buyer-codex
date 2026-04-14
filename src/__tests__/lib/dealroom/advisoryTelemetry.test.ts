@@ -4,6 +4,7 @@ import type {
   PropertyCase,
 } from "@/lib/ai/engines/caseSynthesis";
 import {
+  buildAdvisoryBuyerFeedbackSubmissionInput,
   buildAdvisoryBrokerAdjudicationOpenedPayload,
   buildAdvisoryMemoViewedPayload,
   buildAdvisoryRecommendationFeedbackPayload,
@@ -262,6 +263,37 @@ describe("advisoryTelemetry", () => {
 
     expect(payload.decision).toBe("deferred");
     expect(payload.recommendationConfidence).toBe(0.78);
+  });
+
+  it("builds buyer feedback submission input with artifact version and normalized reasons", () => {
+    const overview = buildSurface();
+    const payload = buildAdvisoryBuyerFeedbackSubmissionInput(overview, {
+      artifact: "recommendation",
+      responses: [
+        { dimension: "actionability", sentiment: "negative" },
+        { dimension: "trust", sentiment: "negative" },
+        { dimension: "actionability", sentiment: "positive" },
+      ],
+      reasonCodes: [
+        "missing_next_step",
+        "too_aggressive",
+        "missing_evidence",
+        "not_relevant",
+      ],
+    });
+
+    expect(payload).toMatchObject({
+      artifact: "recommendation",
+      synthesisVersion: "1.0.0",
+      artifactGeneratedAt: "2026-04-13T19:00:00.000Z",
+      dealRoomId: "deal_123",
+      propertyId: "property_123",
+    });
+    expect(payload.responses).toEqual([
+      { dimension: "trust", sentiment: "negative" },
+      { dimension: "actionability", sentiment: "positive" },
+    ]);
+    expect(payload.reasonCodes).toEqual(["missing_evidence"]);
   });
 
   it("builds buyer-safe summary exports with measurable length and recommendation inclusion", () => {

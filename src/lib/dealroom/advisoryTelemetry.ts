@@ -1,11 +1,18 @@
 import { track, type AnalyticsEventMap } from "@/lib/analytics";
 import type {
+  AdvisoryFeedbackArtifact,
+  AdvisoryFeedbackReasonCode,
   AdvisoryNextActionTarget,
   AdvisoryRecommendationDecision,
   AdvisorySourceTraceTrigger,
   AdvisorySummaryShareMethod,
   AdvisorySurface,
 } from "@/lib/analyticsEvents/contract";
+import {
+  normalizeAdvisoryFeedbackReasonCodes,
+  normalizeAdvisoryFeedbackResponses,
+  type AdvisoryFeedbackResponse,
+} from "@/lib/dealroom/advisory-feedback";
 import type {
   PropertyCaseClaimView,
   PropertyCaseOverviewSurface,
@@ -370,6 +377,33 @@ export function trackAdvisorySummaryShared(
     "advisory_buyer_safe_summary_shared",
     buildAdvisorySummarySharedPayload(overview, input),
   );
+}
+
+export function buildAdvisoryBuyerFeedbackSubmissionInput(
+  overview: PropertyCaseOverviewSurface,
+  input: {
+    artifact: AdvisoryFeedbackArtifact;
+    responses: AdvisoryFeedbackResponse[];
+    reasonCodes: AdvisoryFeedbackReasonCode[];
+  },
+) {
+  const responses = normalizeAdvisoryFeedbackResponses(input.responses);
+  const reasonCodes = normalizeAdvisoryFeedbackReasonCodes(
+    input.artifact,
+    responses,
+    input.reasonCodes,
+  );
+
+  return {
+    ...buildBasePayload(overview),
+    surface: "deal_room_overview" as AdvisorySurface,
+    artifact: input.artifact,
+    synthesisVersion: overview.advisoryVersion.synthesisVersion ?? undefined,
+    artifactGeneratedAt:
+      overview.advisoryVersion.artifactGeneratedAt ?? undefined,
+    responses,
+    reasonCodes,
+  };
 }
 
 export function buildAdvisoryRecommendationFeedbackPayload(

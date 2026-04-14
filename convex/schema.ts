@@ -6,6 +6,10 @@ import {
   agreementAccessScope,
   agreementAuditEventType,
   agreementAuditVisibility,
+  advisoryFeedbackArtifact,
+  advisoryFeedbackDimension,
+  advisoryFeedbackReasonCode,
+  advisoryFeedbackSentiment,
   aiOutputAdjudicationAction,
   aiOutputAdjudicationStatus,
   aiOutputAdjudicationVisibility,
@@ -2123,6 +2127,46 @@ export default defineSchema({
     .index("by_propertyId", ["propertyId"])
     .index("by_propertyId_and_inputHash", ["propertyId", "inputHash"])
     .index("by_dealRoomId", ["dealRoomId"]),
+
+  advisoryBuyerFeedback: defineTable({
+    dealRoomId: v.id("dealRooms"),
+    propertyId: v.id("properties"),
+    buyerId: v.id("users"),
+    surface: v.literal("deal_room_overview"),
+    artifact: advisoryFeedbackArtifact,
+    synthesisVersion: v.optional(v.string()),
+    artifactGeneratedAt: v.optional(v.string()),
+    viewState: v.union(
+      v.literal("ready"),
+      v.literal("partial"),
+      v.literal("empty")
+    ),
+    overallConfidence: v.optional(v.number()),
+    recommendationConfidence: v.optional(v.number()),
+    claimCount: v.number(),
+    sourceCount: v.number(),
+    missingSignalCount: v.number(),
+    coverageAvailableCount: v.number(),
+    coveragePendingCount: v.number(),
+    coverageUncertainCount: v.number(),
+    coverageMissingCount: v.number(),
+    responses: v.array(
+      v.object({
+        dimension: advisoryFeedbackDimension,
+        sentiment: advisoryFeedbackSentiment,
+      })
+    ),
+    reasonCodes: v.array(advisoryFeedbackReasonCode),
+    submittedAt: v.string(),
+  })
+    .index("by_buyerId_and_submittedAt", ["buyerId", "submittedAt"])
+    .index("by_dealRoomId_and_submittedAt", ["dealRoomId", "submittedAt"])
+    .index("by_propertyId_and_submittedAt", ["propertyId", "submittedAt"])
+    .index("by_propertyId_and_artifact_and_submittedAt", [
+      "propertyId",
+      "artifact",
+      "submittedAt",
+    ]),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PROPERTY DOSSIERS (KIN-1021)

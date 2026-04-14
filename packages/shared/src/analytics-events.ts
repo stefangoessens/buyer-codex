@@ -138,6 +138,48 @@ export const ADVISORY_RECOMMENDATION_DECISIONS = [
 export type AdvisoryRecommendationDecision =
   (typeof ADVISORY_RECOMMENDATION_DECISIONS)[number];
 
+export const ADVISORY_FEEDBACK_ARTIFACTS = [
+  "memo",
+  "recommendation",
+  "summary",
+] as const;
+
+export type AdvisoryFeedbackArtifact =
+  (typeof ADVISORY_FEEDBACK_ARTIFACTS)[number];
+
+export const ADVISORY_FEEDBACK_DIMENSIONS = [
+  "usefulness",
+  "trust",
+  "clarity",
+  "actionability",
+] as const;
+
+export type AdvisoryFeedbackDimension =
+  (typeof ADVISORY_FEEDBACK_DIMENSIONS)[number];
+
+export const ADVISORY_FEEDBACK_SENTIMENTS = [
+  "positive",
+  "negative",
+] as const;
+
+export type AdvisoryFeedbackSentiment =
+  (typeof ADVISORY_FEEDBACK_SENTIMENTS)[number];
+
+export const ADVISORY_FEEDBACK_REASON_CODES = [
+  "too_vague",
+  "missing_context",
+  "missing_evidence",
+  "hard_to_verify",
+  "does_not_fit_my_plan",
+  "missing_next_step",
+  "too_aggressive",
+  "too_conservative",
+  "not_relevant",
+] as const;
+
+export type AdvisoryFeedbackReasonCode =
+  (typeof ADVISORY_FEEDBACK_REASON_CODES)[number];
+
 export const ADVISORY_SUMMARY_SHARE_METHODS = [
   "clipboard",
   "native_share",
@@ -426,6 +468,32 @@ export interface AnalyticsEventMap extends LaunchEventMap {
     overallConfidence?: number;
     recommendationConfidence?: number;
   };
+  advisory_buyer_feedback_submitted: {
+    dealRoomId: string;
+    propertyId: string;
+    actorRole: AdvisoryActorRole;
+    surface: AdvisorySurface;
+    variant: AdvisoryViewVariant;
+    viewState: AdvisoryViewState;
+    claimCount: number;
+    sourceCount: number;
+    missingSignalCount: number;
+    coverageAvailableCount: number;
+    coveragePendingCount: number;
+    coverageUncertainCount: number;
+    coverageMissingCount: number;
+    artifact: AdvisoryFeedbackArtifact;
+    synthesisVersion?: string;
+    artifactGeneratedAt?: string;
+    dimension: AdvisoryFeedbackDimension;
+    sentiment: AdvisoryFeedbackSentiment;
+    responseCount: number;
+    reasonCount: number;
+    reasonCodeKey: string;
+    generatedAt?: string;
+    overallConfidence?: number;
+    recommendationConfidence?: number;
+  };
   document_uploaded: {
     documentId: string;
     fileType: string;
@@ -551,7 +619,7 @@ export interface AnalyticsEventContractRelease {
   changes: readonly string[];
 }
 
-export const CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION = "1.2.0" as const;
+export const CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION = "1.3.0" as const;
 export const CURRENT_ANALYTICS_EVENT_CONTRACT_DATE = "2026-04-13" as const;
 
 export const ANALYTICS_EVENT_CONTRACT_CHANGELOG = [
@@ -572,11 +640,11 @@ export const ANALYTICS_EVENT_CONTRACT_CHANGELOG = [
     version: CURRENT_ANALYTICS_EVENT_CONTRACT_VERSION,
     releasedOn: CURRENT_ANALYTICS_EVENT_CONTRACT_DATE,
     summary:
-      "Added advisory telemetry for memo usage, trust drill-downs, summary sharing, recommendation feedback, and broker overrides.",
+      "Added structured buyer-feedback telemetry for advisory memo, recommendation, and summary artifacts.",
     changes: [
-      "Added typed KIN-1042 events for memo views, recommendation views, confidence expansions, source-trace opens, summary copy/share, and explicit recommendation feedback.",
-      "Added broker adjudication-opened and broker-override-submitted events with typed reason categories and review-latency context for calibration analysis.",
-      "Standardized advisory payload context across buyer and broker surfaces with actor role, surface, view state, coverage counts, and calibration-ready confidence fields.",
+      "Added advisory_buyer_feedback_submitted with typed artifact, dimension, sentiment, and reason-code metadata tied to advisory synthesis version and generation timestamp.",
+      "Preserved the existing advisory view/share/override events while expanding the advisory taxonomy to cover buyer usefulness, trust, clarity, and actionability signals.",
+      "Kept advisory payload context consistent across telemetry by reusing the existing surface, coverage, and confidence metadata contract.",
     ],
   },
 ] as const satisfies readonly AnalyticsEventContractRelease[];
@@ -1612,6 +1680,73 @@ export const ANALYTICS_EVENT_CONTRACT = {
           required: true,
           description: "Explicit user response to the recommendation.",
           enumValues: ADVISORY_RECOMMENDATION_DECISIONS,
+        },
+      },
+    },
+    advisory_buyer_feedback_submitted: {
+      name: "advisory_buyer_feedback_submitted",
+      category: "deal_room",
+      description:
+        "Buyer submits structured feedback on the current memo, recommendation, or buyer-safe summary artifact.",
+      owner: "ai",
+      source: "web.deal_room.advisory_feedback",
+      whenFired:
+        "Structured buyer feedback is persisted for the current advisory artifact version.",
+      semantics:
+        "Represents one structured buyer-feedback response for a specific advisory artifact snapshot, with counts that preserve the broader submission shape.",
+      piiSafe: true,
+      introducedIn: "1.3.0",
+      props: {
+        ...ADVISORY_CONTEXT_PROP_SPECS,
+        ...ADVISORY_CALIBRATION_PROP_SPECS,
+        artifact: {
+          type: "enum",
+          required: true,
+          description: "Which buyer-visible advisory artifact received feedback.",
+          enumValues: ADVISORY_FEEDBACK_ARTIFACTS,
+        },
+        synthesisVersion: {
+          type: "string",
+          required: false,
+          description:
+            "Property-case synthesis version tied to the feedback snapshot, when available.",
+        },
+        artifactGeneratedAt: {
+          type: "string",
+          required: false,
+          description:
+            "Generation timestamp of the exact advisory artifact snapshot the buyer reacted to.",
+        },
+        dimension: {
+          type: "enum",
+          required: true,
+          description: "Which advisory quality dimension this response covered.",
+          enumValues: ADVISORY_FEEDBACK_DIMENSIONS,
+        },
+        sentiment: {
+          type: "enum",
+          required: true,
+          description: "Whether the buyer response was positive or negative.",
+          enumValues: ADVISORY_FEEDBACK_SENTIMENTS,
+        },
+        responseCount: {
+          type: "integer",
+          required: true,
+          description: "How many dimension responses were submitted together.",
+          min: 1,
+        },
+        reasonCount: {
+          type: "integer",
+          required: true,
+          description:
+            "How many structured reason codes accompanied the submitted feedback.",
+          min: 0,
+        },
+        reasonCodeKey: {
+          type: "string",
+          required: true,
+          description:
+            "Stable, sorted key of structured reason codes selected alongside the response, or 'none'.",
         },
       },
     },

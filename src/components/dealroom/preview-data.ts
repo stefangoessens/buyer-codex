@@ -182,6 +182,10 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
   viewState: "ready",
   generatedAt: "2026-04-13T15:15:00.000Z",
   generatedAtLabel: "Updated Apr 13",
+  advisoryVersion: {
+    synthesisVersion: "1.0.0",
+    artifactGeneratedAt: "2026-04-13T15:15:00.000Z",
+  },
   confidenceFingerprint: "evidence-graph-preview-v1",
   confidenceReplayKey: "dealroom-preview-123",
   overallConfidence: 0.78,
