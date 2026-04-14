@@ -1,7 +1,7 @@
-import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
+import { mutation, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { authProvider } from "./lib/validators";
 import {
   getSessionContext,
@@ -10,7 +10,7 @@ import {
   sessionUserValidator,
 } from "./lib/session";
 
-export const get = query({
+export const get = internalQuery({
   args: { userId: v.id("users") },
   returns: v.union(sessionUserValidator, v.null()),
   handler: async (ctx, args) => {
@@ -61,7 +61,7 @@ export const create = internalMutation({
     });
 
     if (args.attributionSessionId) {
-      await ctx.runMutation(api.leadAttribution.handoffToUser, {
+      await ctx.runMutation(internal.leadAttribution.handoffToUser, {
         sessionId: args.attributionSessionId,
         userId,
       });
@@ -94,7 +94,7 @@ export const bindAuthIdentity = internalMutation({
     });
 
     if (args.attributionSessionId) {
-      await ctx.runMutation(api.leadAttribution.handoffToUser, {
+      await ctx.runMutation(internal.leadAttribution.handoffToUser, {
         sessionId: args.attributionSessionId,
         userId: args.userId,
       });
@@ -171,7 +171,7 @@ export const ensureCurrentBuyer = mutation({
       await ctx.db.patch(userId, patch);
 
       if (args.attributionSessionId) {
-        await ctx.runMutation(api.leadAttribution.handoffToUser, {
+        await ctx.runMutation(internal.leadAttribution.handoffToUser, {
           sessionId: args.attributionSessionId,
           userId,
         });
@@ -212,7 +212,7 @@ export const ensureCurrentBuyer = mutation({
     });
 
     if (args.attributionSessionId) {
-      await ctx.runMutation(api.leadAttribution.handoffToUser, {
+      await ctx.runMutation(internal.leadAttribution.handoffToUser, {
         sessionId: args.attributionSessionId,
         userId,
       });
