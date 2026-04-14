@@ -23,6 +23,11 @@ const sourcePlatformValidator = v.union(
   v.literal("realtor"),
 );
 
+const intakeSubmitOutcomeValidator = v.union(
+  v.literal("created"),
+  v.literal("duplicate"),
+);
+
 const intakeChannelValidator = v.union(
   v.literal("hero"),
   v.literal("compact"),
@@ -383,9 +388,12 @@ export const submitUrl = mutation({
   returns: v.union(
     v.object({
       success: v.literal(true),
+      outcome: intakeSubmitOutcomeValidator,
       sourceListingId: v.id("sourceListings"),
       attemptId: v.id("intakeAttempts"),
       platform: sourcePlatformValidator,
+      listingId: v.string(),
+      normalizedUrl: v.string(),
     }),
     v.object({
       success: v.literal(false),
@@ -426,9 +434,12 @@ export const submitUrl = mutation({
       });
       return {
         success: true as const,
+        outcome: "duplicate" as const,
         sourceListingId: existing._id,
         attemptId,
         platform: parsed.data.platform,
+        listingId: parsed.data.listingId,
+        normalizedUrl: parsed.data.normalizedUrl,
       };
     }
 
@@ -455,9 +466,12 @@ export const submitUrl = mutation({
 
     return {
       success: true as const,
+      outcome: "created" as const,
       sourceListingId,
       attemptId,
       platform: parsed.data.platform,
+      listingId: parsed.data.listingId,
+      normalizedUrl: parsed.data.normalizedUrl,
     };
   },
 });

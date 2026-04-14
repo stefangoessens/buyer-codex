@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
 import { HeroSection } from "@/components/marketing/HeroSection";
 import { TrustBar } from "@/components/marketing/TrustBar";
 import { FeatureCard } from "@/components/marketing/FeatureCard";
@@ -68,25 +67,16 @@ const testimonials = [
 
 export function HomePageClient() {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
 
   function handleSubmit(submission: { href: string }) {
-    startTransition(() => {
-      router.push(submission.href);
-    });
+    router.push(submission.href);
   }
 
   return (
     <>
       {/* Hero */}
       <HeroSection>
-        {isPending ? (
-          <div className="rounded-xl bg-white/10 px-6 py-4 text-lg font-medium text-white backdrop-blur">
-            Analyzing your property...
-          </div>
-        ) : (
-          <PasteLinkInput variant="hero" onSubmit={handleSubmit} />
-        )}
+        <PasteLinkInput variant="hero" onSubmit={handleSubmit} />
       </HeroSection>
 
       {/* Trust Bar */}
@@ -175,13 +165,7 @@ export function HomePageClient() {
             Paste a listing link and get your free AI analysis in seconds.
           </p>
           <div className="mt-8">
-            {isPending ? (
-              <div className="rounded-xl bg-white/10 px-6 py-4 text-lg font-medium text-white backdrop-blur">
-                Analyzing your property...
-              </div>
-            ) : (
-              <PasteLinkInput variant="hero" onSubmit={handleSubmit} />
-            )}
+            <PasteLinkInput variant="hero" onSubmit={handleSubmit} />
           </div>
         </div>
       </section>
