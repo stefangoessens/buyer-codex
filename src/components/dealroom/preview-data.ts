@@ -255,6 +255,131 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
       },
     ],
   },
+  decisionMemo: {
+    title: "Why this home / why not this home",
+    summary:
+      "Offer prep. The current memo has enough evidence to show the upside, the downside, and a clear recommendation in one place.",
+    upside: {
+      title: "Why this home could be worth pursuing",
+      summary: "These points are carrying the buyer-safe case right now.",
+      items: [
+        {
+          id: "preview-upside-dom",
+          title: "Time on market",
+          body:
+            "Time on market and the latest price adjustment both suggest the seller is prioritizing momentum over waiting for a premium bid.",
+          evidence: [
+            {
+              id: "preview-upside-dom-evidence",
+              label: "39 days on market vs 28 day local median",
+              citationId: "dom-2026-04-13-01",
+              sourceAnchorId: "source-dom-2026-04-13-01",
+              nodeId: null,
+              confidenceLabel: "74% confidence",
+              statusLabel: null,
+              provenance: [],
+            },
+          ],
+        },
+      ],
+    },
+    downside: {
+      title: "Why this home may be risky or overpriced",
+      summary:
+        "These are the strongest reasons to stay disciplined instead of treating the home as an obvious yes.",
+      items: [
+        {
+          id: "preview-downside-pricing",
+          title: "Pricing",
+          body:
+            "The listing is trending above the closest renovated comparable set, which creates room for a measured first offer instead of a full-price opener.",
+          evidence: [
+            {
+              id: "preview-downside-pricing-evidence",
+              label: "$965,000 vs $926,000 renovated comparable average",
+              citationId: "pricing-2026-04-13-01",
+              sourceAnchorId: "source-pricing-2026-04-13-01",
+              nodeId: null,
+              confidenceLabel: "82% confidence",
+              statusLabel: "Supported",
+              provenance: [],
+            },
+          ],
+        },
+      ],
+    },
+    unknowns: {
+      title: "What we still do not know",
+      summary:
+        "These gaps should change how much confidence you place in the memo today.",
+      items: [
+        {
+          id: "preview-unknown-offer",
+          title: "Offer pack refresh is still running",
+          body:
+            "The refreshed counter-scenario set is still being prepared, so the buyer-safe case holds the current opener until the next pass lands.",
+          evidence: [
+            {
+              id: "preview-unknown-offer-evidence",
+              label: "Offer strategy",
+              citationId: null,
+              sourceAnchorId: null,
+              nodeId: null,
+              confidenceLabel: null,
+              statusLabel: "Waiting on evidence",
+              provenance: [],
+            },
+          ],
+        },
+      ],
+    },
+    unresolvedRisks: {
+      title: "Unresolved risks and review-required items",
+      summary:
+        "These issues are visible, but they still need diligence or human review before the case is fully settled.",
+      items: [
+        {
+          id: "preview-risk",
+          title: "Risk",
+          body:
+            "The biggest known risks are visible, but they still need normal diligence.",
+          evidence: [
+            {
+              id: "preview-risk-evidence",
+              label: "document findings",
+              citationId: null,
+              sourceAnchorId: null,
+              nodeId: null,
+              confidenceLabel: "71% confidence",
+              statusLabel: "Supported",
+              provenance: [],
+            },
+          ],
+        },
+      ],
+    },
+    recommendation: {
+      verdict: "pursue_with_caution",
+      label: "Current recommendation",
+      body:
+        "Treat the home as worth pursuing only with a disciplined opener around $928,000. Use this as an illustrative starting point and confirm the final strategy with your broker.",
+      confidenceLabel: "73% action confidence",
+      riskLabel: "Medium risk",
+      openingPriceLabel: "$928,000",
+      evidence: [
+        {
+          id: "preview-recommendation-evidence",
+          label: "pricing support",
+          citationId: null,
+          sourceAnchorId: null,
+          nodeId: null,
+          confidenceLabel: null,
+          statusLabel: "Waiting on evidence",
+          provenance: [],
+        },
+      ],
+    },
+  },
   confidenceSections: [
     {
       key: "pricing",

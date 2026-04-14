@@ -87,9 +87,10 @@ export function buildBuyerSafeSummaryText(
   ).slice(0, 2);
   const summaryState = overview.artifacts.summary;
   const recommendationState = overview.artifacts.recommendation;
+  const memo = overview.decisionMemo;
   const lines = [
     `${overview.propertyAddress}`,
-    `${overview.status.label}. ${overview.headerDescription}`,
+    memo.summary,
     `Confidence: ${overview.overallConfidenceLabel}.`,
   ];
 
@@ -128,10 +129,26 @@ export function buildBuyerSafeSummaryText(
     );
   }
 
-  if (overview.keyTakeaways.length > 0) {
+  if (memo.upside.items.length > 0) {
     lines.push(
-      `Key takeaways: ${overview.keyTakeaways
-        .map((takeaway) => `${takeaway.title}: ${takeaway.body}`)
+      `Why it could be worth pursuing: ${memo.upside.items
+        .map((item) => `${item.title}: ${item.body}`)
+        .join(" ")}`,
+    );
+  }
+
+  if (memo.downside.items.length > 0) {
+    lines.push(
+      `Why to stay disciplined: ${memo.downside.items
+        .map((item) => `${item.title}: ${item.body}`)
+        .join(" ")}`,
+    );
+  }
+
+  if (memo.unknowns.items.length > 0) {
+    lines.push(
+      `Still unknown: ${memo.unknowns.items
+        .map((item) => `${item.title}: ${item.body}`)
         .join(" ")}`,
     );
   }

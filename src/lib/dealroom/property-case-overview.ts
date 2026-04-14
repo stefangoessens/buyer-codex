@@ -6,7 +6,9 @@ import type {
 import {
   RECOMMENDATION_EVIDENCE_SECTION_KEYS,
   type DossierPropertyRecord,
+  type DossierSourceRef,
   type DossierSourceCategory,
+  type EvidenceGraphNode,
   type PropertyEvidenceGraph,
   type RecommendationConfidenceBand,
   type RecommendationConfidenceReasonCode,
@@ -89,7 +91,7 @@ export interface BuildPropertyCaseOverviewInput {
   citations?: PropertyCaseCitationInput[];
   evidenceGraph?: Pick<
     PropertyEvidenceGraph,
-    "fingerprint" | "replayKey" | "sections"
+    "fingerprint" | "replayKey" | "nodes" | "sections"
   > | null;
   marketContext?: PropertyMarketContext | null;
   propertyFacts?: Pick<
@@ -102,6 +104,64 @@ export interface BuildPropertyCaseOverviewInput {
 export interface PropertyCaseTakeaway {
   title: string;
   body: string;
+}
+
+export interface DecisionMemoEvidenceHook {
+  id: string;
+  label: string;
+  citationId: string | null;
+  sourceAnchorId: string | null;
+  nodeId: string | null;
+  confidenceLabel: string | null;
+  statusLabel: string | null;
+  provenance: DossierSourceRef[];
+}
+
+export interface DecisionMemoItemView {
+  id: string;
+  title: string;
+  body: string;
+  evidence: DecisionMemoEvidenceHook[];
+}
+
+export interface DecisionMemoSectionView {
+  title: string;
+  summary: string;
+  items: DecisionMemoItemView[];
+}
+
+export interface DecisionMemoRecommendationView {
+  verdict:
+    | "worth_pursuing"
+    | "pursue_with_caution"
+    | "wait_for_more_evidence";
+  label: string;
+  body: string;
+  confidenceLabel: string | null;
+  riskLabel: string | null;
+  openingPriceLabel: string | null;
+  evidence: DecisionMemoEvidenceHook[];
+}
+
+export interface BuyerSafeDecisionMemoView {
+  title: string;
+  summary: string;
+  upside: DecisionMemoSectionView;
+  downside: DecisionMemoSectionView;
+  unknowns: DecisionMemoSectionView;
+  unresolvedRisks: DecisionMemoSectionView;
+  recommendation: DecisionMemoRecommendationView;
+}
+
+export interface InternalDecisionMemoRationaleSectionView {
+  key: RecommendationEvidenceSectionKey;
+  title: string;
+  summary: string;
+  sourceCategories: DossierSourceCategory[];
+  reasonCodes: RecommendationConfidenceReasonCode[];
+  supportingNodeIds: string[];
+  missingNodeIds: string[];
+  conflictingNodeIds: string[];
 }
 
 export interface PropertyCaseClaimView {
@@ -287,6 +347,7 @@ interface PropertyCaseOverviewBase {
   coverageSummary: string;
   headerDescription: string;
   marketReality: LocalMarketRealityView | null;
+  decisionMemo: BuyerSafeDecisionMemoView;
   confidenceSections: PropertyCaseConfidenceSectionView[];
   artifacts: PropertyCaseArtifactStates;
   claims: PropertyCaseClaimView[];
@@ -317,6 +378,10 @@ export interface InternalPropertyCaseOverview
     adjudicationItems: PropertyCaseAdjudicationItem[];
     marketReality: InternalLocalMarketRealityView | null;
     confidenceSections: InternalPropertyCaseConfidenceSectionView[];
+    decisionMemo: {
+      rationaleSummary: string;
+      sections: InternalDecisionMemoRationaleSectionView[];
+    };
     guardrails: Array<{
       citationId: string;
       engineLabel: string;
@@ -460,6 +525,19 @@ export function buildPropertyCaseOverview(
   );
   const adjudicationSummary = summarizeAdjudication(adjudicationItems);
   const viewState = resolveViewState(payload, claims.length, missingStates);
+  const decisionMemo = buildDecisionMemo({
+    status,
+    viewState,
+    claims,
+    action,
+    missingStates,
+    confidenceSections,
+    recommendationState: artifacts.recommendation,
+    evidenceGraph: input.evidenceGraph ?? null,
+  });
+  const internalDecisionMemo = isInternal
+    ? buildInternalDecisionMemo(internalConfidenceSections)
+    : null;
   const overallConfidence = payload ? payload.overallConfidence : null;
   const overallConfidenceLabel =
     overallConfidence === null
@@ -502,6 +580,7 @@ export function buildPropertyCaseOverview(
     coverageSummary,
     headerDescription,
     marketReality: marketReality.buyer,
+    decisionMemo,
     confidenceSections,
     artifacts,
     claims,
@@ -533,6 +612,11 @@ export function buildPropertyCaseOverview(
       adjudicationItems,
       marketReality: marketReality.internal,
       confidenceSections: internalConfidenceSections,
+      decisionMemo: internalDecisionMemo ?? {
+        rationaleSummary:
+          "Internal rationale is not available until the evidence sections are built.",
+        sections: [],
+      },
       guardrails: Array.from(citationGuardrails.entries())
         .map(([citationId, assessment]) => ({
           citationId,
@@ -591,6 +675,482 @@ function buildTakeaways(claims: PropertyCaseClaimView[]): PropertyCaseTakeaway[]
     title: topicLabels[claim.topic],
     body: claim.narrative,
   }));
+}
+
+function buildDecisionMemo(args: {
+  status: StatusBadge;
+  viewState: PropertyCaseOverviewViewState;
+  claims: PropertyCaseClaimView[];
+  action: PropertyCaseActionView | null;
+  missingStates: PropertyCaseMissingState[];
+  confidenceSections: PropertyCaseConfidenceSectionView[];
+  recommendationState: AdvisorySurfaceState;
+  evidenceGraph: BuildPropertyCaseOverviewInput["evidenceGraph"];
+}): BuyerSafeDecisionMemoView {
+  const evidenceContext = createDecisionMemoEvidenceContext(args.evidenceGraph);
+  const positiveClaims = args.claims
+    .filter((claim) => classifyClaimPolarity(claim) === "positive")
+    .slice(0, 2)
+    .map((claim) => buildClaimDecisionMemoItem(claim, evidenceContext));
+  const negativeClaims = args.claims
+    .filter((claim) => classifyClaimPolarity(claim) === "negative")
+    .slice(0, 2)
+    .map((claim) => buildClaimDecisionMemoItem(claim, evidenceContext));
+
+  const upsideItems =
+    positiveClaims.length > 0
+      ? positiveClaims
+      : args.confidenceSections
+          .filter((section) => section.strongEvidence.length > 0)
+          .slice(0, 2)
+          .map((section) =>
+            buildSectionDecisionMemoItem(
+              section,
+              section.title,
+              section.buyerHeadline,
+              [...section.strongEvidence],
+              evidenceContext,
+              "supporting",
+            ),
+          );
+  const downsideItems = [
+    ...negativeClaims,
+    ...args.confidenceSections
+      .filter(
+        (section) =>
+          section.contradictoryEvidence.length > 0 ||
+          section.status === "mixed" ||
+          section.status === "conflicting_evidence",
+      )
+      .slice(0, 2)
+      .map((section) =>
+        buildSectionDecisionMemoItem(
+          section,
+          section.title,
+          section.buyerExplanation,
+          [
+            ...section.contradictoryEvidence,
+            ...section.missingEvidence.slice(0, 1),
+          ].filter(Boolean),
+          evidenceContext,
+          section.contradictoryEvidence.length > 0
+            ? "conflicting"
+            : "missing",
+        ),
+      ),
+  ].slice(0, 3);
+  const unknownItems = [
+    ...args.missingStates
+      .filter((state) =>
+        state.tone === "pending" ||
+        state.tone === "missing" ||
+        state.tone === "uncertain",
+      )
+      .slice(0, 3)
+      .map((state) => buildMissingStateDecisionMemoItem(state, evidenceContext)),
+  ];
+  if (unknownItems.length === 0) {
+    const missingSection = args.confidenceSections.find(
+      (section) => section.missingEvidence.length > 0,
+    );
+    if (missingSection) {
+      unknownItems.push(
+        buildSectionDecisionMemoItem(
+          missingSection,
+          `${missingSection.title} still needs more evidence`,
+          missingSection.whatWouldIncreaseConfidence[0] ??
+            missingSection.buyerExplanation,
+          [...missingSection.missingEvidence],
+          evidenceContext,
+          "missing",
+        ),
+      );
+    }
+  }
+
+  const unresolvedRiskItems = [
+    ...args.missingStates
+      .filter(
+        (state) =>
+          state.tone === "review_required" || state.tone === "blocked",
+      )
+      .map((state) => buildMissingStateDecisionMemoItem(state, evidenceContext)),
+  ];
+  const riskSection = args.confidenceSections.find((section) => section.key === "risk");
+  if (riskSection) {
+    unresolvedRiskItems.push(
+      buildSectionDecisionMemoItem(
+        riskSection,
+        riskSection.title,
+        riskSection.buyerExplanation,
+        [
+          ...riskSection.missingEvidence,
+          ...riskSection.contradictoryEvidence,
+          ...(riskSection.strongEvidence.length > 0 ? [riskSection.strongEvidence[0]] : []),
+        ].filter(Boolean),
+        evidenceContext,
+        riskSection.contradictoryEvidence.length > 0 ? "conflicting" : "supporting",
+      ),
+    );
+  }
+
+  return {
+    title: "Why this home / why not this home",
+    summary: buildDecisionMemoSummary(args.status, args.viewState, args.missingStates),
+    upside: {
+      title: "Why this home could be worth pursuing",
+      summary:
+        upsideItems.length > 0
+          ? "These points are carrying the buyer-safe case right now."
+          : "No positive signal is strong enough to elevate on its own yet.",
+      items: dedupeDecisionMemoItems(upsideItems),
+    },
+    downside: {
+      title: "Why this home may be risky or overpriced",
+      summary:
+        downsideItems.length > 0
+          ? "These are the strongest reasons to stay disciplined instead of treating the home as an obvious yes."
+          : "No major downside is currently carrying the case on its own.",
+      items: dedupeDecisionMemoItems(downsideItems),
+    },
+    unknowns: {
+      title: "What we still do not know",
+      summary:
+        unknownItems.length > 0
+          ? "These gaps should change how much confidence you place in the memo today."
+          : "No major unknown is currently flagged beyond normal diligence.",
+      items: dedupeDecisionMemoItems(unknownItems),
+    },
+    unresolvedRisks: {
+      title: "Unresolved risks and review-required items",
+      summary:
+        unresolvedRiskItems.length > 0
+          ? "These issues are visible, but they still need diligence or human review before the case is fully settled."
+          : "No unresolved risk is currently escalated beyond standard review.",
+      items: dedupeDecisionMemoItems(unresolvedRiskItems),
+    },
+    recommendation: buildDecisionMemoRecommendation({
+      action: args.action,
+      recommendationState: args.recommendationState,
+      evidenceContext,
+      offerSection:
+        args.evidenceGraph?.sections?.offer_recommendation ?? null,
+      missingStates: args.missingStates,
+    }),
+  };
+}
+
+function buildInternalDecisionMemo(
+  sections: InternalPropertyCaseConfidenceSectionView[],
+): {
+  rationaleSummary: string;
+  sections: InternalDecisionMemoRationaleSectionView[];
+} {
+  return {
+    rationaleSummary:
+      sections.length > 0
+        ? "Internal rationale exposes which dossier sections are carrying the memo, where the trace is thin, and what still needs human review."
+        : "Internal rationale will appear once confidence sections are available.",
+    sections: sections.map((section) => ({
+      key: section.key,
+      title: section.title,
+      summary: section.internalSummary,
+      sourceCategories: [...section.sourceCategories],
+      reasonCodes: [...section.reasonCodes],
+      supportingNodeIds: [...section.supportingNodeIds],
+      missingNodeIds: [...section.missingNodeIds],
+      conflictingNodeIds: [...section.conflictingNodeIds],
+    })),
+  };
+}
+
+function buildDecisionMemoSummary(
+  status: StatusBadge,
+  viewState: PropertyCaseOverviewViewState,
+  missingStates: PropertyCaseMissingState[],
+): string {
+  if (viewState === "ready") {
+    return `${status.label}. The current memo has enough evidence to show the upside, the downside, and a clear recommendation in one place.`;
+  }
+
+  if (viewState === "partial") {
+    return `${status.label}. The current memo is usable, but ${missingStates.length} signal${missingStates.length === 1 ? "" : "s"} still change how decisive the case should feel.`;
+  }
+
+  return `${status.label}. The memo stays explicit about what is missing instead of pretending the case is settled.`;
+}
+
+function classifyClaimPolarity(
+  claim: PropertyCaseClaimView,
+): "positive" | "negative" | "neutral" {
+  switch (claim.topic) {
+    case "pricing":
+    case "comps":
+      return claim.deltaLabel.toLowerCase().includes("below")
+        ? "positive"
+        : claim.deltaLabel.toLowerCase().includes("above")
+          ? "negative"
+          : "neutral";
+    case "days_on_market":
+      return claim.deltaLabel.toLowerCase().includes("above")
+        ? "positive"
+        : claim.deltaLabel.toLowerCase().includes("below")
+          ? "negative"
+          : "neutral";
+    case "leverage":
+    case "offer_recommendation":
+      return claim.deltaLabel.toLowerCase().includes("below")
+        ? "negative"
+        : "positive";
+    default:
+      return "neutral";
+  }
+}
+
+function buildClaimDecisionMemoItem(
+  claim: PropertyCaseClaimView,
+  evidenceContext: DecisionMemoEvidenceContext,
+): DecisionMemoItemView {
+  return {
+    id: `claim-${claim.id}`,
+    title: claim.topicLabel,
+    body: claim.narrative,
+    evidence: buildClaimDecisionMemoEvidence(claim, evidenceContext),
+  };
+}
+
+function buildSectionDecisionMemoItem(
+  section: PropertyCaseConfidenceSectionView,
+  title: string,
+  body: string,
+  labels: string[],
+  evidenceContext: DecisionMemoEvidenceContext,
+  hookKind: "supporting" | "missing" | "conflicting",
+): DecisionMemoItemView {
+  return {
+    id: `section-${section.key}-${hookKind}`,
+    title,
+    body,
+    evidence: buildSectionDecisionMemoEvidence(
+      section.key,
+      labels,
+      evidenceContext,
+      hookKind,
+    ),
+  };
+}
+
+function buildMissingStateDecisionMemoItem(
+  state: PropertyCaseMissingState,
+  evidenceContext: DecisionMemoEvidenceContext,
+): DecisionMemoItemView {
+  const sectionKey = coverageKeyToEvidenceSectionKey(state.engine);
+  return {
+    id: `missing-${state.engine}-${state.tone}`,
+    title: state.title,
+    body: state.description,
+    evidence: buildSectionDecisionMemoEvidence(
+      sectionKey,
+      [state.label],
+      evidenceContext,
+      state.tone === "pending" || state.tone === "missing" || state.tone === "uncertain"
+        ? "missing"
+        : "conflicting",
+    ),
+  };
+}
+
+function buildDecisionMemoRecommendation(args: {
+  action: PropertyCaseActionView | null;
+  recommendationState: AdvisorySurfaceState;
+  evidenceContext: DecisionMemoEvidenceContext;
+  offerSection: RecommendationEvidenceSection | null;
+  missingStates: PropertyCaseMissingState[];
+}): DecisionMemoRecommendationView {
+  const offerEvidence = buildSectionDecisionMemoEvidence(
+    "offer_recommendation",
+    args.offerSection
+      ? [
+          ...args.offerSection.confidenceInputs.supportLabels,
+          ...args.offerSection.confidenceInputs.missingLabels,
+        ].filter(Boolean)
+      : [],
+    args.evidenceContext,
+    args.offerSection?.conflictingNodeIds.length ? "conflicting" : "supporting",
+  );
+
+  if (args.action && !args.recommendationState.withholdOutput) {
+    return {
+      verdict:
+        args.missingStates.length > 0 || args.action.riskLevel !== "low"
+          ? "pursue_with_caution"
+          : "worth_pursuing",
+      label: "Current recommendation",
+      body:
+        args.action.reviewedConclusion ??
+        `Treat the home as worth pursuing only with a disciplined opener around ${args.action.openingPriceLabel}. ${args.action.guardrailExplanation}`,
+      confidenceLabel: args.action.confidenceLabel,
+      riskLabel: args.action.riskLabel,
+      openingPriceLabel: args.action.openingPriceLabel,
+      evidence: offerEvidence,
+    };
+  }
+
+  return {
+    verdict: "wait_for_more_evidence",
+    label: "Current recommendation",
+    body: `${args.recommendationState.title}. ${args.recommendationState.description} ${args.recommendationState.recoveryDescription}`.trim(),
+    confidenceLabel: null,
+    riskLabel: null,
+    openingPriceLabel: null,
+    evidence: offerEvidence,
+  };
+}
+
+interface DecisionMemoEvidenceContext {
+  nodesById: Record<string, EvidenceGraphNode>;
+  nodeIdsByCitation: Map<string, string[]>;
+  sectionsByKey: Partial<Record<RecommendationEvidenceSectionKey, RecommendationEvidenceSection>>;
+}
+
+function createDecisionMemoEvidenceContext(
+  evidenceGraph: BuildPropertyCaseOverviewInput["evidenceGraph"],
+): DecisionMemoEvidenceContext {
+  const nodesById = evidenceGraph?.nodes ?? {};
+  const nodeIdsByCitation = new Map<string, string[]>();
+
+  for (const [nodeId, node] of Object.entries(nodesById)) {
+    for (const citationId of node.internal?.citations ?? []) {
+      nodeIdsByCitation.set(citationId, [
+        ...(nodeIdsByCitation.get(citationId) ?? []),
+        nodeId,
+      ]);
+    }
+  }
+
+  return {
+    nodesById,
+    nodeIdsByCitation,
+    sectionsByKey: evidenceGraph?.sections ?? {},
+  };
+}
+
+function buildClaimDecisionMemoEvidence(
+  claim: PropertyCaseClaimView,
+  evidenceContext: DecisionMemoEvidenceContext,
+): DecisionMemoEvidenceHook[] {
+  const relatedNodeIds = evidenceContext.nodeIdsByCitation.get(claim.citationId) ?? [];
+  const provenance = dedupeDossierSourceRefs(
+    relatedNodeIds.flatMap(
+      (nodeId) => evidenceContext.nodesById[nodeId]?.internal?.provenance ?? [],
+    ),
+  );
+
+  return [
+    {
+      id: `claim-evidence-${claim.id}`,
+      label: claim.referenceLine,
+      citationId: claim.citationId,
+      sourceAnchorId: claim.sourceAnchorId,
+      nodeId: relatedNodeIds[0] ?? null,
+      confidenceLabel: claim.confidenceLabel,
+      statusLabel:
+        claim.guardrailState === "can_say" ? null : claim.guardrailLabel,
+      provenance,
+    },
+  ];
+}
+
+function buildSectionDecisionMemoEvidence(
+  sectionKey: RecommendationEvidenceSectionKey,
+  labels: string[],
+  evidenceContext: DecisionMemoEvidenceContext,
+  hookKind: "supporting" | "missing" | "conflicting",
+): DecisionMemoEvidenceHook[] {
+  const section = evidenceContext.sectionsByKey[sectionKey];
+  if (!section) {
+    return labels.map((label, index) => ({
+      id: `fallback-${sectionKey}-${hookKind}-${index}`,
+      label,
+      citationId: null,
+      sourceAnchorId: null,
+      nodeId: null,
+      confidenceLabel: null,
+      statusLabel: null,
+      provenance: [],
+    }));
+  }
+
+  const nodeIds =
+    hookKind === "supporting"
+      ? section.supportingNodeIds
+      : hookKind === "missing"
+        ? section.missingNodeIds
+        : section.conflictingNodeIds;
+  const selectedNodeIds = nodeIds.slice(0, Math.max(labels.length, 1));
+
+  return selectedNodeIds.map((nodeId, index) => {
+    const node = evidenceContext.nodesById[nodeId];
+    const citationId = node?.internal?.citations?.[0] ?? null;
+    return {
+      id: `${sectionKey}-${hookKind}-${nodeId}`,
+      label: labels[index] ?? node?.label ?? section.title,
+      citationId,
+      sourceAnchorId: citationId ? sourceAnchorId(citationId) : null,
+      nodeId,
+      confidenceLabel:
+        typeof node?.confidence === "number"
+          ? `${formatPercent(node.confidence)} node confidence`
+          : null,
+      statusLabel: evidenceStatusLabel(section.status),
+      provenance: dedupeDossierSourceRefs(node?.internal?.provenance ?? []),
+    };
+  });
+}
+
+function dedupeDecisionMemoItems(
+  items: DecisionMemoItemView[],
+): DecisionMemoItemView[] {
+  const seen = new Set<string>();
+  const deduped: DecisionMemoItemView[] = [];
+
+  for (const item of items) {
+    const key = `${item.title}:${item.body}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(item);
+  }
+
+  return deduped;
+}
+
+function dedupeDossierSourceRefs(refs: DossierSourceRef[]): DossierSourceRef[] {
+  const seen = new Set<string>();
+  const deduped: DossierSourceRef[] = [];
+
+  for (const ref of refs) {
+    const key = `${ref.label}:${ref.category}:${ref.citation ?? ""}:${ref.capturedAt ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(ref);
+  }
+
+  return deduped;
+}
+
+function coverageKeyToEvidenceSectionKey(
+  key: CoverageEngineKey,
+): RecommendationEvidenceSectionKey {
+  switch (key) {
+    case "pricing":
+      return "pricing";
+    case "comps":
+      return "comps";
+    case "leverage":
+      return "leverage";
+    case "offer":
+      return "offer_recommendation";
+  }
 }
 
 function buildAction(
