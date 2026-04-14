@@ -1,226 +1,288 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import { HeroSection } from "@/components/marketing/HeroSection";
-import { TrustBar } from "@/components/marketing/TrustBar";
-import { FeatureCard } from "@/components/marketing/FeatureCard";
-import { TestimonialCard } from "@/components/marketing/TestimonialCard";
 import { HeroInput } from "@/components/marketing/HeroInput";
-import { BentoCard } from "@/components/marketing/BentoCard";
+import {
+  MarketingCtaBand,
+  MarketingSection,
+  MarketingSectionIntro,
+} from "@/components/marketing/MarketingScaffold";
+import { TrustProofShowcase } from "@/components/marketing/TrustProofShowcase";
 import { metadataForStaticPage } from "@/lib/seo/pageDefinitions";
 import { buildHomepageTrustProofReadModel } from "@/lib/trustProof/readModel";
 
-/* ─── Data ────────────────────────────────────────────────────────────── */
+const marketSignals = [
+  {
+    label: "Pricing lane",
+    title: "Fair value, not just a Zestimate",
+    body: "We re-check asking price against comps, condition drift, and negotiation posture before you spend time on the wrong home.",
+  },
+  {
+    label: "Leverage lane",
+    title: "Offer posture with actual context",
+    body: "Days on market, price drops, builder incentives, and listing-side pressure get assembled into one buyer-facing recommendation.",
+  },
+  {
+    label: "Broker lane",
+    title: "Human review where it matters",
+    body: "Licensed Florida brokers stay in the loop for representation, negotiations, contracts, and closing coordination.",
+  },
+] as const;
 
-const features = [
-  { imageSrc: "/images/marketing/features/feature-1.png", imageAlt: "Paste a listing link and instantly get property data", title: "Paste any listing link", description: "Drop a Zillow, Redfin, or Realtor.com URL. We instantly pull the property data and start our AI analysis engine." },
-  { imageSrc: "/images/marketing/features/feature-2.png", imageAlt: "AI-powered property analysis dashboard", title: "Get AI-powered analysis", description: "Fair pricing, comparable sales, leverage signals, risk assessment, and a competitiveness score — all in seconds." },
-  { imageSrc: "/images/marketing/features/feature-3.png", imageAlt: "Expert buyer representation saves you money", title: "Save with expert representation", description: "Our licensed Florida brokers negotiate on your behalf using AI insights. Average buyer savings: $12,400." },
-];
+const operatingCadence = [
+  {
+    step: "01",
+    title: "Intake the listing",
+    body: "Paste a Zillow, Redfin, or Realtor.com URL and we normalize it into a buyer-codex deal room entry point.",
+  },
+  {
+    step: "02",
+    title: "Pressure-test the property",
+    body: "Pricing, comps, leverage, and rebate math run together so your first answer includes the commercial reality.",
+  },
+  {
+    step: "03",
+    title: "Decide with a broker",
+    body: "The system hands off clean context to a licensed broker instead of burying the human workflow behind generic marketing copy.",
+  },
+  {
+    step: "04",
+    title: "Stay on track to close",
+    body: "Representation, coordination, documents, and buyer credit expectations stay visible from first paste through closing.",
+  },
+] as const;
 
-const steps = [
-  { number: 1, title: "Paste a link", description: "Copy any listing URL from Zillow, Redfin, or Realtor.com and paste it into our analysis bar.", imageSrc: "/images/marketing/steps/step-1.png" },
-  { number: 2, title: "Review your analysis", description: "Get an instant AI-powered report with fair pricing, comps, leverage signals, and a property score.", imageSrc: "/images/marketing/steps/step-2.png" },
-  { number: 3, title: "Close with confidence", description: "Connect with a licensed Florida broker who uses your analysis to negotiate the best possible deal.", imageSrc: "/images/marketing/steps/step-3.png" },
-];
+const reviewLanes = [
+  {
+    title: "Value review",
+    description: "Comparable sales, outlier detection, condition context, and overpay signals for Florida neighborhoods that move fast.",
+  },
+  {
+    title: "Negotiation review",
+    description: "Leverage cues, incentive stacking, and buyer credit context so the first conversation is already grounded in strategy.",
+  },
+  {
+    title: "Execution review",
+    description: "Deal-room readiness, showing support, contract guidance, and closing coordination instead of a dead-end lead form.",
+  },
+] as const;
 
-/* ─── Page (Server Component) ─────────────────────────────────────────── */
+const deliverySurfaces = [
+  {
+    title: "Public site",
+    detail: "Explains the service and routes buyers into the same intake system the product uses.",
+  },
+  {
+    title: "Deal room",
+    detail: "Carries pricing, leverage, tasks, documents, and next-best action context once a buyer is in motion.",
+  },
+  {
+    title: "Broker workflow",
+    detail: "Keeps representation and compliance actions clearly separate from the public marketing shell.",
+  },
+] as const;
 
 export const metadata: Metadata = metadataForStaticPage("home");
 
 export default function Home() {
   const trustProof = buildHomepageTrustProofReadModel();
-  const trustStats = trustProof.stats.map((stat) => ({
-    value: stat.value,
-    label: stat.label,
-  }));
 
   return (
     <>
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <HeroSection><HeroInput /></HeroSection>
-
-      {/* ── Trust Bar ────────────────────────────────────────────────── */}
-      <TrustBar stats={trustStats} />
-
-      {/* ── Features (PayFit-style: image cards) ─────────────────────── */}
-      <section className="w-full bg-white py-20 lg:py-28">
-        <div className="mx-auto max-w-[1248px] px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary-400">Why buyer-codex</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.003em] text-neutral-800 lg:text-[41px] lg:leading-[1.2]">How buyer-codex works for you</h2>
-            <p className="mt-4 text-lg leading-relaxed text-neutral-500">From paste to close, we handle every step of your home buying journey with AI precision and human expertise.</p>
-          </div>
-          <div className="mt-14 grid grid-cols-1 gap-8 md:grid-cols-3">
-            {features.map((f) => <FeatureCard key={f.title} imageSrc={f.imageSrc} imageAlt={f.imageAlt} title={f.title} description={f.description} />)}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Product Screenshot (full-width like PayFit hero) ──────── */}
-      <section className="w-full bg-neutral-50 py-16 lg:py-20">
-        <div className="mx-auto max-w-[1248px] px-6">
-          <div className="overflow-hidden rounded-[24px] border border-neutral-200/80 bg-white shadow-lg">
-            <Image
-              src="/images/marketing/hero/product-dashboard.png"
-              alt="buyer-codex property analysis dashboard"
-              width={1248}
-              height={760}
-              className="w-full"
-              sizes="(max-width: 1280px) 100vw, 1248px"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Bento Grid (PayFit-style: image + title cards) ────────── */}
-      <section className="w-full bg-white py-20 lg:py-28">
-        <div className="mx-auto max-w-[1248px] px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-semibold tracking-[-0.003em] text-neutral-800 lg:text-[41px] lg:leading-[1.2]">From analysis to closing, every step covered</h2>
-          </div>
-          <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-12">
-            <BentoCard
-              src="/images/marketing/bento/bento-1.png"
-              title="Fair pricing engine"
-              description="Instant fair-price ranges and overpay risk, grounded in local comparable sales."
-              imageAspectClassName="aspect-[1524/1512]"
-              className="md:col-span-5"
-              sizes="(max-width: 768px) 100vw, 40vw"
-            />
-            <BentoCard
-              src="/images/marketing/bento/bento-2.png"
-              title="Automated comp analysis"
-              description="Pulls comps, adjusts for features, and highlights the listings that truly set the market."
-              imageAspectClassName="aspect-[2160/1512]"
-              className="md:col-span-7"
-              sizes="(max-width: 768px) 100vw, 58vw"
-            />
-            <BentoCard
-              src="/images/marketing/bento/bento-3.png"
-              title="Negotiation leverage"
-              description="Turns data into crisp concession asks, counter offers, and timing advantages."
-              imageAspectClassName="aspect-[2160/1512]"
-              className="md:col-span-7"
-              sizes="(max-width: 768px) 100vw, 58vw"
-            />
-            <BentoCard
-              src="/images/marketing/bento/bento-4.png"
-              title="Market intelligence"
-              description="Track price drops, days-on-market shifts, and micro-trends as they happen."
-              imageAspectClassName="aspect-[1524/1512]"
-              className="md:col-span-5"
-              sizes="(max-width: 768px) 100vw, 40vw"
-            />
-            <BentoCard
-              src="/images/marketing/bento/bento-5.png"
-              title="Document management"
-              description="Keep disclosures, PDFs, and revisions organized in one place from offer to close."
-              imageAspectClassName="aspect-[1749/1512]"
-              className="md:col-span-5"
-              sizes="(max-width: 768px) 100vw, 40vw"
-            />
-            <BentoCard
-              src="/images/marketing/bento/bento-6.png"
-              title="Deal room timeline"
-              description="A single timeline for tasks, deadlines, and broker actions so nothing slips."
-              imageAspectClassName="aspect-[2160/1512]"
-              className="md:col-span-7"
-              sizes="(max-width: 768px) 100vw, 58vw"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ── How It Works (PayFit-style: number + title + desc + phone mockup) */}
-      <section id="how-it-works" className="scroll-mt-[84px] w-full bg-white py-20 lg:py-28">
-        <div className="mx-auto max-w-[1248px] px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary-400">Simple process</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.003em] text-neutral-800 lg:text-[41px] lg:leading-[1.2]">Three steps to your best deal</h2>
-          </div>
-          <div className="mt-16 grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-6">
-            {steps.map((step) => (
-              <div key={step.number} className="group text-center">
-                {/* Step number */}
-                <p className="text-sm font-bold text-primary-400">{step.number}</p>
-                <h3 className="mt-2 text-xl font-semibold text-neutral-800">{step.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-neutral-500">{step.description}</p>
-                {/* Phone mockup image */}
-                <div className="mt-6 overflow-hidden rounded-[24px] border border-neutral-200 bg-neutral-50 transition-shadow duration-300 group-hover:shadow-lg">
-                  <div className="relative aspect-[3/4]">
-                    <Image src={step.imageSrc} alt="" fill className="object-cover object-top" sizes="(max-width: 768px) 100vw, 33vw" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Testimonials ─────────────────────────────────────────────── */}
-      <section className="w-full bg-neutral-50 py-20 lg:py-28">
-        <div className="mx-auto max-w-[1248px] px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary-400">Social proof</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.003em] text-neutral-800 lg:text-[41px] lg:leading-[1.2]">What buyers are saying</h2>
-          </div>
-          {trustProof.sectionBadge && (
-            <p
-              className="mt-6 text-center text-xs font-semibold uppercase tracking-[0.18em] text-accent-700"
-              aria-label={trustProof.sectionBadgeAriaLabel ?? trustProof.sectionBadge}
-            >
-              {trustProof.sectionBadge}
+      <section
+        className="px-6 pb-8 pt-10 lg:px-8 lg:pb-12 lg:pt-14"
+        data-testid="homepage-hero"
+      >
+        <div className="mx-auto grid max-w-[1280px] gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+          <div className="rounded-[40px] border border-white/70 bg-white/90 p-8 shadow-[0_28px_80px_rgba(15,23,42,0.1)] backdrop-blur lg:p-10">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-600">
+              Florida-exclusive buyer brokerage
             </p>
-          )}
-          <div className="mt-14 grid grid-cols-1 gap-8 md:grid-cols-3">
-            {trustProof.caseStudies.map((study) => (
-              <TestimonialCard
-                key={study.id}
-                quote={study.summary}
-                author={study.buyerDisplayName}
-                role={study.buyerRole}
-                eyebrow={
-                  trustProof.sliceLabelingMode.kind === "mixed" &&
-                  study.isIllustrative
-                    ? study.badge ?? undefined
-                    : undefined
-                }
-                eyebrowAriaLabel={study.badgeAriaLabel ?? undefined}
-              />
-            ))}
+            <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-[-0.06em] text-slate-950 sm:text-5xl lg:text-7xl">
+              Get the best deal on your Florida home
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 lg:text-lg">
+              buyer-codex is a buyer operating system, not a brochure site. Paste
+              a listing and you move straight into pricing, leverage, broker
+              guidance, and closing-aware next steps.
+            </p>
+
+            <div className="mt-8 max-w-3xl">
+              <HeroInput />
+            </div>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {[
+                "Supports Zillow, Redfin, and Realtor.com",
+                "No buyer upfront fee or subscription",
+                "Licensed Florida broker representation stays attached",
+              ].map((line) => (
+                <div
+                  key={line}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700"
+                >
+                  {line}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="rounded-[40px] bg-slate-950 p-7 text-white shadow-[0_35px_100px_rgba(15,23,42,0.18)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-300">
+                Re-owned public shell
+              </p>
+              <h2 className="mt-4 text-2xl font-semibold tracking-[-0.04em] lg:text-3xl">
+                The marketing site now mirrors how the service actually runs.
+              </h2>
+              <div className="mt-6 space-y-4">
+                {marketSignals.map((signal) => (
+                  <div
+                    key={signal.title}
+                    className="rounded-[26px] border border-white/10 bg-white/5 p-5"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-200">
+                      {signal.label}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold text-white">
+                      {signal.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">
+                      {signal.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-[32px] border border-slate-200 bg-white p-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-600">
+                  Decision cadence
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
+                  4 stages
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Intake, analysis, broker review, and closing coordination stay
+                  connected instead of split across separate marketing fragments.
+                </p>
+              </div>
+              <div className="rounded-[32px] border border-slate-200 bg-white p-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-600">
+                  Buyer economics
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
+                  Commission rebate built in
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Pricing education, savings framing, and broker representation
+                  now share one consistent public boundary.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── Stats Banner ─────────────────────────────────────────────── */}
-      <section className="relative w-full overflow-hidden bg-gradient-to-r from-primary-700 to-primary-600 py-16 lg:py-20">
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="absolute -left-20 -top-20 h-60 w-60 rounded-full bg-white/[0.04] blur-3xl" />
-          <div className="absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-white/[0.04] blur-3xl" />
-        </div>
-        <div className="relative mx-auto max-w-[1248px] px-6">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12">
-            {[{ value: "$12,400", label: "Avg. buyer savings" }, { value: "23 days", label: "Avg. time to close" }, { value: "98%", label: "Client satisfaction" }, { value: "4.9/5", label: "Average rating" }].map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="text-3xl font-semibold tracking-tight text-white lg:text-4xl">{s.value}</div>
-                <div className="mt-2 text-sm font-medium text-primary-100/80">{s.label}</div>
+      <MarketingSection id="how-it-works" className="scroll-mt-28 pt-6 lg:pt-8">
+        <div className="grid gap-8 rounded-[40px] border border-slate-200 bg-white px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.08)] lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)] lg:px-8 lg:py-10">
+          <MarketingSectionIntro
+            eyebrow="How it works"
+            title="A public-site rhythm built around real buyer work."
+            description="The homepage now leads with service stages and operating boundaries instead of inherited feature-card and testimonial-first sequencing."
+          />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {operatingCadence.map((item) => (
+              <div
+                key={item.step}
+                className="rounded-[28px] border border-slate-200 bg-slate-50 p-5"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-600">
+                  {item.step}
+                </p>
+                <h3 className="mt-3 text-xl font-semibold text-slate-950">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  {item.body}
+                </p>
               </div>
             ))}
           </div>
         </div>
-      </section>
+      </MarketingSection>
 
-      {/* ── Final CTA ────────────────────────────────────────────────── */}
-      <section className="relative w-full overflow-hidden bg-primary-800 py-20 lg:py-28">
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:48px_48px]" />
+      <MarketingSection>
+        <MarketingSectionIntro
+          eyebrow="What gets re-checked"
+          title="Each buyer decision runs through three distinct review lanes."
+          description="This makes the public shell match the product boundary: educational framing on the outside, operational decision support on the inside."
+          align="center"
+        />
+
+        <div className="mt-10 grid gap-5 lg:grid-cols-3">
+          {reviewLanes.map((lane) => (
+            <div
+              key={lane.title}
+              className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)]"
+            >
+              <h3 className="text-xl font-semibold text-slate-950">
+                {lane.title}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                {lane.description}
+              </p>
+            </div>
+          ))}
         </div>
-        <div className="relative mx-auto max-w-3xl px-6 text-center">
-          <h2 className="text-3xl font-semibold tracking-[-0.003em] text-white lg:text-[41px] lg:leading-[1.2]">Ready to find your Florida home?</h2>
-          <p className="mt-4 text-lg text-primary-100/80">Paste a listing link and get your free AI analysis in seconds. No sign-up required.</p>
-          <div className="mt-8"><HeroInput /></div>
+      </MarketingSection>
+
+      <TrustProofShowcase
+        eyebrow="Buyer proof"
+        title="Representative outcomes stay in view without taking over the shell."
+        description="Proof and testimonials now sit inside a dedicated shared boundary rather than driving the entire page rhythm."
+        stats={trustProof.stats}
+        caseStudies={trustProof.caseStudies}
+        sectionBadge={trustProof.sectionBadge}
+        sectionBadgeAriaLabel={trustProof.sectionBadgeAriaLabel}
+      />
+
+      <MarketingSection>
+        <div className="grid gap-8 rounded-[40px] bg-slate-950 px-6 py-8 text-white lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:px-8 lg:py-10">
+          <MarketingSectionIntro
+            eyebrow="Shared boundaries"
+            title="Marketing, product, and broker workflows now have cleaner edges."
+            description="The public shell explains what the platform does, while the deal room and broker workflows own the execution detail."
+            tone="light"
+          />
+
+          <div className="grid gap-4">
+            {deliverySurfaces.map((surface) => (
+              <div
+                key={surface.title}
+                className="rounded-[28px] border border-white/10 bg-white/5 p-5"
+              >
+                <h3 className="text-lg font-semibold text-white">
+                  {surface.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  {surface.detail}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
-      </section>
+      </MarketingSection>
+
+      <MarketingCtaBand
+        eyebrow="Start with a live listing"
+        title="Paste a property link and move straight into analysis."
+        description="The public site now hands buyers into the same intake and deal-room path the product actually uses, without a disconnected marketing detour."
+        primaryHref="/get-started"
+        primaryLabel="Open guided intake"
+        secondaryHref="/pricing"
+        secondaryLabel="Review pricing"
+      />
     </>
   );
 }
