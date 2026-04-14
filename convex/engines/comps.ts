@@ -3,6 +3,8 @@
 import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
+import { evaluateCompsSelection } from "../../src/lib/ai/engines/comps";
+import { serializeEngineInputSnapshot } from "../../src/lib/ai/engines/runtime";
 
 export const runCompsEngine = internalAction({
   args: {
@@ -37,8 +39,6 @@ export const runCompsEngine = internalAction({
       throw new Error(`Unknown comps prompt version: ${args.promptVersion}`);
     }
 
-    const { selectComps } = await import("../../src/lib/ai/engines/comps");
-
     const subject = {
       address: property.address?.formatted ?? "Unknown",
       beds: property.beds ?? 0,
@@ -65,34 +65,14 @@ export const runCompsEngine = internalAction({
       args.candidates && args.candidates.length > 0
         ? args.candidates
         : dossierCompsInput?.candidates ?? [];
-    const inputSnapshot = JSON.stringify({ subject: subjectInput, candidates });
-
-    const result = selectComps({ subject: subjectInput, candidates });
-    const citations = Array.from(
-      new Set(
-        result.comps.flatMap((comp) =>
-          comp.sourceCitations?.map((citation) => citation.citation) ??
-          [comp.sourceCitation],
-        ),
-      ),
-    );
-    const confidenceBase =
-      result.comps.length >= 3 ? 0.7 : result.comps.length >= 1 ? 0.52 : 0.3;
-    const basisBoost =
-      result.selectionBasis === "subdivision"
-        ? 0.18
-        : result.selectionBasis === "school_zone"
-          ? 0.1
-          : 0.04;
-    const conflictPenalty = result.comps.some(
-      (comp) => (comp.candidate.conflicts?.length ?? 0) > 0,
-    )
-      ? 0.04
-      : 0;
-    const confidence = Number(
-      Math.max(0.3, Math.min(0.94, confidenceBase + basisBoost - conflictPenalty))
-        .toFixed(2),
-    );
+    const inputSnapshot = serializeEngineInputSnapshot("comps", {
+      subject: subjectInput,
+      candidates,
+    });
+    const execution = evaluateCompsSelection({
+      subject: subjectInput,
+      candidates,
+    });
 
     const outputId: any = await ctx.runMutation(
       internal.aiEngineOutputs.createOutput,
@@ -102,10 +82,10 @@ export const runCompsEngine = internalAction({
         promptKey: "default",
         promptVersion: args.promptVersion,
         inputSnapshot,
-        confidence,
-        citations,
-        output: JSON.stringify(result),
-        modelId: prompt.model,
+        confidence: execution.confidence,
+        citations: execution.citations,
+        output: JSON.stringify(execution.output),
+        modelId: execution.modelId,
       },
     );
 

@@ -10,6 +10,11 @@ import { assessEngineOutputGuardrail } from "../src/lib/advisory/guardrails";
 import { projectAdvisoryEvidenceSection } from "../src/lib/advisory/surface-state";
 import { buildOfferWhatIfModel } from "../src/lib/dealroom/offer-what-if";
 import type { OfferInput } from "../src/lib/ai/engines/types";
+import { evaluateOfferScenarios } from "../src/lib/ai/engines/offer";
+import {
+  parseEngineInputSnapshot,
+  serializeEngineInputSnapshot,
+} from "../src/lib/ai/engines/runtime";
 import {
   buildNegotiationPlaybookBundle,
   projectNegotiationPlaybookForAudience,
@@ -52,7 +57,7 @@ async function loadOfferScenarios(
     });
     return {
       input: latest.inputSnapshot
-        ? (JSON.parse(latest.inputSnapshot) as OfferInput)
+        ? parseEngineInputSnapshot<OfferInput>(latest.inputSnapshot, "offer")
         : undefined,
       output: JSON.parse(latest.output),
       confidence: latest.confidence,
@@ -499,50 +504,22 @@ export const seedOfferScenarios = mutation({
 
     const list = property.listPrice;
     const fair = args.fairValue ?? Math.round(list * 0.97);
-    const scenarios = [
-      {
-        name: "Aggressive",
-        price: Math.round(fair * 0.97),
-        priceVsListPct: Number(((Math.round(fair * 0.97) / list - 1) * 100).toFixed(1)),
-        earnestMoney: Math.round(fair * 0.97 * 0.01),
-        closingDays: 45,
-        contingencies: ["inspection", "financing", "appraisal"],
-        competitivenessScore: 35,
-        riskLevel: "low",
-        explanation:
-          "Opens below fair value. Full contingency protection. Best savings if seller accepts, but higher rejection risk.",
+    const input: OfferInput = {
+      listPrice: list,
+      pricing: {
+        fairValue: fair,
       },
-      {
-        name: "Balanced",
-        price: fair,
-        priceVsListPct: Number(((fair / list - 1) * 100).toFixed(1)),
-        earnestMoney: Math.round(fair * 0.02),
-        closingDays: 35,
-        contingencies: ["inspection", "financing"],
-        competitivenessScore: 60,
-        riskLevel: "medium",
-        explanation:
-          "Near fair value. Standard terms. Good balance of savings and acceptance probability.",
-      },
-      {
-        name: "Competitive",
-        price: Math.round(fair * 1.02),
-        priceVsListPct: Number(((Math.round(fair * 1.02) / list - 1) * 100).toFixed(1)),
-        earnestMoney: Math.round(fair * 1.02 * 0.03),
-        closingDays: 30,
-        contingencies: ["inspection"],
-        competitivenessScore: 85,
-        riskLevel: "high",
-        explanation:
-          "Strong offer above fair value. Minimal contingencies, fast close. Highest win probability but less protection.",
-      },
-    ];
-    const output = {
-      scenarios,
-      recommendedIndex: args.competingOffers && args.competingOffers > 0 ? 2 : 1,
-      inputSummary: `List: $${list.toLocaleString()}, Fair value: $${fair.toLocaleString()}, Leverage: ${args.leverageScore ?? "N/A"}`,
-      refreshable: true,
+      leverage:
+        typeof args.leverageScore === "number"
+          ? {
+              score: args.leverageScore,
+            }
+          : undefined,
+      fairValue: fair,
+      leverageScore: args.leverageScore,
+      competingOffers: args.competingOffers,
     };
+    const execution = evaluateOfferScenarios(input);
     const offerPromptRef = getPromptVersionRef("offer", "default");
 
     const id = await ctx.db.insert("aiEngineOutputs", {
@@ -550,16 +527,11 @@ export const seedOfferScenarios = mutation({
       engineType: "offer",
       promptKey: offerPromptRef.promptKey,
       promptVersion: offerPromptRef.version,
-      inputSnapshot: JSON.stringify({
-        listPrice: list,
-        fairValue: fair,
-        leverageScore: args.leverageScore,
-        competingOffers: args.competingOffers,
-      }),
-      confidence: 0.8,
-      citations: [],
+      inputSnapshot: serializeEngineInputSnapshot("offer", input),
+      confidence: execution.confidence,
+      citations: execution.citations,
       reviewState: "pending",
-      output: JSON.stringify(output),
+      output: JSON.stringify(execution.output),
       modelId: "seed-mock",
       generatedAt: new Date().toISOString(),
     });

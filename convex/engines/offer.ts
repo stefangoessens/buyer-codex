@@ -3,6 +3,13 @@
 import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "../_generated/api";
+import type {
+  OfferInput,
+  OfferLeverageContext,
+  OfferPricingContext,
+} from "../../src/lib/ai/engines/types";
+import { evaluateOfferScenarios } from "../../src/lib/ai/engines/offer";
+import { serializeEngineInputSnapshot } from "../../src/lib/ai/engines/runtime";
 
 export const runOfferEngine = internalAction({
   args: {
@@ -33,11 +40,7 @@ export const runOfferEngine = internalAction({
       throw new Error(`Unknown offer prompt version: ${args.promptVersion}`);
     }
 
-    const { generateOfferScenarios } = await import(
-      "../../src/lib/ai/engines/offer"
-    );
-
-    // Get latest pricing output for fair value
+    // Get latest pricing output for explicit offer dependencies.
     const pricingOutput: any = await ctx.runQuery(
       api.aiEngineOutputs.getLatest,
       {
@@ -45,16 +48,27 @@ export const runOfferEngine = internalAction({
         engineType: "pricing",
       },
     );
-    let fairValue: number | undefined;
+    let pricingContext: OfferPricingContext | undefined;
     if (pricingOutput) {
       try {
-        fairValue = JSON.parse(pricingOutput.output).fairValue?.value;
+        const parsed = JSON.parse(pricingOutput.output);
+        const fairValue = parsed.fairValue?.value;
+        if (typeof fairValue === "number") {
+          pricingContext = {
+            fairValue,
+            likelyAccepted: parsed.likelyAccepted?.value,
+            strongOpener: parsed.strongOpener?.value,
+            walkAway: parsed.walkAway?.value,
+            reviewRequired: parsed.reviewFallback?.reviewRequired,
+            sourceOutputId: String(pricingOutput._id),
+          };
+        }
       } catch {
         // pricing output may not be parseable — proceed without fair value
       }
     }
 
-    // Get latest leverage score
+    // Get latest leverage output for explicit offer dependencies.
     const leverageOutput: any = await ctx.runQuery(
       api.aiEngineOutputs.getLatest,
       {
@@ -62,31 +76,45 @@ export const runOfferEngine = internalAction({
         engineType: "leverage",
       },
     );
-    let leverageScore: number | undefined;
+    let leverageContext: OfferLeverageContext | undefined;
     if (leverageOutput) {
       try {
-        leverageScore = JSON.parse(leverageOutput.output).score;
+        const parsed = JSON.parse(leverageOutput.output);
+        if (typeof parsed.score === "number") {
+          leverageContext = {
+            score: parsed.score,
+            summary: parsed.summary,
+            signalCount: parsed.signalCount,
+            signalNames: Array.isArray(parsed.signals)
+              ? parsed.signals
+                  .map((signal: { name?: unknown }) =>
+                    typeof signal.name === "string" ? signal.name : null,
+                  )
+                  .filter((value: string | null): value is string => value !== null)
+              : undefined,
+            sourceOutputId: String(leverageOutput._id),
+          };
+        }
       } catch {
         // leverage output may not be parseable — proceed without leverage score
       }
     }
 
-    const result = generateOfferScenarios({
+    const input: OfferInput = {
       listPrice: property.listPrice,
-      fairValue,
-      leverageScore,
+      pricing: pricingContext,
+      leverage: leverageContext,
+      fairValue: pricingContext?.fairValue,
+      leverageScore: leverageContext?.score,
       buyerMaxBudget: args.buyerMaxBudget,
       daysOnMarket: property.daysOnMarket,
       competingOffers: args.competingOffers,
-    });
-    const inputSnapshot = JSON.stringify({
-      listPrice: property.listPrice,
-      fairValue,
-      leverageScore,
-      buyerMaxBudget: args.buyerMaxBudget,
-      daysOnMarket: property.daysOnMarket,
-      competingOffers: args.competingOffers,
-    });
+      sellerMotivated: leverageContext?.signalNames?.includes(
+        "motivated_seller_language",
+      ),
+    };
+    const execution = evaluateOfferScenarios(input);
+    const inputSnapshot = serializeEngineInputSnapshot("offer", input);
 
     const outputId: any = await ctx.runMutation(
       internal.aiEngineOutputs.createOutput,
@@ -96,10 +124,10 @@ export const runOfferEngine = internalAction({
         promptKey: "default",
         promptVersion: args.promptVersion,
         inputSnapshot,
-        confidence: 0.75,
-        citations: ["pricing_engine", "leverage_engine"],
-        output: JSON.stringify(result),
-        modelId: prompt.model,
+        confidence: execution.confidence,
+        citations: execution.citations,
+        output: JSON.stringify(execution.output),
+        modelId: execution.modelId,
       },
     );
 

@@ -5,8 +5,13 @@ import type {
   PricingReviewFallback,
   PricingReviewReason,
 } from "./types";
-import { gateway, type GatewayDependencies } from "../gateway";
-import type { GatewayRequest, GatewayUsage } from "../types";
+import type { GatewayRequest, GatewayResult, GatewayUsage } from "../types";
+import {
+  buildUsageBackedExecution,
+  type DeterministicEngineExecution,
+} from "./runtime";
+
+type GatewayDependencies = import("../types").GatewayProviderMap;
 
 const PRICING_REVIEW_CONFIDENCE_THRESHOLD = 0.8;
 const HIGH_DISAGREEMENT_SPREAD = 0.12;
@@ -311,7 +316,7 @@ export function parsePricingResponse(
   }
 }
 
-export async function executePricingAnalysis(args: {
+export async function executePricingAnalysisWithGateway(args: {
   input: PricingInput;
   promptTemplate: string;
   systemPrompt?: string;
@@ -319,8 +324,11 @@ export async function executePricingAnalysis(args: {
   promptVersion?: string;
   promptModel?: string;
   dealRoomId?: string;
-  gatewayDependencies?: Partial<GatewayDependencies>;
-}): Promise<{ output: PricingOutput; usage: GatewayUsage }> {
+  invokeGateway: (request: GatewayRequest) => Promise<GatewayResult>;
+}): Promise<{
+  execution: DeterministicEngineExecution<PricingOutput>;
+  usage: GatewayUsage;
+}> {
   const {
     input,
     promptTemplate,
@@ -329,25 +337,22 @@ export async function executePricingAnalysis(args: {
     promptVersion,
     promptModel,
     dealRoomId,
-    gatewayDependencies,
+    invokeGateway,
   } = args;
 
   const request = buildPricingRequest(input, promptTemplate, systemPrompt);
-  const response = await gateway(
-    {
-      ...request,
-      dealRoomId,
-      prompt:
-        promptKey && promptVersion
-          ? {
-              promptKey,
-              version: promptVersion,
-              model: promptModel,
-            }
-          : undefined,
-    },
-    gatewayDependencies,
-  );
+  const response = await invokeGateway({
+    ...request,
+    dealRoomId,
+    prompt:
+      promptKey && promptVersion
+        ? {
+            promptKey,
+            version: promptVersion,
+            model: promptModel,
+          }
+        : undefined,
+  });
 
   if (!response.success) {
     throw new Error(`Pricing analysis failed: ${response.error.message}`);
@@ -367,7 +372,40 @@ export async function executePricingAnalysis(args: {
   }
 
   return {
-    output: parsed,
+    execution: buildUsageBackedExecution({
+      output: parsed,
+      confidence: parsed.overallConfidence,
+      citations: parsed.estimateSources,
+      usage: response.data.usage,
+    }),
     usage: response.data.usage,
+  };
+}
+
+export async function executePricingAnalysis(args: {
+  input: PricingInput;
+  promptTemplate: string;
+  systemPrompt?: string;
+  promptKey?: string;
+  promptVersion?: string;
+  promptModel?: string;
+  dealRoomId?: string;
+  gatewayDependencies?: Partial<GatewayDependencies>;
+}): Promise<{ output: PricingOutput; usage: GatewayUsage }> {
+  const { gateway } = await import("../gateway");
+  const { execution, usage } = await executePricingAnalysisWithGateway({
+    input: args.input,
+    promptTemplate: args.promptTemplate,
+    systemPrompt: args.systemPrompt,
+    promptKey: args.promptKey,
+    promptVersion: args.promptVersion,
+    promptModel: args.promptModel,
+    dealRoomId: args.dealRoomId,
+    invokeGateway: (request) => gateway(request, args.gatewayDependencies),
+  });
+
+  return {
+    output: execution.output,
+    usage,
   };
 }

@@ -1,4 +1,8 @@
 import type { LeverageInput, LeverageSignal, LeverageOutput } from "./types";
+import {
+  buildDeterministicEngineExecution,
+  DETERMINISTIC_ENGINE_MODEL_IDS,
+} from "./runtime";
 
 const MOTIVATED_PHRASES = [
   "must sell",
@@ -451,6 +455,20 @@ export function analyzeLeverage(input: LeverageInput): LeverageOutput {
     summary: buildSummary(score, signals.length, rationale),
     rationale,
   };
+}
+
+export function collectLeverageCitations(output: LeverageOutput): string[] {
+  return output.signals.map((signal) => signal.citation);
+}
+
+export function evaluateLeverageAnalysis(input: LeverageInput) {
+  const output = analyzeLeverage(input);
+  return buildDeterministicEngineExecution({
+    output,
+    confidence: output.overallConfidence,
+    citations: collectLeverageCitations(output),
+    modelId: DETERMINISTIC_ENGINE_MODEL_IDS.leverage,
+  });
 }
 
 function compactSignals(

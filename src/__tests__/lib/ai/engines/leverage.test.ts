@@ -5,6 +5,7 @@ import {
   detectDomPressure,
   detectMotivatedLanguage,
   detectPriceReductions,
+  evaluateLeverageAnalysis,
 } from "@/lib/ai/engines/leverage";
 
 describe("detectMotivatedLanguage", () => {
@@ -208,5 +209,23 @@ describe("analyzeLeverage", () => {
     expect(result.signals.some((signal) => signal.direction === "bearish")).toBe(
       true,
     );
+  });
+
+  it("packages deterministic execution metadata for replay and persistence", () => {
+    const execution = evaluateLeverageAnalysis({
+      propertyId: "p4",
+      listPrice: 500000,
+      daysOnMarket: 70,
+      sqft: 1800,
+      neighborhoodMedianDom: 30,
+      description: "Must sell. Bring all offers.",
+    });
+
+    expect(execution.modelId).toBe("deterministic-leverage-v2");
+    expect(execution.confidence).toBeGreaterThan(0.6);
+    expect(execution.citations).toContain(
+      "Listing DOM vs neighborhood median DOM",
+    );
+    expect(execution.citations).toContain("Listing description analysis");
   });
 });

@@ -4,7 +4,8 @@ import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { LeverageInput } from "../../src/lib/ai/engines/types";
-import { analyzeLeverage } from "../../src/lib/ai/engines/leverage";
+import { evaluateLeverageAnalysis } from "../../src/lib/ai/engines/leverage";
+import { serializeEngineInputSnapshot } from "../../src/lib/ai/engines/runtime";
 
 export const runLeverageEngine = internalAction({
   args: {
@@ -51,9 +52,8 @@ export const runLeverageEngine = internalAction({
         wasWithdrawn: property.wasWithdrawn,
         wasPendingFellThrough: property.wasPendingFellThrough,
       };
-    const inputSnapshot = JSON.stringify(input);
-
-    const result = analyzeLeverage(input);
+    const inputSnapshot = serializeEngineInputSnapshot("leverage", input);
+    const execution = evaluateLeverageAnalysis(input);
 
     const outputId: any = await ctx.runMutation(
       internal.aiEngineOutputs.createOutput,
@@ -63,10 +63,10 @@ export const runLeverageEngine = internalAction({
         promptKey: "default",
         promptVersion: args.promptVersion,
         inputSnapshot,
-        confidence: result.overallConfidence,
-        citations: result.signals.map((s: { citation: string }) => s.citation),
-        output: JSON.stringify(result),
-        modelId: prompt.model,
+        confidence: execution.confidence,
+        citations: execution.citations,
+        output: JSON.stringify(execution.output),
+        modelId: execution.modelId,
       },
     );
 

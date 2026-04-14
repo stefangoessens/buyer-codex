@@ -4,6 +4,7 @@ import {
   replayPromptExecution,
   type GatewayInvoker,
 } from "@/lib/ai/promptReplay";
+import { serializeEngineInputSnapshot } from "@/lib/ai/engines/runtime";
 
 describe("replayPromptExecution", () => {
   it("replays deterministic offer outputs from a stored input snapshot", async () => {
@@ -19,17 +20,23 @@ describe("replayPromptExecution", () => {
         prompt: "unused deterministic prompt",
         model: "deterministic-v1",
       },
-      inputSnapshot: JSON.stringify({
+      inputSnapshot: serializeEngineInputSnapshot("offer", {
         listPrice: 500_000,
-        fairValue: 485_000,
-        leverageScore: 62,
+        pricing: {
+          fairValue: 485_000,
+          sourceOutputId: "pricing-output-1",
+        },
+        leverage: {
+          score: 62,
+          sourceOutputId: "leverage-output-1",
+        },
         competingOffers: 2,
       }),
       invokeGateway,
     });
 
     expect(result.promptVersion).toBe("v-offer");
-    expect(result.modelId).toBe("deterministic-v1");
+    expect(result.modelId).toBe("deterministic-offer-v2");
     expect(JSON.parse(result.outputSnapshot).scenarios).toHaveLength(3);
     expect(invokeGateway).not.toHaveBeenCalled();
   });
@@ -65,7 +72,7 @@ describe("replayPromptExecution", () => {
         systemPrompt: "Return JSON only.",
         model: "claude-sonnet-4-20250514",
       },
-      inputSnapshot: JSON.stringify({
+      inputSnapshot: serializeEngineInputSnapshot("pricing", {
         propertyId: "property-1",
         listPrice: 500_000,
         address: "123 Main St",
@@ -94,6 +101,34 @@ describe("replayPromptExecution", () => {
         },
       }),
     );
+  });
+
+  it("keeps replay compatibility with historical plain JSON snapshots", async () => {
+    const invokeGateway: GatewayInvoker = vi
+      .fn()
+      .mockRejectedValue(new Error("gateway should not be called"));
+
+    const result = await replayPromptExecution({
+      prompt: {
+        engineType: "offer",
+        promptKey: "default",
+        version: "v-offer",
+        prompt: "unused deterministic prompt",
+        model: "legacy-model-id",
+      },
+      inputSnapshot: JSON.stringify({
+        listPrice: 500_000,
+        fairValue: 490_000,
+        leverageScore: 55,
+      }),
+      invokeGateway,
+    });
+
+    expect(result.modelId).toBe("deterministic-offer-v2");
+    expect(JSON.parse(result.outputSnapshot).dependencySummary).toMatchObject({
+      pricing: { fairValue: 490_000 },
+      leverage: { score: 55 },
+    });
   });
 });
 
