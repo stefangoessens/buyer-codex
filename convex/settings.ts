@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireRole } from "./lib/session";
+import { SETTINGS_CATALOG } from "../src/lib/settings/catalog";
 
 /**
  * Convex queries + mutations for the internal settings area
@@ -11,11 +12,10 @@ import { requireRole } from "./lib/session";
  *   - writes: role-gated per catalog entry — admin can write
  *     anything, brokers only entries with `writeRole === "broker"`
  *
- * Pure validation logic lives in `src/lib/settings/*`. Convex
- * files cannot import from `src/`, so this file duplicates the
- * catalog + validator inline. The TS source is canonical — tests
- * in `src/__tests__/lib/settings/logic.test.ts` exercise the
- * pure module to prevent drift.
+ * Pure validation logic lives in `src/lib/settings/*`. Convex shares
+ * the same catalog definitions via a direct relative import so the
+ * internal editor and the mutation layer cannot drift on key, kind,
+ * or constraint shape.
  */
 
 // MARK: - Inline catalog mirror
@@ -55,130 +55,17 @@ interface InlineCatalogEntry {
   };
 }
 
-/**
- * Mirror of `SETTINGS_CATALOG` from `src/lib/settings/catalog.ts`.
- * Keep the two aligned — any drift is visible to the Vitest
- * suite on the src/ copy at build time.
- */
-const SETTINGS_CATALOG_INLINE: readonly InlineCatalogEntry[] = [
-  {
-    key: "disclosure.buyer_representation",
-    label: "Buyer representation disclosure",
-    description:
-      "Rendered at the top of the buyer agreement form and on the legal disclosures page.",
-    category: "disclosures",
-    kind: "richText",
-    writeRole: "admin",
-    defaultJson:
-      "buyer-codex represents the buyer in Florida residential real estate transactions. As a licensed Florida brokerage, we act as the buyer's exclusive agent on every transaction unless the buyer signs a different form of representation.",
-    constraints: { minLength: 50, maxLength: 4000 },
-  },
-  {
-    key: "disclosure.fee_transparency",
-    label: "Fee transparency disclosure",
-    description:
-      "Short explanation of how buyer-codex's commission rebate interacts with builder and seller credits.",
-    category: "disclosures",
-    kind: "richText",
-    writeRole: "admin",
-    defaultJson:
-      "buyer-codex's commission rebate is calculated from the buyer-agent commission specified in the listing agreement. The rebate is delivered as a closing credit and does not stack with builder incentives unless the builder's written terms allow it.",
-    constraints: { minLength: 50, maxLength: 2000 },
-  },
-  {
-    key: "fee.default_rebate_pct",
-    label: "Default buyer rebate percentage",
-    description:
-      "Default assumption used by the savings calculator and pricing engine when the real listing commission isn't available.",
-    category: "fees",
-    kind: "number",
-    writeRole: "admin",
-    defaultJson: 0.9,
-    constraints: { min: 0, max: 3 },
-  },
-  {
-    key: "fee.default_buyer_credit_floor",
-    label: "Minimum buyer credit at closing",
-    description:
-      "Operational floor — buyer credits below this amount require manual broker approval before surfacing to the buyer.",
-    category: "fees",
-    kind: "number",
-    writeRole: "admin",
-    defaultJson: 500,
-    constraints: { min: 0, max: 100000, integer: true },
-  },
-  {
-    key: "rollout.savings_calculator_enabled",
-    label: "Savings calculator enabled",
-    description:
-      "Global kill switch for the savings calculator on the public site.",
-    category: "rollout",
-    kind: "boolean",
-    writeRole: "broker",
-    defaultJson: true,
-  },
-  {
-    key: "rollout.new_construction_pages_enabled",
-    label: "New-construction pages enabled",
-    description:
-      "Global kill switch for the /new-construction/* programmatic pages.",
-    category: "rollout",
-    kind: "boolean",
-    writeRole: "broker",
-    defaultJson: true,
-  },
-  {
-    key: "ops.support_email",
-    label: "Support email",
-    description:
-      "Contact address rendered in the footer and sent via the contact form.",
-    category: "operational",
-    kind: "string",
-    writeRole: "broker",
-    defaultJson: "support@buyerv2.com",
-    constraints: {
-      minLength: 5,
-      maxLength: 200,
-      pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
-    },
-  },
-  {
-    key: "ops.broker_review_sla_hours",
-    label: "Broker review SLA (hours)",
-    description:
-      "Target turnaround time for broker review of AI-generated outputs.",
-    category: "operational",
-    kind: "number",
-    writeRole: "admin",
-    defaultJson: 4,
-    constraints: { min: 1, max: 168, integer: true },
-  },
-  {
-    key: "branding.site_name",
-    label: "Site name",
-    description:
-      "Display name used across titles, OG cards, and footer.",
-    category: "branding",
-    kind: "string",
-    writeRole: "admin",
-    defaultJson: "buyer-codex",
-    constraints: { minLength: 1, maxLength: 50 },
-  },
-  {
-    key: "branding.primary_color",
-    label: "Primary brand color",
-    description: "Hex color used for primary buttons and accent strokes.",
-    category: "branding",
-    kind: "string",
-    writeRole: "admin",
-    defaultJson: "#1B2B65",
-    constraints: {
-      minLength: 7,
-      maxLength: 7,
-      pattern: "^#[0-9a-fA-F]{6}$",
-    },
-  },
-];
+const SETTINGS_CATALOG_INLINE: readonly InlineCatalogEntry[] =
+  SETTINGS_CATALOG.entries.map((entry) => ({
+    key: entry.key,
+    label: entry.label,
+    description: entry.description,
+    category: entry.category,
+    kind: entry.kind,
+    writeRole: entry.writeRole,
+    defaultJson: entry.defaultValue.value,
+    constraints: entry.constraints,
+  }));
 
 function findInlineEntry(key: string): InlineCatalogEntry | undefined {
   return SETTINGS_CATALOG_INLINE.find((e) => e.key === key);

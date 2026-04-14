@@ -1,8 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
-import { AdminShell, type AdminShellSession } from "@/components/admin/AdminShell";
+import { AdminShell, useAdminShellSession } from "@/components/admin/AdminShell";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { OverrideForm } from "@/components/admin/OverrideForm";
@@ -22,12 +20,9 @@ export default function OverridesIndexPage() {
 }
 
 function OverridesContent() {
-  const session = useQuery(api.adminShell.getCurrentSession) as
-    | AdminShellSession
-    | null
-    | undefined;
+  const session = useAdminShellSession();
 
-  if (session === undefined) {
+  if (session.user.role !== "admin") {
     return (
       <>
         <AdminPageHeader
@@ -35,19 +30,7 @@ function OverridesContent() {
           title="Manual overrides"
           description="Audited manual changes with structured reason capture."
         />
-        <AdminEmptyState title="Loading session…" />
-      </>
-    );
-  }
-  if (session === null) {
-    return (
-      <>
-        <AdminPageHeader
-          eyebrow="Ops tools"
-          title="Manual overrides"
-          description="Audited manual changes with structured reason capture."
-        />
-        <AdminEmptyState title="Not authorized" />
+        <AdminEmptyState description="Only admins can execute manual overrides." title="Not authorized" />
       </>
     );
   }

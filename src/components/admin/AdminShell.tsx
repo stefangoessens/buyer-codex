@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useState } from "react";
+import { createContext, type ReactNode, useContext, useState } from "react";
 import { useQuery } from "convex/react";
 import { usePathname } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
@@ -30,6 +30,18 @@ export interface AdminShellSession {
     latestKpiComputedAt: string | null;
     pendingOverrideCount: number;
   };
+}
+
+const AdminShellSessionContext = createContext<AdminShellSession | null>(null);
+
+export function useAdminShellSession(): AdminShellSession {
+  const session = useContext(AdminShellSessionContext);
+  if (!session) {
+    throw new Error(
+      "useAdminShellSession must be used within an authorized AdminShell",
+    );
+  }
+  return session;
 }
 
 /**
@@ -94,38 +106,40 @@ function AdminShellLive({ children }: { children: ReactNode }) {
   const navItems = session.navItems as unknown as NavItem[];
 
   return (
-    <div className="flex min-h-screen bg-neutral-50 text-neutral-900">
-      <h1 className="sr-only">Broker Console</h1>
-      <AdminSidebar
-        navItems={navItems}
-        pathname={pathname}
-        role={session.user.role}
-        openReviewItems={session.snapshot.openReviewItems}
-        urgentReviewItems={session.snapshot.urgentReviewItems}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AdminTopbar
-          user={session.user}
-          snapshot={session.snapshot}
-          mobileNavigation={
-            <AdminMobileNavigation
-              navItems={navItems}
-              pathname={pathname}
-              role={session.user.role}
-              openReviewItems={session.snapshot.openReviewItems}
-              urgentReviewItems={session.snapshot.urgentReviewItems}
-            />
-          }
+    <AdminShellSessionContext.Provider value={session}>
+      <div className="flex min-h-screen bg-neutral-50 text-neutral-900">
+        <h1 className="sr-only">Broker Console</h1>
+        <AdminSidebar
+          navItems={navItems}
+          pathname={pathname}
+          role={session.user.role}
+          openReviewItems={session.snapshot.openReviewItems}
+          urgentReviewItems={session.snapshot.urgentReviewItems}
         />
-        <main
-          id="admin-main"
-          className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8"
-          role="main"
-        >
-          {children}
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <AdminTopbar
+            user={session.user}
+            snapshot={session.snapshot}
+            mobileNavigation={
+              <AdminMobileNavigation
+                navItems={navItems}
+                pathname={pathname}
+                role={session.user.role}
+                openReviewItems={session.snapshot.openReviewItems}
+                urgentReviewItems={session.snapshot.urgentReviewItems}
+              />
+            }
+          />
+          <main
+            id="admin-main"
+            className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8"
+            role="main"
+          >
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </AdminShellSessionContext.Provider>
   );
 }
 

@@ -1,8 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
-import { AdminShell, type AdminShellSession } from "@/components/admin/AdminShell";
+import { AdminShell, useAdminShellSession } from "@/components/admin/AdminShell";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
@@ -22,13 +20,10 @@ export default function ConsoleOverviewPage() {
 }
 
 function ConsoleOverviewContent() {
-  const session = useQuery(api.adminShell.getCurrentSession) as
-    | AdminShellSession
-    | null
-    | undefined;
+  const session = useAdminShellSession();
 
-  const snapshot = session?.snapshot;
-  const latestKpi = snapshot?.latestKpiComputedAt
+  const snapshot = session.snapshot;
+  const latestKpi = snapshot.latestKpiComputedAt
     ? formatConsoleTimestamp(snapshot.latestKpiComputedAt)
     : "No snapshots yet";
 
@@ -37,7 +32,7 @@ function ConsoleOverviewContent() {
       <AdminPageHeader
         eyebrow="Overview"
         title={
-          session?.user.name
+          session.user.name
             ? `Welcome back, ${session.user.name.split(" ")[0] ?? "there"}`
             : "Internal console"
         }
@@ -47,25 +42,23 @@ function ConsoleOverviewContent() {
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <AdminMetricCard
           label="Open review items"
-          value={snapshot ? snapshot.openReviewItems.toLocaleString("en-US") : "—"}
+          value={snapshot.openReviewItems.toLocaleString("en-US")}
           helper={
-            snapshot
-              ? snapshot.openReviewItems === 0
-                ? "All queues clear"
-                : pluralize(snapshot.openReviewItems, "item") + " waiting"
-              : "Loading…"
+            snapshot.openReviewItems === 0
+              ? "All queues clear"
+              : pluralize(snapshot.openReviewItems, "item") + " waiting"
           }
-          tone={snapshot && snapshot.openReviewItems > 0 ? "warning" : "default"}
+          tone={snapshot.openReviewItems > 0 ? "warning" : "default"}
         />
         <AdminMetricCard
           label="Urgent review items"
-          value={snapshot ? snapshot.urgentReviewItems.toLocaleString("en-US") : "—"}
+          value={snapshot.urgentReviewItems.toLocaleString("en-US")}
           helper={
-            snapshot && snapshot.urgentReviewItems === 0
+            snapshot.urgentReviewItems === 0
               ? "No urgent escalations"
               : "Needs attention"
           }
-          tone={snapshot && snapshot.urgentReviewItems > 0 ? "error" : "default"}
+          tone={snapshot.urgentReviewItems > 0 ? "error" : "default"}
         />
         <AdminMetricCard
           label="Latest KPI snapshot"
@@ -74,9 +67,9 @@ function ConsoleOverviewContent() {
         />
         <AdminMetricCard
           label="Pending overrides"
-          value={snapshot ? snapshot.pendingOverrideCount.toLocaleString("en-US") : "—"}
+          value={snapshot.pendingOverrideCount.toLocaleString("en-US")}
           helper="Manual changes awaiting reversal review"
-          tone={snapshot && snapshot.pendingOverrideCount > 0 ? "warning" : "default"}
+          tone={snapshot.pendingOverrideCount > 0 ? "warning" : "default"}
         />
       </section>
 

@@ -34,6 +34,16 @@ describe("admin/nav", () => {
         expect(item.allowedRoles.length).toBeGreaterThan(0);
       }
     });
+
+    it("includes the intelligence monitor in the shared metrics section", () => {
+      expect(
+        STATIC_NAV_ITEMS.find((item) => item.slug === "intelligence"),
+      ).toMatchObject({
+        href: "/intelligence",
+        section: "metrics",
+        allowedRoles: ["broker", "admin"],
+      });
+    });
   });
 
   describe("isNavItemAllowedForRole", () => {
