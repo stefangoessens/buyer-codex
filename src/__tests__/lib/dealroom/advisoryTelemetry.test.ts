@@ -73,6 +73,74 @@ function availableCoverage(): PropertyCaseCoverageInput[] {
   ];
 }
 
+function propertyFactsFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    daysOnMarket: 58,
+    sqftLiving: 2400,
+    priceReductions: [{ amount: 15000, date: "2026-04-02T00:00:00.000Z" }],
+    updatedAt: "2026-04-13T18:30:00.000Z",
+    ...overrides,
+  };
+}
+
+function marketContextFixture() {
+  return {
+    propertyId: "property_123",
+    baselines: [],
+    windows: [
+      {
+        windowDays: 90,
+        selectedContext: {
+          geoKey: "Coconut Grove",
+          geoKind: "neighborhood" as const,
+          windowDays: 90,
+          avgPricePerSqft: 255,
+          medianDom: 32,
+          medianPricePerSqft: 250,
+          medianListPrice: 620_000,
+          avgSaleToListRatio: 0.973,
+          medianSaleToListRatio: 0.968,
+          priceReductionFrequency: 0.38,
+          avgReductionPct: 0.031,
+          medianReductionPct: 0.026,
+          inventoryCount: 9,
+          pendingCount: 3,
+          salesVelocity: 0.7,
+          trajectory: "flat" as const,
+          sampleSize: {
+            total: 10,
+            sold: 6,
+            active: 2,
+            pending: 2,
+            pricePerSqft: 6,
+            dom: 6,
+            saleToList: 6,
+            reduction: 5,
+          },
+          provenance: {
+            source: "bright-data://market/coconut-grove/90",
+            fetchedAt: "2026-04-13T18:00:00.000Z",
+          },
+          lastRefreshedAt: "2026-04-13T18:00:00.000Z",
+        },
+        selectedGeoKind: "neighborhood" as const,
+        selectedGeoKey: "Coconut Grove",
+        downgradeReasons: [
+          {
+            code: "insufficient_sold_sample" as const,
+            geoKind: "subdivision" as const,
+            geoKey: "Palm Estates",
+            message:
+              "Subdivision baseline for Palm Estates only had 2 sold samples; minimum trustworthy sample is 3.",
+          },
+        ],
+        confidence: 0.88,
+      },
+    ],
+    generatedAt: "2026-04-13T18:30:00.000Z",
+  };
+}
+
 function buildSurface(viewerRole: "buyer" | "broker" | "admin" = "buyer") {
   return buildPropertyCaseOverview({
     dealRoomId: "deal_123",
@@ -110,6 +178,8 @@ function buildSurface(viewerRole: "buyer" | "broker" | "admin" = "buyer") {
         reviewState: viewerRole === "buyer" ? "approved" : "rejected",
       },
     ],
+    marketContext: marketContextFixture(),
+    propertyFacts: propertyFactsFixture(),
     viewerRole,
   });
 }
@@ -245,11 +315,21 @@ describe("advisoryTelemetry", () => {
           reviewState: "approved",
         },
       ],
+      marketContext: marketContextFixture(),
+      propertyFacts: propertyFactsFixture(),
       viewerRole: "buyer",
     });
     const summary = buildBuyerSafeSummaryText(overview);
     const payload = buildAdvisorySummaryCopiedPayload(overview, summary);
 
+    expect(summary).toContain("Neighborhood reality: Overpriced for this market.");
+    expect(summary).toContain(
+      "Market context: Neighborhood · Coconut Grove; 6 sold / 10 total records; Fresh · 30m old; High reliability.",
+    );
+    expect(summary).toContain(
+      "Fallback geography: Using neighborhood data for Coconut Grove because the tighter market slice did not have enough sold homes.",
+    );
+    expect(summary).toContain("Recommended opener");
     expect(summary).toContain("Broker-reviewed conclusion");
     expect(payload.summaryLength).toBe(summary.length);
     expect(payload.includesRecommendation).toBe(true);

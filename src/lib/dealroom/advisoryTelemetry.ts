@@ -101,6 +101,18 @@ export function buildBuyerSafeSummaryText(
     return lines.join("\n");
   }
 
+  if (overview.marketReality) {
+    lines.push(
+      `Neighborhood reality: ${overview.marketReality.position.label}. ${overview.marketReality.position.summary}`,
+    );
+    lines.push(
+      `Market context: ${overview.marketReality.geographyLabel}; ${overview.marketReality.sampleSizeLabel}; ${overview.marketReality.freshnessLabel}; ${overview.marketReality.reliabilityLabel}.`,
+    );
+    if (overview.marketReality.fallbackNotice) {
+      lines.push(`Fallback geography: ${overview.marketReality.fallbackNotice}`);
+    }
+  }
+
   if (overview.action && !recommendationState.withholdOutput) {
     lines.push(
       `Recommended opener: ${overview.action.openingPriceLabel} (${overview.action.confidenceLabel}, ${overview.action.riskLabel.toLowerCase()}).`,

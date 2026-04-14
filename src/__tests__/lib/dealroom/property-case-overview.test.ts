@@ -82,6 +82,141 @@ function availableCoverage(): PropertyCaseCoverageInput[] {
   ];
 }
 
+function propertyFactsFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    daysOnMarket: 58,
+    sqftLiving: 2400,
+    priceReductions: [{ amount: 15000, date: "2026-04-02T00:00:00.000Z" }],
+    updatedAt: "2026-04-13T18:30:00.000Z",
+    ...overrides,
+  };
+}
+
+function marketContextFixture() {
+  return {
+    propertyId: "property_123",
+    baselines: [
+      {
+        geoKey: "Palm Estates",
+        geoKind: "subdivision" as const,
+        windowDays: 90,
+        avgPricePerSqft: 255,
+        medianDom: 45,
+        medianPricePerSqft: 250,
+        medianListPrice: 620_000,
+        avgSaleToListRatio: 0.973,
+        medianSaleToListRatio: 0.968,
+        priceReductionFrequency: 0.38,
+        avgReductionPct: 0.031,
+        medianReductionPct: 0.026,
+        inventoryCount: 9,
+        pendingCount: 3,
+        salesVelocity: 0.7,
+        trajectory: "flat" as const,
+        sampleSize: {
+          total: 2,
+          sold: 2,
+          active: 0,
+          pending: 0,
+          pricePerSqft: 2,
+          dom: 2,
+          saleToList: 2,
+          reduction: 2,
+        },
+        provenance: {
+          source: "bright-data://market/palm-estates/90",
+          fetchedAt: "2026-04-13T18:00:00.000Z",
+        },
+        lastRefreshedAt: "2026-04-13T18:00:00.000Z",
+      },
+      {
+        geoKey: "Coconut Grove",
+        geoKind: "neighborhood" as const,
+        windowDays: 90,
+        avgPricePerSqft: 255,
+        medianDom: 32,
+        medianPricePerSqft: 250,
+        medianListPrice: 620_000,
+        avgSaleToListRatio: 0.973,
+        medianSaleToListRatio: 0.968,
+        priceReductionFrequency: 0.38,
+        avgReductionPct: 0.031,
+        medianReductionPct: 0.026,
+        inventoryCount: 9,
+        pendingCount: 3,
+        salesVelocity: 0.7,
+        trajectory: "flat" as const,
+        sampleSize: {
+          total: 10,
+          sold: 6,
+          active: 2,
+          pending: 2,
+          pricePerSqft: 6,
+          dom: 6,
+          saleToList: 6,
+          reduction: 5,
+        },
+        provenance: {
+          source: "bright-data://market/coconut-grove/90",
+          fetchedAt: "2026-04-13T18:00:00.000Z",
+        },
+        lastRefreshedAt: "2026-04-13T18:00:00.000Z",
+      },
+    ],
+    windows: [
+      {
+        windowDays: 90,
+        selectedContext: {
+          geoKey: "Coconut Grove",
+          geoKind: "neighborhood" as const,
+          windowDays: 90,
+          avgPricePerSqft: 255,
+          medianDom: 32,
+          medianPricePerSqft: 250,
+          medianListPrice: 620_000,
+          avgSaleToListRatio: 0.973,
+          medianSaleToListRatio: 0.968,
+          priceReductionFrequency: 0.38,
+          avgReductionPct: 0.031,
+          medianReductionPct: 0.026,
+          inventoryCount: 9,
+          pendingCount: 3,
+          salesVelocity: 0.7,
+          trajectory: "flat" as const,
+          sampleSize: {
+            total: 10,
+            sold: 6,
+            active: 2,
+            pending: 2,
+            pricePerSqft: 6,
+            dom: 6,
+            saleToList: 6,
+            reduction: 5,
+          },
+          provenance: {
+            source: "bright-data://market/coconut-grove/90",
+            fetchedAt: "2026-04-13T18:00:00.000Z",
+          },
+          lastRefreshedAt: "2026-04-13T18:00:00.000Z",
+        },
+        selectedGeoKind: "neighborhood" as const,
+        selectedGeoKey: "Coconut Grove",
+        downgradeReasons: [
+          {
+            code: "insufficient_sold_sample" as const,
+            geoKind: "subdivision" as const,
+            geoKey: "Palm Estates",
+            message:
+              "Subdivision baseline for Palm Estates only had 2 sold samples; minimum trustworthy sample is 3.",
+          },
+        ],
+        confidence: 0.88,
+      },
+    ],
+    generatedAt: "2026-04-13T18:30:00.000Z",
+  };
+}
+
 function evidenceGraphFixture(): Pick<
   PropertyEvidenceGraph,
   "fingerprint" | "replayKey" | "sections"
@@ -322,6 +457,8 @@ describe("buildPropertyCaseOverview", () => {
         },
       ],
       evidenceGraph: evidenceGraphFixture(),
+      marketContext: marketContextFixture(),
+      propertyFacts: propertyFactsFixture(),
       viewerRole: "buyer",
     });
 
@@ -337,6 +474,17 @@ describe("buildPropertyCaseOverview", () => {
     expect(surface.coverageStats.availableCount).toBe(4);
     expect(surface.confidenceFingerprint).toBe("evidence-graph-v1");
     expect(surface.confidenceReplayKey).toBe("replay-key-v1");
+    expect(surface.marketReality).toMatchObject({
+      geographyLabel: "Neighborhood · Coconut Grove",
+      fallbackNotice:
+        "Using neighborhood data for Coconut Grove because the tighter market slice did not have enough sold homes.",
+      sampleSizeLabel: "6 sold / 10 total records",
+      reliabilityLabel: "High reliability",
+      position: {
+        code: "overpriced",
+        label: "Overpriced for this market",
+      },
+    });
     expect(surface.confidenceSections[0]).toMatchObject({
       key: "pricing",
       band: "medium",
@@ -461,6 +609,8 @@ describe("buildPropertyCaseOverview", () => {
         },
       ],
       evidenceGraph: evidenceGraphFixture(),
+      marketContext: marketContextFixture(),
+      propertyFacts: propertyFactsFixture(),
       viewerRole: "broker",
     });
 
@@ -487,6 +637,14 @@ describe("buildPropertyCaseOverview", () => {
       reviewState: "approved",
       adjudicationStatus: "approved",
       visibility: "buyer_safe",
+    });
+    expect(surface.internal.marketReality).toMatchObject({
+      selectedGeoKind: "neighborhood",
+      selectedGeoKey: "Coconut Grove",
+      marketWindowDays: 90,
+      downgradeReasons: [
+        "Subdivision baseline for Palm Estates only had 2 sold samples; minimum trustworthy sample is 3.",
+      ],
     });
     expect(surface.internal.confidenceSections[0]).toMatchObject({
       key: "pricing",

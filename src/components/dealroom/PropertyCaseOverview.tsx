@@ -531,6 +531,213 @@ function PropertyCaseOverviewBody({
         </section>
       )}
 
+      {overview.marketReality && (
+        <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
+          <CardHeader className="gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle>Neighborhood reality</CardTitle>
+                <CardDescription className="mt-2 max-w-3xl text-sm leading-6">
+                  {overview.marketReality.position.summary}
+                </CardDescription>
+              </div>
+              <MarketPositionBadge tone={overview.marketReality.position.tone}>
+                {overview.marketReality.position.label}
+              </MarketPositionBadge>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="border-neutral-200 bg-neutral-50 text-neutral-700">
+                {overview.marketReality.geographyLabel}
+              </Badge>
+              <Badge variant="outline" className="border-neutral-200 bg-neutral-50 text-neutral-700">
+                {overview.marketReality.marketWindowLabel}
+              </Badge>
+              <Badge variant="outline" className="border-neutral-200 bg-neutral-50 text-neutral-700">
+                {overview.marketReality.sampleSizeLabel}
+              </Badge>
+              <Badge variant="outline" className="border-neutral-200 bg-neutral-50 text-neutral-700">
+                {overview.marketReality.freshnessLabel}
+              </Badge>
+              <Badge variant="outline" className="border-neutral-200 bg-neutral-50 text-neutral-700">
+                {overview.marketReality.reliabilityLabel}
+              </Badge>
+            </div>
+
+            {overview.marketReality.fallbackNotice ? (
+              <div className="rounded-[18px] border border-warning-200 bg-warning-50/70 px-4 py-3 text-sm leading-6 text-warning-800">
+                {overview.marketReality.fallbackNotice}
+              </div>
+            ) : null}
+          </CardHeader>
+          <CardContent className="grid gap-4 xl:grid-cols-2">
+            {overview.marketReality.signals.map((signal) => (
+              <article
+                key={signal.key}
+                className="rounded-[22px] border border-neutral-200/80 bg-neutral-50/78 p-5"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-900">
+                      {signal.label}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-neutral-600">
+                      {signal.summary}
+                    </p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "border-transparent",
+                      signal.status === "missing" && "bg-neutral-200 text-neutral-700",
+                      signal.status === "available" &&
+                        signal.tone === "positive" &&
+                        "bg-success-50 text-success-700",
+                      signal.status === "available" &&
+                        signal.tone === "warning" &&
+                        "bg-warning-50 text-warning-700",
+                      signal.status === "available" &&
+                        signal.tone === "neutral" &&
+                        "bg-neutral-200 text-neutral-700",
+                    )}
+                  >
+                    {signal.status === "available" ? "Available" : "Missing"}
+                  </Badge>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {signal.subjectLabel ? (
+                    <Badge variant="outline" className="border-neutral-200 bg-white text-neutral-700">
+                      {signal.subjectLabel}
+                    </Badge>
+                  ) : null}
+                  {signal.baselineLabel ? (
+                    <Badge variant="outline" className="border-neutral-200 bg-white text-neutral-700">
+                      {signal.baselineLabel}
+                    </Badge>
+                  ) : null}
+                  {signal.deltaLabel ? (
+                    <Badge variant="outline" className="border-neutral-200 bg-white text-neutral-700">
+                      {signal.deltaLabel}
+                    </Badge>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </CardContent>
+
+          {overview.variant === "internal" && overview.internal.marketReality && (
+            <CardContent className="pt-0">
+              <div className="rounded-[22px] bg-neutral-950 p-5 text-white shadow-[0_28px_56px_-38px_rgba(3,14,29,0.45)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      Internal baseline detail
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-white/75">
+                      Raw market baseline metadata stays separate from the buyer-safe interpretation.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className="bg-white/10 text-white">
+                      {overview.internal.marketReality.selectedGeoKind
+                        ? `${overview.internal.marketReality.selectedGeoKind.replaceAll("_", " ")}${overview.internal.marketReality.selectedGeoKey ? ` · ${overview.internal.marketReality.selectedGeoKey}` : ""}`
+                        : "No selected geography"}
+                    </Badge>
+                    <Badge className="bg-white/10 text-white">
+                      {overview.internal.marketReality.marketWindowDays}-day window
+                    </Badge>
+                    <Badge className="bg-white/10 text-white">
+                      {Math.round(overview.internal.marketReality.confidence * 100)}% confidence
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <MetricTile
+                    label="Generated"
+                    value={new Date(
+                      overview.internal.marketReality.generatedAt,
+                    ).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  />
+                  <MetricTile
+                    label="Last refreshed"
+                    value={
+                      overview.internal.marketReality.lastRefreshedAt
+                        ? new Date(
+                            overview.internal.marketReality.lastRefreshedAt,
+                          ).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        : "Unavailable"
+                    }
+                  />
+                  <MetricTile
+                    label="Source"
+                    value={overview.internal.marketReality.sourceLabel ?? "Unavailable"}
+                    monospace
+                  />
+                  <MetricTile
+                    label="Downgrades"
+                    value={String(
+                      overview.internal.marketReality.downgradeReasons.length,
+                    )}
+                  />
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/55">
+                      Baseline metrics
+                    </p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {overview.internal.marketReality.baselineMetrics.length > 0 ? (
+                        overview.internal.marketReality.baselineMetrics.map((metric) => (
+                          <div
+                            key={metric.label}
+                            className="rounded-xl border border-white/10 bg-white/5 p-3"
+                          >
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
+                              {metric.label}
+                            </p>
+                            <p className="mt-2 text-sm text-white">{metric.value}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-white/75">
+                          No raw baseline metrics were available.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/55">
+                      Downgrade reasons
+                    </p>
+                    {overview.internal.marketReality.downgradeReasons.length > 0 ? (
+                      <ul className="mt-3 space-y-2 text-sm leading-6 text-white/78">
+                        {overview.internal.marketReality.downgradeReasons.map((reason) => (
+                          <li key={reason}>{reason}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-sm text-white/75">
+                        No fallback downgrade was needed for this market slice.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       {overview.confidenceSections.length > 0 && (
         <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)]">
           <CardHeader>
@@ -1154,6 +1361,27 @@ function ConfidenceBadge({
         tone === "strong" && "bg-success-50 text-success-700",
         tone === "mixed" && "bg-warning-50 text-warning-700",
         tone === "weak" && "bg-neutral-200 text-neutral-700",
+      )}
+    >
+      {children}
+    </Badge>
+  );
+}
+
+function MarketPositionBadge({
+  tone,
+  children,
+}: {
+  tone: "warning" | "positive" | "neutral";
+  children: React.ReactNode;
+}) {
+  return (
+    <Badge
+      className={cn(
+        "border-transparent",
+        tone === "positive" && "bg-success-50 text-success-700",
+        tone === "warning" && "bg-warning-50 text-warning-700",
+        tone === "neutral" && "bg-neutral-200 text-neutral-700",
       )}
     >
       {children}

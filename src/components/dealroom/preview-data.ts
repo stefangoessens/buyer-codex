@@ -197,6 +197,64 @@ export const previewPropertyCaseOverview: PropertyCaseOverviewSurface = {
     "Pricing, comps, and leverage are approved for the buyer-safe case. Offer strategy stays visible with one pending citation refresh.",
   headerDescription:
     "The asking price is still above the strongest comparable cluster, but the leverage signals are positive enough to support a disciplined opening number instead of a full-price start.",
+  marketReality: {
+    geographyLabel: "Subdivision · Palm Estates",
+    marketWindowLabel: "90-day market window",
+    fallbackNotice: null,
+    sampleSizeLabel: "6 sold / 12 total records",
+    freshnessLabel: "Fresh · 30m old",
+    reliabilityLabel: "High reliability",
+    position: {
+      code: "overpriced",
+      label: "Overpriced for this market",
+      summary:
+        "This listing is asking more per sqft than the local norm for the selected market slice.",
+      tone: "warning",
+    },
+    signals: [
+      {
+        key: "days_on_market",
+        label: "Days on market",
+        status: "available",
+        tone: "warning",
+        summary: "This home has been on market longer than typical for this subdivision.",
+        subjectLabel: "39 days",
+        baselineLabel: "28 day local median",
+        deltaLabel: "+39.3% vs local median (+11 days)",
+      },
+      {
+        key: "price_per_sqft",
+        label: "Price per sqft",
+        status: "available",
+        tone: "warning",
+        summary: "The asking price per sqft is above the local norm.",
+        subjectLabel: "$340/sqft",
+        baselineLabel: "$315/sqft median · $320/sqft avg",
+        deltaLabel: "+7.9% vs local median",
+      },
+      {
+        key: "sale_to_list",
+        label: "Sale-to-list behavior",
+        status: "available",
+        tone: "positive",
+        summary: "Homes here usually close meaningfully below asking.",
+        subjectLabel: null,
+        baselineLabel: "96.8% median close-to-ask",
+        deltaLabel: "97.2% avg",
+      },
+      {
+        key: "price_cuts",
+        label: "Price-cut behavior",
+        status: "available",
+        tone: "positive",
+        summary:
+          "This listing has already cut price 1 time, while about 38% of local listings cut at all.",
+        subjectLabel: "1 cut · $20,000 total (2%) · last cut 9d ago",
+        baselineLabel: "38% of local listings cut · 2.6% median cut",
+        deltaLabel: null,
+      },
+    ],
+  },
   confidenceSections: [
     {
       key: "pricing",
