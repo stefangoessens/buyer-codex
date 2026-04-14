@@ -198,7 +198,7 @@ export const V11_DECISIONING_RELEASE_PLAN = {
     supportingDrilldowns: [KIN_1023, KIN_1035, KIN_1030],
     deferredPeerSurfaces: [KIN_1025, KIN_1027, KIN_1029, KIN_1032, KIN_1033],
     platformRule:
-      "Ship decisioning on web first. Do not block the web launch on KIN-1050 mobile/iOS parity.",
+      "Ship decisioning on responsive web first. KIN-1050 defines mobile web scope plus a bounded native iOS snapshot, but full native parity does not block v1.1.",
   },
   mustHaveCapabilities: [
     {
@@ -393,7 +393,7 @@ export const V11_DECISIONING_RELEASE_PLAN = {
       issue: KIN_1050,
       cutTo: "v1.2",
       reason:
-        "The decisioning release is web-first. Mobile and iOS parity stay deferred until the memo-first composition proves itself on desktop and web mobile.",
+        "KIN-1050 only commits v1.1 to responsive web mobile plus a bounded native iOS snapshot. Full native iOS parity stays deferred until the memo-first composition proves itself on web.",
     },
   ] as const satisfies readonly DeferredIssue[],
   exitCriteria: {
