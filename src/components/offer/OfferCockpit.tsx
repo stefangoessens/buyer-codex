@@ -7,6 +7,7 @@ import { useOfferCockpit } from "@/lib/dealroom/use-offer-cockpit";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { BrokerReviewBadge } from "./BrokerReviewBadge";
 import { EligibilityGate } from "./EligibilityGate";
+import { OfferWhatIfComparison } from "./OfferWhatIfComparison";
 import { OfferTermsEditor } from "./OfferTermsEditor";
 import { OfferValidationSummary } from "./OfferValidationSummary";
 import { ScenarioComparison } from "./ScenarioComparison";
@@ -92,23 +93,32 @@ export function OfferCockpit({ dealRoomId }: OfferCockpitProps) {
         />
 
         {showScenarioComparison && scenarios ? (
-          <ScenarioComparison
-            scenarios={scenarios.scenarios}
-            recommendedIndex={scenarios.recommendedIndex}
-            listPrice={data.listPrice}
-            selectedScenarioName={cockpit.selectedScenarioName}
-            onSelectScenario={cockpit.selectScenario}
-            inputSummary={scenarios.inputSummary}
-            confidence={data.scenarios?.confidence}
-            refreshedAt={data.scenarios?.generatedAt}
-            guardrailNote={
-              cockpit.playbookState.kind === "ready"
-                ? scenarioGuardrail?.state === "softened"
-                  ? `${scenarioGuardrail.buyerHeadline}. ${scenarioGuardrail.buyerExplanation}`
-                  : undefined
-                : cockpit.playbookState.description
-            }
-          />
+          <>
+            <ScenarioComparison
+              scenarios={scenarios.scenarios}
+              recommendedIndex={scenarios.recommendedIndex}
+              listPrice={data.listPrice}
+              selectedScenarioName={cockpit.selectedScenarioName}
+              onSelectScenario={cockpit.selectScenario}
+              inputSummary={scenarios.inputSummary}
+              confidence={data.scenarios?.confidence}
+              refreshedAt={data.scenarios?.generatedAt}
+              guardrailNote={
+                cockpit.playbookState.kind === "ready"
+                  ? scenarioGuardrail?.state === "softened"
+                    ? `${scenarioGuardrail.buyerHeadline}. ${scenarioGuardrail.buyerExplanation}`
+                    : undefined
+                  : cockpit.playbookState.description
+              }
+            />
+
+            {data.whatIf && (
+              <OfferWhatIfComparison
+                model={data.whatIf}
+                viewerRole={data.viewerRole}
+              />
+            )}
+          </>
         ) : (
           <Card>
             <CardContent className="p-6">

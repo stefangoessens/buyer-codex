@@ -8,6 +8,8 @@ import { getPromptVersionRef } from "../packages/shared/src/prompt-registry";
 import { buildOfferFlowProfile, loadBuyerProfileView } from "./lib/buyerProfile";
 import { assessEngineOutputGuardrail } from "../src/lib/advisory/guardrails";
 import { projectAdvisoryEvidenceSection } from "../src/lib/advisory/surface-state";
+import { buildOfferWhatIfModel } from "../src/lib/dealroom/offer-what-if";
+import type { OfferInput } from "../src/lib/ai/engines/types";
 
 /**
  * Offer cockpit backend for KIN-791.
@@ -45,6 +47,9 @@ async function loadOfferScenarios(
       reviewState: latest.reviewState,
     });
     return {
+      input: latest.inputSnapshot
+        ? (JSON.parse(latest.inputSnapshot) as OfferInput)
+        : undefined,
       output: JSON.parse(latest.output),
       confidence: latest.confidence,
       reviewState: latest.reviewState,
@@ -146,6 +151,16 @@ export const getCockpit = query({
     const formattedAddress =
       property.address.formatted ??
       `${property.address.street}${property.address.unit ? ` ${property.address.unit}` : ""}, ${property.address.city}, ${property.address.state} ${property.address.zip}`;
+    const whatIf = buildOfferWhatIfModel({
+      offerInput: scenarios?.input ?? null,
+      offerOutput: scenarios?.output ?? null,
+      offerConfidence: scenarios?.confidence ?? null,
+      offerReviewState: scenarios?.reviewState ?? null,
+      pricingOutput: dossier?.sections?.latestOutputs?.data?.pricing?.output ?? null,
+      leverageInput:
+        dossier?.sections?.downstreamInputs?.data?.engineInputs?.leverage ?? null,
+      leverageOutput: dossier?.sections?.latestOutputs?.data?.leverage?.output ?? null,
+    });
 
     return {
       dealRoom,
@@ -154,6 +169,7 @@ export const getCockpit = query({
       propertyAddress: formattedAddress,
       draft,
       scenarios,
+      whatIf,
       offerEvidence: projectAdvisoryEvidenceSection(
         dossier?.evidenceGraph?.sections?.offer_recommendation,
       ),
