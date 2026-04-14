@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { SurfaceState } from "@/components/product/SurfaceState";
 import { Card, CardContent } from "@/components/ui/card";
 import { useOfferCockpit } from "@/lib/dealroom/use-offer-cockpit";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -48,10 +49,14 @@ export function OfferCockpit({ dealRoomId }: OfferCockpitProps) {
   const scenarios = data.scenarios?.output;
   const scenarioGuardrail = data.scenarios?.guardrail;
   const disabled = !cockpit.canEdit;
-  const buyerScenarioBlocked =
-    data.viewerRole === "buyer" &&
-    (scenarioGuardrail?.state === "review_required" ||
-      scenarioGuardrail?.state === "blocked");
+  const showScenarioComparison =
+    Boolean(scenarios) && !cockpit.playbookState.withholdOutput;
+  const playbookTone =
+    cockpit.playbookState.tone === "critical"
+      ? "error"
+      : cockpit.playbookState.tone === "info"
+        ? "info"
+        : "empty";
 
   return (
     <EligibilityGate
@@ -86,7 +91,7 @@ export function OfferCockpit({ dealRoomId }: OfferCockpitProps) {
           onDiscard={() => cockpit.reset()}
         />
 
-        {scenarios && !buyerScenarioBlocked ? (
+        {showScenarioComparison && scenarios ? (
           <ScenarioComparison
             scenarios={scenarios.scenarios}
             recommendedIndex={scenarios.recommendedIndex}
@@ -97,27 +102,22 @@ export function OfferCockpit({ dealRoomId }: OfferCockpitProps) {
             confidence={data.scenarios?.confidence}
             refreshedAt={data.scenarios?.generatedAt}
             guardrailNote={
-              scenarioGuardrail?.state === "softened"
-                ? `${scenarioGuardrail.buyerHeadline}. ${scenarioGuardrail.buyerExplanation}`
-                : undefined
+              cockpit.playbookState.kind === "ready"
+                ? scenarioGuardrail?.state === "softened"
+                  ? `${scenarioGuardrail.buyerHeadline}. ${scenarioGuardrail.buyerExplanation}`
+                  : undefined
+                : cockpit.playbookState.description
             }
           />
-        ) : buyerScenarioBlocked ? (
-          <Card>
-            <CardContent className="py-8 text-center text-sm text-neutral-500">
-              <p className="font-medium text-neutral-700">
-                {scenarioGuardrail?.buyerHeadline}
-              </p>
-              <p className="mt-2">
-                {scenarioGuardrail?.buyerExplanation}
-              </p>
-            </CardContent>
-          </Card>
         ) : (
           <Card>
-            <CardContent className="py-8 text-center text-sm text-neutral-500">
-              Offer scenarios have not been generated yet. Your broker will run the
-              offer engine shortly.
+            <CardContent className="p-6">
+              <SurfaceState
+                title={cockpit.playbookState.title}
+                description={`${cockpit.playbookState.description} ${cockpit.playbookState.recoveryDescription}`}
+                tone={playbookTone}
+                className="border-0 bg-transparent px-0 py-2 shadow-none"
+              />
             </CardContent>
           </Card>
         )}

@@ -11,6 +11,11 @@ import type {
   AdvisoryOutputClass,
 } from "@/lib/advisory/guardrails";
 import {
+  buildAdvisorySurfaceState,
+  type AdvisoryEvidenceSectionInput,
+  type AdvisorySurfaceState,
+} from "@/lib/advisory/surface-state";
+import {
   emptyTerms,
   scenarioToTerms,
   type BrokerReviewState,
@@ -66,6 +71,7 @@ type CockpitServerPayload = {
       buyerExplanation: string;
     };
   } | null;
+  offerEvidence: AdvisoryEvidenceSectionInput | null;
   eligibility: OfferEligibilitySnapshot;
   canEdit: boolean;
   viewerRole: "buyer" | "broker" | "admin";
@@ -84,6 +90,7 @@ export interface OfferCockpitState {
   submitting: boolean;
   validation: OfferCockpitValidation;
   brokerReviewState: BrokerReviewState;
+  playbookState: AdvisorySurfaceState;
   brokerNote: string | null;
   status: OfferCockpitStatus;
   canEdit: boolean;
@@ -194,6 +201,18 @@ export function useOfferCockpit(
   const brokerReviewState: BrokerReviewState =
     data?.draft?.brokerReviewState ?? "not_submitted";
   const brokerNote = data?.draft?.brokerNote ?? null;
+  const playbookState = useMemo(
+    () =>
+      buildAdvisorySurfaceState({
+        surface: "playbook",
+        audience: data?.viewerRole === "buyer" ? "buyer_safe" : "internal",
+        isLoading: data === undefined,
+        evidence: data?.offerEvidence,
+        guardrailState: data?.scenarios?.guardrail.state,
+        hasRenderableContent: Boolean(data?.scenarios?.output),
+      }),
+    [data],
+  );
   const canEdit =
     (data?.canEdit ?? false) && (status === "draft" || status === "rejected");
   const canSubmit = canEdit && validation.ok;
@@ -301,6 +320,7 @@ export function useOfferCockpit(
     submitting,
     validation,
     brokerReviewState,
+    playbookState,
     brokerNote,
     status,
     canEdit,

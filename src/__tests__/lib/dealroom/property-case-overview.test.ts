@@ -346,6 +346,10 @@ describe("buildPropertyCaseOverview", () => {
         "Resolve the conflict around conflicting portal estimates.",
       ]),
     });
+    expect(surface.artifacts.memo.kind).toBe("conflicting");
+    expect(surface.artifacts.recommendation.kind).toBe("partial");
+    expect(surface.artifacts.summary.kind).toBe("conflicting");
+    expect(surface.artifacts.summary.withholdOutput).toBe(true);
     expect(surface.internal).toBeUndefined();
   });
 
@@ -425,6 +429,10 @@ describe("buildPropertyCaseOverview", () => {
       status: "waiting_on_evidence",
       missingEvidence: ["broker-reviewed leverage output"],
     });
+    expect(surface.artifacts.memo.kind).toBe("conflicting");
+    expect(surface.artifacts.recommendation.kind).toBe("review_required");
+    expect(surface.artifacts.recommendation.withholdOutput).toBe(true);
+    expect(surface.artifacts.summary.kind).toBe("conflicting");
   });
 
   it("keeps internal-only cache metadata off buyer-safe views and on staff views", () => {
@@ -491,6 +499,60 @@ describe("buildPropertyCaseOverview", () => {
     });
   });
 
+  it("marks recommendation artifacts conflicting when the evidence graph disagrees", () => {
+    const evidenceGraph = evidenceGraphFixture();
+    evidenceGraph.sections.offer_recommendation = {
+      ...evidenceGraph.sections.offer_recommendation,
+      status: "conflicting_evidence",
+      conflictingNodeIds: ["conflicting-offer-input"],
+      buyerSummary: {
+        ...evidenceGraph.sections.offer_recommendation.buyerSummary,
+        caution: "Portal estimates lowered confidence.",
+        status: "conflicting_evidence",
+      },
+      confidenceInputs: {
+        ...evidenceGraph.sections.offer_recommendation.confidenceInputs,
+        band: "low",
+        conflictingLabels: ["portal estimates"],
+      },
+      internalTrace: {
+        ...evidenceGraph.sections.offer_recommendation.internalTrace!,
+        conflictingNodeIds: ["conflicting-offer-input"],
+      },
+    };
+
+    const surface = buildPropertyCaseOverview({
+      dealRoomId: "deal_123",
+      propertyId: "property_123",
+      propertyAddress: "123 Palm Way, Miami Beach, FL 33139",
+      listPrice: 640_000,
+      photoUrl: null,
+      dealStatus: "offer_prep",
+      caseRecord: {
+        generatedAt: "2026-04-13T19:00:00.000Z",
+        hitCount: 2,
+        payload: payloadFixture(),
+      },
+      coverage: availableCoverage(),
+      citations: [
+        {
+          citationId: "engineOut_offer_1",
+          engineType: "offer",
+          confidence: 0.82,
+          generatedAt: "2026-04-13T18:56:00.000Z",
+          reviewState: "approved",
+        },
+      ],
+      evidenceGraph,
+      viewerRole: "buyer",
+    });
+
+    expect(surface.action).not.toBeNull();
+    expect(surface.artifacts.recommendation.kind).toBe("conflicting");
+    expect(surface.artifacts.recommendation.withholdOutput).toBe(true);
+    expect(surface.artifacts.summary.kind).toBe("conflicting");
+  });
+
   it("returns an empty state when no case exists and nothing is actively pending", () => {
     const surface = buildPropertyCaseOverview({
       dealRoomId: "deal_123",
@@ -522,13 +584,14 @@ describe("buildPropertyCaseOverview", () => {
           reason: "Offer scenarios have not been generated yet.",
         },
       ],
-      evidenceGraph: evidenceGraphFixture(),
       viewerRole: "buyer",
     });
 
     expect(surface.viewState).toBe("empty");
     expect(surface.claims).toEqual([]);
     expect(surface.overallConfidence).toBeNull();
+    expect(surface.artifacts.memo.kind).toBe("missing");
+    expect(surface.artifacts.summary.withholdOutput).toBe(true);
   });
 
   it("updates confidence fingerprints and section guidance deterministically when evidence changes", () => {

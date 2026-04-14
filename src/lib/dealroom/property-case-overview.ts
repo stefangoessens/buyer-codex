@@ -20,6 +20,12 @@ import {
   type AdvisoryGuardrailState,
 } from "@/lib/advisory/guardrails";
 import {
+  buildAdvisorySurfaceState,
+  projectAdvisoryEvidenceSection,
+  summarizeAdvisoryEvidence,
+  type AdvisorySurfaceState,
+} from "@/lib/advisory/surface-state";
+import {
   buildStatusBadge,
   type DealStatus,
   type SectionStatus,
@@ -181,6 +187,13 @@ export interface PropertyCaseAdjudicationItem {
   linkedClaimCount: number;
 }
 
+export interface PropertyCaseArtifactStates {
+  memo: AdvisorySurfaceState;
+  recommendation: AdvisorySurfaceState;
+  playbook: AdvisorySurfaceState;
+  summary: AdvisorySurfaceState;
+}
+
 interface PropertyCaseOverviewBase {
   variant: PropertyCaseOverviewVariant;
   viewerRole: PropertyCaseOverviewViewerRole;
@@ -203,6 +216,7 @@ interface PropertyCaseOverviewBase {
   coverageSummary: string;
   headerDescription: string;
   confidenceSections: PropertyCaseConfidenceSectionView[];
+  artifacts: PropertyCaseArtifactStates;
   claims: PropertyCaseClaimView[];
   keyTakeaways: PropertyCaseTakeaway[];
   action: PropertyCaseActionView | null;
@@ -295,6 +309,57 @@ export function buildPropertyCaseOverview(
   );
   const coverageStats = buildCoverageStats(input.coverage, payload);
   const keyTakeaways = buildTakeaways(claims);
+  const memoEvidence = summarizeAdvisoryEvidence([
+    projectAdvisoryEvidenceSection(input.evidenceGraph?.sections?.pricing),
+    projectAdvisoryEvidenceSection(input.evidenceGraph?.sections?.comps),
+    projectAdvisoryEvidenceSection(input.evidenceGraph?.sections?.leverage),
+  ]);
+  const recommendationEvidence = summarizeAdvisoryEvidence([
+    projectAdvisoryEvidenceSection(
+      input.evidenceGraph?.sections?.offer_recommendation,
+    ),
+  ]);
+  const summaryEvidence = summarizeAdvisoryEvidence([
+    projectAdvisoryEvidenceSection(input.evidenceGraph?.sections?.pricing),
+    projectAdvisoryEvidenceSection(input.evidenceGraph?.sections?.comps),
+    projectAdvisoryEvidenceSection(input.evidenceGraph?.sections?.leverage),
+    projectAdvisoryEvidenceSection(
+      input.evidenceGraph?.sections?.offer_recommendation,
+    ),
+  ]);
+  const hasPendingCoverage = input.coverage.some(
+    (entry) => entry.status === "pending",
+  );
+  const artifacts: PropertyCaseArtifactStates = {
+    memo: buildAdvisorySurfaceState({
+      surface: "memo",
+      evidence: memoEvidence,
+      isLoading: claims.length === 0 && hasPendingCoverage,
+      hasRenderableContent: claims.length > 0 || keyTakeaways.length > 0,
+    }),
+    recommendation: buildAdvisorySurfaceState({
+      surface: "recommendation",
+      evidence: recommendationEvidence,
+      guardrailState: offerGuardrail?.state,
+      isLoading:
+        action === null && coverageByKey.get("offer")?.status === "pending",
+      hasRenderableContent: action !== null,
+    }),
+    playbook: buildAdvisorySurfaceState({
+      surface: "playbook",
+      evidence: recommendationEvidence,
+      guardrailState: offerGuardrail?.state,
+      isLoading:
+        action === null && coverageByKey.get("offer")?.status === "pending",
+      hasRenderableContent: action !== null,
+    }),
+    summary: buildAdvisorySurfaceState({
+      surface: "summary",
+      evidence: summaryEvidence,
+      isLoading: claims.length === 0 && hasPendingCoverage,
+      hasRenderableContent: claims.length > 0 || action !== null,
+    }),
+  };
   const sources = buildSources(payload?.claims ?? [], input.citations ?? []);
   const adjudicationItems = buildAdjudicationItems(
     payload?.claims ?? [],
@@ -344,6 +409,7 @@ export function buildPropertyCaseOverview(
     coverageSummary,
     headerDescription,
     confidenceSections,
+    artifacts,
     claims,
     keyTakeaways,
     action,

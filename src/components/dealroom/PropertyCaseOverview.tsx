@@ -146,6 +146,9 @@ function PropertyCaseOverviewBody({
   const canNativeShare =
     typeof navigator !== "undefined" && typeof navigator.share === "function";
   const summaryText = buildBuyerSafeSummaryText(overview);
+  const memoState = overview.artifacts.memo;
+  const recommendationState = overview.artifacts.recommendation;
+  const summaryState = overview.artifacts.summary;
 
   useEffect(() => {
     if (!telemetryEnabled) return;
@@ -170,7 +173,13 @@ function PropertyCaseOverviewBody({
   ]);
 
   useEffect(() => {
-    if (!telemetryEnabled || !overview.action) return;
+    if (
+      !telemetryEnabled ||
+      !overview.action ||
+      overview.artifacts.recommendation.withholdOutput
+    ) {
+      return;
+    }
 
     const nextKey = [
       overview.dealRoomId,
@@ -184,6 +193,7 @@ function PropertyCaseOverviewBody({
     trackAdvisoryRecommendationViewed(overview);
   }, [
     overview.action,
+    overview.artifacts.recommendation.withholdOutput,
     overview.dealRoomId,
     overview.generatedAt,
     telemetryEnabled,
@@ -424,18 +434,27 @@ function PropertyCaseOverviewBody({
                 Buyer-safe summary
               </p>
               <p className="text-sm leading-6 text-neutral-600">
-                Copy or share the current memo in plain language without exposing
-                internal-only review detail.
+                {summaryState.description}
               </p>
+              {summaryState.kind !== "ready" ? (
+                <p className="text-xs font-medium text-neutral-500">
+                  {summaryState.recoveryDescription}
+                </p>
+              ) : null}
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={handleCopySummary}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopySummary}
+                  disabled={summaryState.withholdOutput}
+                >
                   Copy summary
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleShareSummary}
-                  disabled={!canNativeShare}
+                  disabled={!canNativeShare || summaryState.withholdOutput}
                 >
                   Share summary
                 </Button>
@@ -450,8 +469,18 @@ function PropertyCaseOverviewBody({
         </div>
       </section>
 
-      {overview.keyTakeaways.length > 0 && (
+      {(overview.keyTakeaways.length > 0 || memoState.kind !== "ready") && (
         <section className="grid gap-4 xl:grid-cols-3">
+          {memoState.kind !== "ready" ? (
+            <Card className="rounded-[24px] border-neutral-200/80 bg-white shadow-[0_14px_32px_-28px_rgba(3,14,29,0.09)] xl:col-span-3">
+              <CardContent className="pt-6">
+                <EmptyStateCard
+                  title={memoState.title}
+                  description={`${memoState.description} ${memoState.recoveryDescription}`}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
           {overview.keyTakeaways.map((takeaway) => (
             <Card
               key={`${takeaway.title}-${takeaway.body}`}
@@ -612,8 +641,8 @@ function PropertyCaseOverviewBody({
               ))
             ) : (
               <EmptyStateCard
-                title="No buyer-safe claims yet"
-                description="The overview stays empty until we have enough verified evidence to make comparative statements."
+                title={memoState.title}
+                description={`${memoState.description} ${memoState.recoveryDescription}`}
               />
             )}
           </CardContent>
@@ -628,7 +657,7 @@ function PropertyCaseOverviewBody({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {overview.action ? (
+              {overview.action && !recommendationState.withholdOutput ? (
                 <div className="space-y-5">
                   <div className="rounded-[22px] bg-neutral-950 p-5 text-white shadow-[0_28px_56px_-38px_rgba(3,14,29,0.45)]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">
@@ -741,8 +770,8 @@ function PropertyCaseOverviewBody({
                 </div>
               ) : (
                 <EmptyStateCard
-                  title="Action withheld for now"
-                  description="A recommended opener will appear once pricing, leverage, and offer signals can support it safely."
+                  title={recommendationState.title}
+                  description={`${recommendationState.description} ${recommendationState.recoveryDescription}`}
                 />
               )}
             </CardContent>

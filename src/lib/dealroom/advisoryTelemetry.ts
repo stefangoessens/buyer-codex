@@ -35,6 +35,11 @@ function buildBasePayload(
   overview: PropertyCaseOverviewSurface,
   surface: AdvisorySurface = "deal_room_overview",
 ): AdvisoryTelemetryBase {
+  const hasVisibleRecommendation =
+    overview.action !== null && !overview.artifacts.recommendation.withholdOutput;
+  const recommendationConfidence = hasVisibleRecommendation
+    ? overview.action?.confidence
+    : undefined;
   return {
     dealRoomId: overview.dealRoomId,
     propertyId: overview.propertyId,
@@ -53,8 +58,8 @@ function buildBasePayload(
     ...(typeof overview.overallConfidence === "number"
       ? { overallConfidence: overview.overallConfidence }
       : {}),
-    ...(overview.action
-      ? { recommendationConfidence: overview.action.confidence }
+    ...(typeof recommendationConfidence === "number"
+      ? { recommendationConfidence }
       : {}),
   };
 }
@@ -80,18 +85,30 @@ export function buildBuyerSafeSummaryText(
       ),
     ),
   ).slice(0, 2);
+  const summaryState = overview.artifacts.summary;
+  const recommendationState = overview.artifacts.recommendation;
   const lines = [
     `${overview.propertyAddress}`,
     `${overview.status.label}. ${overview.headerDescription}`,
     `Confidence: ${overview.overallConfidenceLabel}.`,
   ];
 
-  if (overview.action) {
+  if (summaryState.withholdOutput) {
+    lines.push(
+      `Summary status: ${summaryState.title}. ${summaryState.description}`,
+    );
+    lines.push(`Recovery: ${summaryState.recoveryDescription}`);
+    return lines.join("\n");
+  }
+
+  if (overview.action && !recommendationState.withholdOutput) {
     lines.push(
       `Recommended opener: ${overview.action.openingPriceLabel} (${overview.action.confidenceLabel}, ${overview.action.riskLabel.toLowerCase()}).`,
     );
   } else {
-    lines.push("Recommendation: No opener is being surfaced yet.");
+    lines.push(
+      `Recommendation status: ${recommendationState.title}. ${recommendationState.description}`,
+    );
   }
 
   if (overview.keyTakeaways.length > 0) {
@@ -122,6 +139,10 @@ export function buildBuyerSafeSummaryText(
     lines.push(`What would increase confidence: ${nextSteps.join(" ")}`);
   }
 
+  if (summaryState.kind !== "ready") {
+    lines.push(`Recovery: ${summaryState.recoveryDescription}`);
+  }
+
   return lines.join("\n");
 }
 
@@ -130,7 +151,8 @@ export function buildAdvisoryMemoViewedPayload(
 ): AnalyticsEventMap["advisory_memo_viewed"] {
   return {
     ...buildBasePayload(overview),
-    hasRecommendation: overview.action !== null,
+    hasRecommendation:
+      overview.action !== null && !overview.artifacts.recommendation.withholdOutput,
   };
 }
 
@@ -143,7 +165,9 @@ export function trackAdvisoryMemoViewed(
 export function buildAdvisoryRecommendationViewedPayload(
   overview: PropertyCaseOverviewSurface,
 ): AnalyticsEventMap["advisory_recommendation_viewed"] | null {
-  if (!overview.action) return null;
+  if (!overview.action || overview.artifacts.recommendation.withholdOutput) {
+    return null;
+  }
 
   return {
     ...buildBasePayload(overview),
@@ -270,7 +294,8 @@ export function buildAdvisorySummaryCopiedPayload(
   return {
     ...buildBasePayload(overview),
     summaryLength: summaryText.length,
-    includesRecommendation: overview.action !== null,
+    includesRecommendation:
+      overview.action !== null && !overview.artifacts.recommendation.withholdOutput,
   };
 }
 
@@ -295,7 +320,8 @@ export function buildAdvisorySummarySharedPayload(
     ...buildBasePayload(overview),
     method: input.method,
     summaryLength: input.summaryText.length,
-    includesRecommendation: overview.action !== null,
+    includesRecommendation:
+      overview.action !== null && !overview.artifacts.recommendation.withholdOutput,
   };
 }
 
