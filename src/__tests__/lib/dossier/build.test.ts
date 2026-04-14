@@ -324,6 +324,8 @@ describe("buildPropertyDossier", () => {
 
   it("labels source categories on the evidence graph and strips internal trace from buyers", () => {
     const dossier = buildPropertyDossier(createInput());
+    const listingAgent =
+      dossier.sections.enrichmentArtifacts.data.listingAgents[0];
 
     expect(dossier.sections.propertyFacts.sourceCategories).toEqual([
       "deterministic_extracted",
@@ -373,6 +375,13 @@ describe("buildPropertyDossier", () => {
     expect(dossier.evidenceGraph.nodes["pricing-output"].internal).toMatchObject({
       engineType: "pricing",
     });
+    expect(listingAgent.trackRecord?.status).toBe("narrowed");
+    expect(listingAgent.trackRecord?.buyerSafeSummary).toContain(
+      "Listing-agent history",
+    );
+    expect(listingAgent.trackRecord?.acquisition.unavailableMetrics).toEqual(
+      expect.arrayContaining(["price_cut_severity", "relist_rate"]),
+    );
 
     const buyerSafe = projectBuyerSafeDossier(dossier);
     expect(buyerSafe.internalSectionKeys).toEqual([]);

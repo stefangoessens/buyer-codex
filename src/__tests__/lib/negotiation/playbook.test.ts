@@ -9,7 +9,10 @@ import {
   projectNegotiationPlaybookForAudience,
   type NegotiationPlaybookInputs,
 } from "@/lib/negotiation/playbook";
-import type { PropertyMarketContext } from "@/lib/enrichment/types";
+import type {
+  ListingAgentTrackRecord,
+  PropertyMarketContext,
+} from "@/lib/enrichment/types";
 
 function pricingFixture(): PricingOutput {
   return {
@@ -220,6 +223,42 @@ function inputFixture(
   };
 }
 
+function listingAgentTrackRecordFixture(): ListingAgentTrackRecord {
+  return {
+    status: "narrowed",
+    scope: "individual_agent",
+    confidence: 0.74,
+    confidenceLabel: "moderate",
+    benchmarkArea: {
+      geoKind: "neighborhood",
+      geoKey: "South Beach",
+      windowDays: 90,
+    },
+    acquisition: {
+      viability: "partial",
+      thresholds: {
+        minimumSoldSamples: 8,
+        minimumPriceCutSamples: 6,
+        minimumTrajectorySamples: 10,
+      },
+      availableMetrics: [
+        "days_on_market",
+        "ask_to_sale_ratio",
+        "price_cut_frequency",
+      ],
+      unavailableMetrics: ["price_cut_severity", "relist_rate"],
+      notes: [
+        "DOM and ask-to-sale use 14 sold listings, which clears the preferred 8-sale floor.",
+      ],
+    },
+    metrics: [],
+    buyerSafeSummary:
+      "Listing-agent history adds usable context here. This agent's listings usually take longer to sell than nearby norms. This agent tends to accept larger ask-to-sale discounts than nearby norms.",
+    internalSummary:
+      "Taylor Listing track record is narrowed at 74% confidence. Benchmark area: neighborhood=South Beach @ 90d.",
+  };
+}
+
 describe("buildNegotiationPlaybookBundle", () => {
   it("builds primary and fallback strategy branches from the offer ladder", () => {
     const bundle = buildNegotiationPlaybookBundle(inputFixture());
@@ -244,6 +283,34 @@ describe("buildNegotiationPlaybookBundle", () => {
     expect(buyerSafe.primary?.rationale[0]).toContain("Pricing sits below or near list");
     expect(internal.primary?.rationale[0]).toContain("Fair value reads");
     expect(internal.invalidationConditions[0]).toContain("Buyer readiness");
+  });
+
+  it("prefers the track-record buyer/internal summaries when benchmark intelligence is available", () => {
+    const bundle = buildNegotiationPlaybookBundle(
+      inputFixture({
+        listingAgent: {
+          name: "Taylor Listing",
+          brokerage: "Harbor Group",
+          avgDaysOnMarket: 31,
+          medianListToSellRatio: 0.973,
+          priceCutFrequency: 0.29,
+          trackRecord: listingAgentTrackRecordFixture(),
+        },
+      }),
+    );
+    const buyerSafe = projectNegotiationPlaybookForAudience(bundle, "buyer_safe");
+    const internal = projectNegotiationPlaybookForAudience(bundle, "internal");
+
+    expect(
+      buyerSafe.primary?.rationale.some((item) =>
+        item.includes("accept larger ask-to-sale discounts"),
+      ),
+    ).toBe(true);
+    expect(
+      internal.primary?.rationale.some((item) =>
+        item.includes("track record is narrowed"),
+      ),
+    ).toBe(true);
   });
 
   it("hides buyer-safe branches when negotiation language still needs review", () => {
