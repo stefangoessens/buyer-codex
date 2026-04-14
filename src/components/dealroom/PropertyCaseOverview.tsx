@@ -32,12 +32,14 @@ import {
 } from "@/lib/dealroom/advisoryTelemetry";
 import { isConfigured } from "@/lib/env";
 import type { PropertyCaseOverviewSurface } from "@/lib/dealroom/property-case-overview";
+import type { BuyerReadinessSurface } from "@/lib/dealroom/buyer-readiness";
 import { trackDealRoomUnlocked } from "@/lib/intake/pasteLinkFunnel";
 import { cn } from "@/lib/utils";
 import type {
   AdvisoryAdjudicationAction,
   AdvisoryAdjudicationVisibility,
 } from "@/lib/advisory/adjudication";
+import { BuyerReadinessCard } from "./BuyerReadinessCard";
 import { previewPropertyCaseOverview } from "./preview-data";
 
 interface PropertyCaseOverviewProps {
@@ -102,6 +104,12 @@ function LivePropertyCaseOverview({
   const overview = useQuery(api.dealRoomCaseOverview.getOverview, {
     dealRoomId,
   }) as PropertyCaseOverviewSurface | null | undefined;
+  const readiness = useQuery(
+    (api as any).dealRoomBuyerReadiness.getReadiness,
+    {
+      dealRoomId,
+    },
+  ) as BuyerReadinessSurface | null | undefined;
 
   useEffect(() => {
     if (!overview) return;
@@ -114,7 +122,7 @@ function LivePropertyCaseOverview({
     });
   }, [overview]);
 
-  if (overview === undefined) {
+  if (overview === undefined || readiness === undefined) {
     return <LoadingState variant="panel" />;
   }
 
@@ -132,6 +140,7 @@ function LivePropertyCaseOverview({
   return (
     <PropertyCaseOverviewBody
       overview={overview}
+      readiness={readiness ?? undefined}
       telemetryEnabled
       onSubmitAdjudication={async ({
         citationId,
@@ -162,10 +171,12 @@ function LivePropertyCaseOverview({
 
 function PropertyCaseOverviewBody({
   overview,
+  readiness,
   telemetryEnabled = false,
   onSubmitAdjudication,
 }: {
   overview: PropertyCaseOverviewSurface;
+  readiness?: BuyerReadinessSurface | null;
   telemetryEnabled?: boolean;
   onSubmitAdjudication?: (input: SubmitSourceAdjudicationInput) => Promise<void>;
 }) {
@@ -307,6 +318,7 @@ function PropertyCaseOverviewBody({
 
   return (
     <div className="flex flex-col gap-8">
+      {readiness ? <BuyerReadinessCard readiness={readiness} /> : null}
       <section className="overflow-hidden rounded-[32px] border border-neutral-200/80 bg-white shadow-[0_18px_40px_-34px_rgba(3,14,29,0.1)]">
         <div className="grid gap-0 lg:grid-cols-[1.4fr_0.9fr]">
           <div className="relative min-h-[340px] overflow-hidden bg-neutral-950 px-6 py-6 text-white sm:px-8 lg:px-10">
