@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import type { OfferOutput, OfferScenario } from "@/lib/ai/engines/types";
+import type {
+  OfferInput,
+  OfferOutput,
+  OfferScenario,
+} from "@/lib/ai/engines/types";
 import type {
   AdvisoryApprovalPath,
   AdvisoryGuardrailState,
@@ -15,6 +19,7 @@ import {
   type AdvisoryEvidenceSectionInput,
   type AdvisorySurfaceState,
 } from "@/lib/advisory/surface-state";
+import type { OfferWhatIfModel } from "@/lib/dealroom/offer-what-if";
 import {
   emptyTerms,
   scenarioToTerms,
@@ -58,6 +63,7 @@ type CockpitServerPayload = {
     lastSavedAt: string;
   } | null;
   scenarios: {
+    input?: OfferInput;
     output: OfferOutput;
     confidence: number;
     reviewState: "pending" | "approved" | "rejected";
@@ -71,6 +77,7 @@ type CockpitServerPayload = {
       buyerExplanation: string;
     };
   } | null;
+  whatIf: OfferWhatIfModel | null;
   offerEvidence: AdvisoryEvidenceSectionInput | null;
   eligibility: OfferEligibilitySnapshot;
   canEdit: boolean;
