@@ -3,7 +3,9 @@ import { v } from "convex/values";
 import { requireAuth } from "./lib/session";
 import { summarizePricingCalibration } from "../src/lib/ai/engines/pricingCalibration";
 import { summarizeRecommendationBacktests } from "../src/lib/ai/engines/recommendationBacktest";
+import { summarizeAdjudicationCalibration } from "../src/lib/ai/engines/adjudicationCalibration";
 import type {
+  AdjudicationCalibrationRecord,
   CalibrationRecord,
   RecommendationBacktestRecord,
 } from "../src/lib/ai/engines/types";
@@ -21,9 +23,10 @@ export const getCalibrationSnapshot = query({
       throw new Error("Only brokers/admins can review advisory backtests");
     }
 
-    const [pricingRows, recommendationRows] = await Promise.all([
+    const [pricingRows, recommendationRows, adjudicationRows] = await Promise.all([
       ctx.db.query("pricingCalibrationRecords").collect(),
       ctx.db.query("recommendationBacktestRecords").collect(),
+      ctx.db.query("adjudicationCalibrationRecords").collect(),
     ]);
 
     const pricing = pricingRows.filter((row) => {
@@ -45,11 +48,33 @@ export const getCalibrationSnapshot = query({
       return true;
     }) as RecommendationBacktestRecord[];
 
+    const adjudications = adjudicationRows.filter((row) => {
+      if (args.propertyId && row.propertyId !== args.propertyId) return false;
+      if (args.dealRoomId && row.dealRoomId !== args.dealRoomId) return false;
+      return true;
+    }) as AdjudicationCalibrationRecord[];
+
     const limit = args.limit ?? 10;
 
     return {
       pricingSummary: summarizePricingCalibration(pricing),
       recommendationSummary: summarizeRecommendationBacktests(recommendations),
+      adjudicationSignals: {
+        overallSummary: summarizeAdjudicationCalibration(adjudications),
+        confidenceSummary: summarizeAdjudicationCalibration(
+          adjudications,
+          "confidence",
+        ),
+        recommendationSummary: summarizeAdjudicationCalibration(
+          adjudications,
+          "recommendation",
+        ),
+        recent: [...adjudications]
+          .sort((left, right) =>
+            right.adjudicatedAt.localeCompare(left.adjudicatedAt),
+          )
+          .slice(0, limit),
+      },
       recentPricing: [...pricing]
         .sort((left, right) => right.recordedAt.localeCompare(left.recordedAt))
         .slice(0, limit),
